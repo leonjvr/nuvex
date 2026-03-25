@@ -1,0 +1,15 @@
+division:
+  id: system
+  name: System Administration
+  protected: true
+  description: "Built-in division providing core infrastructure services. Ships with every SIDJUA installation. Cannot be deleted."
+  budget:
+    daily_limit_usd: 2.00
+    monthly_cap_usd: 30.00
+  agents:
+    - guide
+    - hr
+    - it
+    - auditor
+    - finance
+    - librarian

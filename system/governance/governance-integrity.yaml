@@ -1,0 +1,23 @@
+# SIDJUA System Governance — Governance Integrity
+# MANDATORY — Cannot be disabled or weakened by user configuration
+metadata:
+  id: governance-integrity
+  name: Governance Integrity
+  description: Rules ensuring the governance system itself cannot be bypassed
+  category: governance
+  enforcement: mandatory
+
+rules:
+  - id: SYS-GOV-001
+    name: Governance layer cannot be disabled
+    description: No agent, division, or user configuration can disable the governance enforcement pipeline
+    enforcement: mandatory
+    severity: critical
+    category: system-integrity
+
+  - id: SYS-GOV-002
+    name: Agent hierarchy enforcement
+    description: Agents MUST respect their hierarchical boundaries. L2 agents cannot override L1 decisions.
+    enforcement: mandatory
+    severity: high
+    category: hierarchy-integrity

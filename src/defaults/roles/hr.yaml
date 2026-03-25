@@ -1,0 +1,21 @@
+role:
+  id: hr
+  name: HR Manager
+  tier: 2
+  division: system
+  description: "Manages agent lifecycle — defines roles, assigns skills, handles onboarding and offboarding of new agents."
+  icon: users
+  domains:
+    - agent-management
+    - organization
+  status: active
+  capabilities:
+    - Define new agent roles from user requirements
+    - Determine appropriate tier (T1/T2/T3)
+    - Assign skills and division membership
+    - Create agent definition YAML
+    - Manage agent offboarding
+    - Maintain organizational chart
+  recommended_model:
+    min_quality: "B+"
+    suggested: "groq-llama70b-free"

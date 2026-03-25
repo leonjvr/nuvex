@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["api_token_secret"],
+  "properties": {
+    "api_token_secret": {
+      "type": "string",
+      "description": "Secret name in the SIDJUA secret store for the platform API token. Store the token with: sidjua secrets set <name> <value>"
+    },
+    "webhook_url": {
+      "type": "string",
+      "description": "Optional: public HTTPS URL for platform to push messages to (if using webhooks instead of polling)"
+    },
+    "polling_interval_ms": {
+      "type": "number",
+      "description": "Optional: polling interval in milliseconds (default: 5000). Only used when webhook_url is not set."
+    }
+  }
+}

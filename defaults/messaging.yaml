@@ -1,0 +1,88 @@
+# SIDJUA — Messaging Gateway Configuration
+#
+# This file controls which messaging adapter instances are active and how
+# inbound/outbound messages are governed.
+#
+# To enable a messaging channel:
+#   1. Copy the relevant example block from adapters/messaging/<adapter>/README.md
+#   2. Paste it under the `instances:` key below
+#   3. Run: sidjua messaging reload
+#
+# See adapters/messaging/DEVELOPER-GUIDE.md for full documentation.
+
+governance:
+  # If true, only users with an explicit sidjua mapping can send messages.
+  require_mapping: false
+
+  # If true, new users can register themselves via platform commands.
+  allow_self_register: false
+
+  # Maximum response length in characters before truncation.
+  response_max_length: 4000
+
+  # Prepend short task ID "[abc12]" to every agent response.
+  include_task_id_in_response: false
+
+  # Show typing indicator while agent processes (adapter must declare "typing" capability).
+  typing_indicator: false
+
+  # Global inbound message cap across all adapter instances.
+  max_inbound_per_hour: 1000
+
+# No instances are enabled by default.
+# Add adapter instances here to enable messaging channels.
+instances: []
+
+# ---------------------------------------------------------------------------
+# Task Bridge — message → task pipeline
+# ---------------------------------------------------------------------------
+task_bridge:
+  mode: direct_passthrough
+
+  defaults:
+    priority:    5
+    budget_usd:  1.00
+    ttl_seconds: 3600
+
+  override:
+    enabled: true
+    window_seconds: 300
+    non_overrideable_rules:
+      - forbidden.destructive_system_action
+      - forbidden.data_exfiltration
+      - forbidden.privilege_escalation
+    require_admin_for_override:
+      - budget.division_monthly_limit
+      - approval.tier1_required
+
+  commands:
+    enabled: true
+    prefix: "/"
+
+  # Map specific chat IDs to task divisions.
+  # Uncomment and configure as needed.
+  channel_routing:
+    default: "general"
+    # telegram:
+    #   "123456789": "research"
+    # discord:
+    #   "guild-channel-1": "development"
+
+# Example — uncomment and configure to enable:
+#
+# instances:
+#   - id: "tg-main"
+#     adapter: "telegram"
+#     enabled: true
+#     config:
+#       bot_token_secret: "my-telegram-bot-token"
+#     rate_limit_per_min: 30
+#
+#   - id: "ws-gui"
+#     adapter: "websocket"
+#     enabled: true
+#     config:
+#       port: 4201
+#       auth_mode: "token"
+#       auth_token: "my-ws-token"
+#     rate_limit_per_min: 60

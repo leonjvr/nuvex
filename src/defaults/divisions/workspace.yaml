@@ -1,0 +1,9 @@
+division:
+  id: workspace
+  name: General Workspace
+  protected: false
+  description: "Default workspace for user-created agents. All new agents land here unless assigned to a division."
+  budget:
+    daily_limit_usd: 10.00
+    monthly_cap_usd: 100.00
+  agents: []

@@ -1,0 +1,45 @@
+# SIDJUA — Delegation Bridge Configuration
+# Governs inter-agent task delegation for V1.0.
+#
+# Rules enforced by DelegationPolicyResolver + DelegationService:
+#   - T1 and T2 agents may delegate to equal or lower tier agents
+#   - T3 agents cannot delegate (execution tier only)
+#   - Maximum delegation depth is 1 (subtasks cannot create further subtasks)
+#   - Budget allocation per subtask is capped at budget_share_max × parent remaining
+
+delegation:
+  # Master enable/disable switch. Set to false to block all delegation globally.
+  enabled: true
+
+  # Maximum delegation chain depth. V1.0 enforces max_depth: 1 (flat).
+  # Subtasks created via delegate_task cannot themselves call delegate_task.
+  max_depth: 1
+
+  # Maximum number of concurrent pending subtasks per parent task.
+  max_subtasks_per_task: 5
+
+  # Default timeout for delegated subtasks in seconds (300 = 5 minutes).
+  # Subtasks exceeding this are marked "timeout" by the daemon heartbeat.
+  default_timeout_seconds: 300
+
+  # Maximum fraction of the parent task's remaining budget that may be
+  # allocated to a single subtask. 0.5 = 50%.
+  budget_share_max: 0.5
+
+  # When true, a human must approve each delegation before the subtask is
+  # created. Not supported in V1.0 — set to false.
+  require_approval: false
+
+  # Per-tier delegation tool permissions.
+  # T1/T2 may call delegate_task; T3 may only list available agents.
+  tier_permissions:
+    T1:
+      - delegate_task
+      - list_available_agents
+      - check_delegation_status
+    T2:
+      - delegate_task
+      - list_available_agents
+      - check_delegation_status
+    T3:
+      - list_available_agents

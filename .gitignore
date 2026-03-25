@@ -1,0 +1,37 @@
+node_modules/
+dist/
+backups/
+.env
+.env.*
+!.env.example
+*.db
+*.db-wal
+*.db-shm
+.system/
+agents/definitions/
+agents/skills/
+*.log
+*.pid
+.DS_Store
+
+# Internal files — NEVER commit
+COMMUNICATION-FACT-SHEET.md
+CLAUDE.md
+AGENTS.md
+CHANGELOG.md
+SECURITY.md
+CONTRIBUTING.md
+CODEOWNERS
+consulting/
+specs/
+assets/
+tests/
+.github/
+
+# Internal docs
+docs/GUI-SMOKE-TEST-CHECKLIST.md
+docs/LICENSE-AUDIT.md
+docs/TESTING.md
+docs/PRE-ACTION-PIPELINE-SPEC-V1.md
+docs/SIDJUA-APPLY-TECH-SPEC-V1.md
+docs/security-limitations-v1.md
