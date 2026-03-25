@@ -1,8 +1,0 @@
-agent_clearance:
-  tier_1: SECRET
-  tier_2: CONFIDENTIAL
-  tier_3: INTERNAL
-
-division_overrides:
-  legal:
-    tier_2: SECRET
