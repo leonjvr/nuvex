@@ -1,0 +1,59 @@
+name: davinci-resolve
+type: deterministic
+protocol: local_script
+script_path: "${RESOLVE_SCRIPT_PATH}"
+runtime: python3
+auth:
+  type: none
+  secret_ref: ""
+actions:
+  create_timeline:
+    function: create_timeline
+    params:
+      name:
+        type: string
+        required: true
+      width:
+        type: number
+        required: false
+      height:
+        type: number
+        required: false
+      fps:
+        type: number
+        required: false
+    governance:
+      require_approval: true
+      budget_per_call: 0.00
+      rate_limit: "10/minute"
+      risk_level: medium
+  import_media:
+    function: import_media
+    params:
+      file_path:
+        type: string
+        required: true
+      bin_name:
+        type: string
+        required: false
+    governance:
+      require_approval: false
+      budget_per_call: 0.00
+      rate_limit: "30/minute"
+      risk_level: low
+  render:
+    function: render_project
+    params:
+      preset:
+        type: string
+        required: false
+      output_path:
+        type: string
+        required: true
+    governance:
+      require_approval: true
+      budget_per_call: 0.00
+      rate_limit: "2/hour"
+      risk_level: high
+      timeout_seconds: 3600
+enabled: true

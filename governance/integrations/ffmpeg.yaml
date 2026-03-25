@@ -1,0 +1,41 @@
+name: ffmpeg
+type: deterministic
+protocol: cli
+auth:
+  type: none
+  secret_ref: ""
+actions:
+  convert:
+    command: ffmpeg
+    params:
+      input:
+        type: string
+        required: true
+      output:
+        type: string
+        required: true
+      codec:
+        type: string
+        required: false
+      bitrate:
+        type: string
+        required: false
+    governance:
+      require_approval: false
+      budget_per_call: 0.00
+      rate_limit: "5/minute"
+      risk_level: medium
+      timeout_seconds: 3600
+  probe:
+    command: ffmpeg
+    params:
+      input:
+        type: string
+        required: true
+    governance:
+      require_approval: false
+      budget_per_call: 0.00
+      rate_limit: "30/minute"
+      risk_level: low
+      timeout_seconds: 30
+enabled: true

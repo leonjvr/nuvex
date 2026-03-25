@@ -1,0 +1,11 @@
+division:
+  id: executive
+  name: Executive & Strategy
+  protected: true
+  description: "Strategic leadership, vision, and oversight. Ships with every SIDJUA installation."
+  budget:
+    daily_limit_usd: 5.00
+    monthly_cap_usd: 50.00
+  agents:
+    - ceo-assistant
+    - guide

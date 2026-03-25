@@ -1,0 +1,100 @@
+/**
+ * Custom Messaging Adapter Template
+ *
+ * To create your own adapter:
+ *   1. Copy this _template directory to adapters/messaging/<your-name>/
+ *   2. Rename .template files (remove .template suffix)
+ *   3. Implement the MessagingAdapterPlugin interface below
+ *   4. Define your config schema in config.schema.json
+ *   5. Document setup in README.md
+ *   6. Add an instance to governance/messaging.yaml
+ *
+ * SIDJUA auto-discovers adapters on startup or on:
+ *   sidjua messaging adapter reload
+ *
+ * No core code changes required.
+ */
+
+import type {
+  MessagingAdapterPlugin,
+  AdapterInstance,
+  AdapterCallbacks,
+  ResponseOptions,
+} from "../../src/messaging/adapter-plugin.js";
+
+// ---------------------------------------------------------------------------
+// Plugin implementation
+// ---------------------------------------------------------------------------
+
+const plugin: MessagingAdapterPlugin = {
+  meta: {
+    name:        "my-adapter",           // CHANGE: must match directory name
+    version:     "1.0.0",
+    description: "My custom messaging adapter",
+    channel:     "my-platform",          // CHANGE: unique identifier for this platform
+    configSchema: {
+      // Load this from config.schema.json in production, or inline here.
+      // See config.schema.json.template for structure.
+      $schema:    "http://json-schema.org/draft-07/schema#",
+      type:       "object",
+      required:   ["api_token_secret"],
+      properties: {
+        api_token_secret: {
+          type:        "string",
+          description: "Secret name in SIDJUA secret store for the API token",
+        },
+      },
+    },
+    capabilities: ["text"],              // see AdapterCapability for full list
+  },
+
+  createInstance(instanceId, config, callbacks): AdapterInstance {
+    // Resolve secrets via callbacks — never store raw credentials.
+    // const token = await callbacks.getSecret(config.api_token_secret as string);
+
+    return {
+      instanceId,
+      channel: "my-platform",           // CHANGE: must match meta.channel
+
+      async start(): Promise<void> {
+        // TODO: connect to the platform
+        // Example: initialise SDK, register webhook, start polling loop
+        callbacks.logger.info("my-adapter", "Started", {
+          metadata: { instance_id: instanceId },
+        });
+      },
+
+      async stop(): Promise<void> {
+        // TODO: disconnect from the platform
+        // Example: clear polling interval, close WebSocket, deregister webhook
+        callbacks.logger.info("my-adapter", "Stopped", {
+          metadata: { instance_id: instanceId },
+        });
+      },
+
+      async sendResponse(
+        chatId:  string,
+        text:    string,
+        options?: ResponseOptions,
+      ): Promise<void> {
+        // TODO: send a message to chatId
+        // Example: await sdk.sendMessage(chatId, text);
+        void chatId;
+        void text;
+        void options;
+      },
+
+      isHealthy(): boolean {
+        // TODO: return true only when the connection is live
+        return true;
+      },
+
+      // Optional: format text for the platform (e.g. escape Markdown)
+      // formatText(text: string): string {
+      //   return text.replace(/_/g, "\\_");
+      // },
+    };
+  },
+};
+
+export default plugin;

@@ -1,0 +1,45 @@
+name: n8n
+type: deterministic
+protocol: rest
+base_url: "${N8N_BASE_URL}"
+auth:
+  type: api_key
+  header: "X-N8N-API-KEY"
+  secret_ref: "n8n-api-key"
+actions:
+  trigger_workflow:
+    method: POST
+    path: "/api/v1/workflows/{workflow_id}/execute"
+    params:
+      workflow_id:
+        type: string
+        required: true
+      payload:
+        type: object
+        required: false
+    governance:
+      require_approval: conditional
+      budget_per_call: 0.00
+      rate_limit: "10/minute"
+      risk_level: medium
+  list_workflows:
+    method: GET
+    path: "/api/v1/workflows"
+    governance:
+      require_approval: false
+      budget_per_call: 0.00
+      rate_limit: "30/minute"
+      risk_level: low
+  get_execution:
+    method: GET
+    path: "/api/v1/executions/{execution_id}"
+    params:
+      execution_id:
+        type: string
+        required: true
+    governance:
+      require_approval: false
+      budget_per_call: 0.00
+      rate_limit: "30/minute"
+      risk_level: low
+enabled: true

@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.vitest-cache/
+
+# Data (runtime)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Logs
+logs/
+*.log
+
+# Secrets — NEVER commit
+*.pem
+*.key
+*.cert
+# Only ignore top-level secrets directories (runtime data), not src/secrets/ source code
+/secrets/
+*.secrets.db
+
+# IP protection — FYEO documents, never commit
+FINGERPRINT-REPORT.md
+scripts/verify-watermark.sh
+
+# GUI
+sidjua-gui/node_modules/
+sidjua-gui/dist/
+sidjua-gui/src-tauri/target/
+sidjua-multiarch.tar
+
+# Build artifacts (docker exports, release tarballs — belong in CI, not git)
+/sidjua-*.tar.gz
+/sidjua-*.tar.gz.sha256
+/sidjua-*.tar
+/sidjua-*.tar.gz.ots
+
+# OTS timestamp files (git root level)
+/.ots-*.ots
+
+# Audit scan artifacts
+/CODEBASE-AUDIT-SCAN-*.md
+COMMUNICATION-FACT-SHEET.md
+consulting/
+CLAUDE.md
+specs/
+SECURITY.md
+CONTRIBUTING.md
+CHANGELOG.md
+AGENTS.md
+CODEOWNERS

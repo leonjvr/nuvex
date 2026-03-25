@@ -1,0 +1,103 @@
+{
+  "name": "sidjua",
+  "version": "1.0.0",
+  "description": "SIDJUA Free — Multi-Agent Governance Framework",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "sidjua": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup && mkdir -p dist/roles dist/divisions dist/knowledge dist/i18n/messages locales && cp src/i18n/messages/en.json dist/i18n/messages/en.json && cp src/core/backup-checkpoint-worker.cjs dist/backup-checkpoint-worker.cjs && cp src/defaults/roles/*.yaml dist/roles/ && cp src/defaults/divisions/*.yaml dist/divisions/ && cp src/defaults/knowledge/*.md dist/knowledge/ && cp src/defaults/approved-providers.json dist/ && cp src/locales/*.json locales/ && node -e \"const v=JSON.parse(require('fs').readFileSync('package.json','utf8')).version;require('fs').writeFileSync('dist/.version',v);\"",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "i18n:check": "npx tsx scripts/check-i18n-completeness.ts",
+    "audit:check": "npm audit --audit-level=high"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "ai",
+    "governance",
+    "agents",
+    "automation",
+    "multi-agent",
+    "llm",
+    "orchestration",
+    "audit",
+    "compliance",
+    "open-source"
+  ],
+  "author": "Götz Kohlberg",
+  "homepage": "https://sidjua.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GoetzKohlberg/sidjua.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GoetzKohlberg/sidjua/issues"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.3.2",
+    "@types/papaparse": "^5.5.2",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/ssh2": "^1.15.5",
+    "@types/ws": "^8.18.1",
+    "sharp": "^0.34.5",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sandbox-runtime": "^0.0.40",
+    "@anthropic-ai/sdk": "0.78.0",
+    "@slack/bolt": "^4.6.0",
+    "@types/adm-zip": "^0.5.7",
+    "@types/nodemailer": "^7.0.11",
+    "@types/shell-quote": "^1.7.5",
+    "@types/yauzl": "^2.10.3",
+    "@types/yazl": "^3.3.0",
+    "adm-zip": "^0.5.16",
+    "argon2": "0.44.0",
+    "baileys": "^7.0.0-rc.9",
+    "better-sqlite3": "12.6.2",
+    "cheerio": "^1.2.0",
+    "commander": "^14.0.3",
+    "cron-parser": "^5.5.0",
+    "discord.js": "^14.25.1",
+    "hono": "^4.12.3",
+    "imapflow": "^1.2.16",
+    "mammoth": "^1.11.0",
+    "nodemailer": "^8.0.3",
+    "openai": "6.25.0",
+    "papaparse": "^5.5.3",
+    "pdf-parse": "^2.4.5",
+    "shell-quote": "^1.8.3",
+    "ssh2": "^1.17.0",
+    "telegraf": "^4.16.3",
+    "tiktoken": "^1.0.22",
+    "ws": "8.19.0",
+    "yaml": "^2.8.2",
+    "yauzl": "^3.2.1",
+    "yazl": "^3.3.1"
+  }
+}

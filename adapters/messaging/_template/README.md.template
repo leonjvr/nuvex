@@ -1,0 +1,92 @@
+# My Custom Adapter
+
+Replace this with your adapter's documentation.
+
+## Prerequisites
+
+- An account on <platform>
+- API credentials (bot token, API key, etc.)
+
+## Setup
+
+### 1. Store credentials
+
+```bash
+sidjua secrets set my-api-token <your-token-value>
+```
+
+### 2. Add instance to governance/messaging.yaml
+
+```yaml
+instances:
+  - id: "my-instance"
+    adapter: "my-adapter"
+    enabled: true
+    config:
+      api_token_secret: "my-api-token"
+    rate_limit_per_min: 10
+```
+
+### 3. Apply or reload
+
+On first setup:
+```bash
+sidjua apply
+```
+
+To add a running instance without restart:
+```bash
+sidjua messaging adapter reload
+```
+
+## Config options
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `api_token_secret` | yes | string | Secret name for the API token |
+| `webhook_url` | no | string | Public HTTPS URL for webhook delivery |
+| `polling_interval_ms` | no | number | Poll interval in ms (default: 5000) |
+
+## Multiple instances
+
+Run two instances of the same adapter with different configs:
+
+```yaml
+instances:
+  - id: "team-alpha"
+    adapter: "my-adapter"
+    enabled: true
+    config:
+      api_token_secret: "alpha-token"
+    rate_limit_per_min: 20
+
+  - id: "team-beta"
+    adapter: "my-adapter"
+    enabled: true
+    config:
+      api_token_secret: "beta-token"
+    rate_limit_per_min: 10
+```
+
+## Capabilities
+
+- [x] Text messages
+- [ ] Attachments
+- [ ] Threads
+- [ ] Reactions
+- [ ] Typing indicator
+- [ ] Rich text (Markdown / HTML)
+- [ ] Read receipts
+
+## Troubleshooting
+
+```bash
+sidjua messaging status          # show all adapter instances
+sidjua messaging status my-instance  # show specific instance health
+sidjua daemon status             # show daemon loop health
+```
+
+Check logs with:
+```bash
+tail -f .system/logs/sidjua.log | grep "my-adapter"
+```

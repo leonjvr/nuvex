@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "imap_host_secret",
+    "imap_user_secret",
+    "imap_pass_secret",
+    "smtp_host_secret",
+    "smtp_user_secret",
+    "smtp_pass_secret",
+    "from_address"
+  ],
+  "properties": {
+    "imap_host_secret": {
+      "type": "string",
+      "description": "Secret name for IMAP hostname"
+    },
+    "imap_user_secret": {
+      "type": "string",
+      "description": "Secret name for IMAP username"
+    },
+    "imap_pass_secret": {
+      "type": "string",
+      "description": "Secret name for IMAP password"
+    },
+    "imap_port": {
+      "type": "integer",
+      "default": 993,
+      "description": "IMAP port"
+    },
+    "imap_tls": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use TLS for IMAP"
+    },
+    "smtp_host_secret": {
+      "type": "string",
+      "description": "Secret name for SMTP hostname"
+    },
+    "smtp_user_secret": {
+      "type": "string",
+      "description": "Secret name for SMTP username"
+    },
+    "smtp_pass_secret": {
+      "type": "string",
+      "description": "Secret name for SMTP password"
+    },
+    "smtp_port": {
+      "type": "integer",
+      "default": 587,
+      "description": "SMTP port"
+    },
+    "smtp_tls": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use TLS for SMTP"
+    },
+    "from_address": {
+      "type": "string",
+      "description": "Sender email address for outbound messages"
+    },
+    "response_subject": {
+      "type": "string",
+      "default": "SIDJUA Response",
+      "description": "Subject line for response emails"
+    },
+    "mailbox": {
+      "type": "string",
+      "default": "INBOX",
+      "description": "IMAP mailbox to monitor"
+    }
+  }
+}

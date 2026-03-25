@@ -1,0 +1,102 @@
+# SIDJUA TestCorp — Phase 15 Test Deployment
+# 32-Agent Company Structure for stress-testing multi-agent governance
+# See: specs/PHASE-15-TEST-DEPLOYMENT-SPEC-V1.md
+
+schema_version: "1.0"
+
+company:
+  name: "SIDJUA TestCorp"
+  industry: "AI Governance Platform Testing"
+  size: "medium"
+  locale: "en"
+  timezone: "Asia/Manila"
+  mode: "business"
+
+divisions:
+
+  - code: executive
+    name:
+      en: Executive
+    scope: CTO-level strategic coordination, delegation to all division managers
+    required: true
+    active: true
+    head:
+      role: CTO
+      agent: sonnet-cto
+
+  - code: hr
+    name:
+      en: Human Resources
+    scope: Agent creation, onboarding, role design, hiring request processing
+    required: true
+    active: true
+    head:
+      role: HR Manager
+      agent: hr-manager
+
+  - code: documentation
+    name:
+      en: Documentation
+    scope: Technical writing, user manuals, knowledge management, release notes
+    required: true
+    active: true
+    head:
+      role: Documentation Manager
+      agent: doc-manager
+
+  - code: qa
+    name:
+      en: Quality Assurance
+    scope: Error monitoring, compliance checking, test execution, bug reporting
+    required: true
+    active: true
+    head:
+      role: QA Manager
+      agent: qa-manager
+
+  - code: engineering
+    name:
+      en: Engineering
+    scope: Backend, frontend, infrastructure, security, code review, integration
+    required: true
+    active: true
+    head:
+      role: Engineering Manager
+      agent: eng-manager
+
+  - code: operations
+    name:
+      en: Operations
+    scope: Deployment, monitoring, backup, incident response, system health
+    required: true
+    active: true
+    head:
+      role: Operations Manager
+      agent: ops-manager
+
+  - code: admin
+    name:
+      en: Administration
+    scope: Budget tracking, internal communications, scheduling, archiving
+    required: false
+    active: true
+    head:
+      role: Admin Manager
+      agent: admin-manager
+
+size_presets:
+  solo:
+    recommended: []
+    description: "Executive only."
+  small:
+    recommended: [hr, qa]
+    description: "With HR and QA."
+  medium:
+    recommended: [hr, documentation, qa, engineering, operations]
+    description: "Full development org."
+  large:
+    recommended: [hr, documentation, qa, engineering, operations, admin]
+    description: "Complete org with admin."
+  enterprise:
+    recommended: [hr, documentation, qa, engineering, operations, admin]
+    description: "All divisions, full governance."

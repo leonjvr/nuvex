@@ -1,0 +1,66 @@
+# SIDJUA System Governance — Agent Security Baseline
+# MANDATORY — Cannot be disabled or weakened by user configuration
+# Governance Ruleset Version: see VERSION file in this directory
+metadata:
+  id: agent-security-baseline
+  name: Agent Security Baseline
+  description: Mandatory security rules protecting against known AI agent attack vectors
+  category: security
+  enforcement: mandatory
+
+rules:
+  - id: SYS-SEC-001
+    name: Agent credential isolation
+    description: Agents MUST NOT share API keys or credentials with other agents
+    enforcement: mandatory
+    severity: critical
+    category: credential-security
+
+  - id: SYS-SEC-002
+    name: No plaintext secrets in config
+    description: Agent configurations MUST NOT contain plaintext API keys, passwords, or tokens
+    enforcement: mandatory
+    severity: critical
+    category: credential-security
+
+  - id: SYS-SEC-003
+    name: Agent network boundary
+    description: Agents MUST NOT open network listeners or expose ports without explicit governance approval
+    enforcement: mandatory
+    severity: critical
+    category: network-security
+
+  - id: SYS-SEC-004
+    name: Tool execution sandboxing
+    description: Agent tool calls MUST be executed within the governance sandbox, never as raw system commands
+    enforcement: mandatory
+    severity: critical
+    category: execution-security
+
+  - id: SYS-SEC-005
+    name: Audit trail integrity
+    description: Agents MUST NOT modify, delete, or suppress their own audit trail entries
+    enforcement: mandatory
+    severity: critical
+    category: audit-integrity
+
+  - id: SYS-SEC-006
+    name: Budget enforcement
+    description: Agents MUST NOT exceed their allocated budget. Budget exhaustion halts the agent.
+    enforcement: mandatory
+    severity: high
+    category: cost-control
+
+  - id: SYS-SEC-007
+    name: Prompt injection defense
+    description: Agent inputs MUST pass prompt injection detection before execution
+    enforcement: mandatory
+    severity: critical
+    category: input-security
+
+  - id: SYS-SEC-008
+    name: Human escalation on destructive actions
+    description: Destructive actions (delete, overwrite, send external) MUST require human approval unless explicitly waived in user governance
+    enforcement: mandatory
+    severity: high
+    category: human-oversight

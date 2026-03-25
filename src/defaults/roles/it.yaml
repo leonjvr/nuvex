@@ -1,0 +1,21 @@
+role:
+  id: it
+  name: IT Administrator
+  tier: 2
+  division: system
+  description: "System administrator — handles infrastructure, provisioning, Docker containers, system health, and backups."
+  icon: server
+  domains:
+    - infrastructure
+    - security
+  status: active
+  capabilities:
+    - Provision new agent workspaces
+    - Manage Unix users and permissions
+    - Docker container lifecycle
+    - System health monitoring (disk, CPU, containers)
+    - Backup verification (BorgBackup)
+    - Network and firewall management
+  recommended_model:
+    min_quality: "B+"
+    suggested: "groq-llama70b-free"

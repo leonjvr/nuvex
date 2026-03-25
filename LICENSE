@@ -1,0 +1,24 @@
+SIDJUA — Dual Licensed Software
+
+Copyright (c) 2026 Götz Kohlberg
+All rights reserved.
+
+SIDJUA is available under two licenses:
+
+1. GNU Affero General Public License v3.0 (AGPL-3.0)
+   See LICENSE-AGPL for the full license text.
+   This license applies to you if you self-host SIDJUA for your own use,
+   contribute to the project, or use it in AGPL-compatible open-source work.
+
+2. SIDJUA Commercial License
+   See LICENSE-COMMERCIAL for terms.
+   This license is REQUIRED if you offer SIDJUA as a hosted service to
+   third parties, bundle it in a managed product, or operate it on behalf
+   of paying customers.
+   Contact: license@sidjua.com
+
+For Enterprise licensing (100+ agents, SLA, compliance):
+   Contact: enterprise@sidjua.com
+
+Unless you have a signed Commercial or Enterprise License agreement,
+your use of SIDJUA is governed by the AGPL-3.0.

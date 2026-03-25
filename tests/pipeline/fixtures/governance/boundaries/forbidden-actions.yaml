@@ -1,0 +1,13 @@
+forbidden:
+  - action: contract.sign
+    reason: "Contracts require human signature"
+    escalate_to: CEO
+
+  - action: data.delete
+    condition: "target contains 'audit'"
+    reason: "Audit trail is immutable"
+    escalate_to: SYSTEM_BLOCK
+
+  - action: "purchase.*"
+    reason: "All purchases require human authorization"
+    escalate_to: CFO

@@ -1,0 +1,22 @@
+role:
+  id: auditor
+  name: Auditor
+  tier: 2
+  division: system
+  description: "Compliance officer — monitors audit trails, budget enforcement, governance compliance, and generates reports. Cross-domain: covers both financial and IT auditing."
+  icon: shield-check
+  domains:
+    - finance
+    - it
+    - compliance
+  status: active
+  capabilities:
+    - Monitor audit trail for policy violations
+    - Budget enforcement and overspend alerts
+    - Governance compliance checks
+    - Generate periodic reports (daily, weekly, monthly)
+    - Detect anomalies in access patterns and spending
+    - EU AI Act Article 12 compliance monitoring
+  recommended_model:
+    min_quality: "B+"
+    suggested: "groq-llama70b-free"

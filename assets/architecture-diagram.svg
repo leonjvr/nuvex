@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+<defs>
+  <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#64748b"/>
+  </marker>
+</defs>
+<rect width="1200" height="900" fill="#ffffff"/>
+<text x="600" y="44" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#0f3d3d">SIDJUA Platform Architecture</text>
+<text x="600" y="68" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#64748b">Governance by Architecture — Every action checked before execution</text>
+<rect x="80" y="100" width="200" height="60" rx="8" fill="#dbeafe" stroke="#1e40af" stroke-width="1.5"/>
+<text x="180" y="126" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1e40af">CLI</text>
+<text x="180" y="144" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#60a5fa">sidjua command</text>
+<rect x="350" y="100" width="200" height="60" rx="8" fill="#dbeafe" stroke="#1e40af" stroke-width="1.5"/>
+<text x="450" y="126" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1e40af">Dashboard</text>
+<text x="450" y="144" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#60a5fa">Port 4200</text>
+<rect x="620" y="100" width="200" height="60" rx="8" fill="#dbeafe" stroke="#1e40af" stroke-width="1.5"/>
+<text x="720" y="126" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1e40af">REST API</text>
+<text x="720" y="144" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#60a5fa">/api/v1/*</text>
+<rect x="890" y="100" width="200" height="60" rx="8" fill="#dbeafe" stroke="#1e40af" stroke-width="1.5"/>
+<text x="990" y="126" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1e40af">SSE Stream</text>
+<text x="990" y="144" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#60a5fa">Real-time events</text>
+<line x1="180" y1="160" x2="180" y2="185" stroke="#64748b" stroke-width="1.5"/>
+<line x1="450" y1="160" x2="450" y2="185" stroke="#64748b" stroke-width="1.5"/>
+<line x1="720" y1="160" x2="720" y2="185" stroke="#64748b" stroke-width="1.5"/>
+<line x1="990" y1="160" x2="990" y2="185" stroke="#64748b" stroke-width="1.5"/>
+<line x1="180" y1="185" x2="990" y2="185" stroke="#64748b" stroke-width="1.5"/>
+<line x1="585" y1="185" x2="585" y2="210" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="103" y="213" width="1000" height="54" rx="8" fill="rgba(0,0,0,0.07)"/>
+<rect x="100" y="210" width="1000" height="54" rx="8" fill="#e6f4f4" stroke="#2e8b8b" stroke-width="1.5"/>
+<text x="600" y="235" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1a5c5c">Agent Lifecycle Manager</text>
+<text x="600" y="253" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#2e8b8b">Orchestrator · Task pipeline · Division routing · Budget accounting</text>
+<line x1="585" y1="264" x2="585" y2="310" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="103" y="313" width="1000" height="110" rx="8" fill="rgba(0,0,0,0.07)"/>
+<rect x="100" y="310" width="1000" height="110" rx="8" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+<text x="600" y="332" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#92400e">Stage 0 — Pre-Action Governance Pipeline</text>
+<text x="600" y="350" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#b45309">Every agent action is checked here BEFORE execution</text>
+<rect x="174" y="358" width="148" height="54" rx="6" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+<text x="248" y="378" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#991b1b">S1</text>
+<text x="248" y="394" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#991b1b">Forbidden</text>
+<line x1="324" y1="385" x2="346" y2="385" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="350" y="358" width="148" height="54" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="424" y="378" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#92400e">S2</text>
+<text x="424" y="394" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#92400e">Approval</text>
+<line x1="500" y1="385" x2="522" y2="385" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="526" y="358" width="148" height="54" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
+<text x="600" y="378" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#065f46">S3</text>
+<text x="600" y="394" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#065f46">Budget</text>
+<line x1="676" y1="385" x2="698" y2="385" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="702" y="358" width="148" height="54" rx="6" fill="#e0e7ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="776" y="378" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#3730a3">S4</text>
+<text x="776" y="394" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#3730a3">Classify</text>
+<line x1="852" y1="385" x2="874" y2="385" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="878" y="358" width="148" height="54" rx="6" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+<text x="952" y="378" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#15803d">S5</text>
+<text x="952" y="394" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#15803d">Policy</text>
+<text x="1108" y="369" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#16a34a">✓ cleared</text>
+<line x1="585" y1="420" x2="585" y2="470" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="585" y1="445" x2="220" y2="445" stroke="#64748b" stroke-width="1.5"/>
+<line x1="220" y1="445" x2="220" y2="470" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="585" y1="445" x2="600" y2="445" stroke="#64748b" stroke-width="1.5"/>
+<line x1="600" y1="445" x2="600" y2="470" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="585" y1="445" x2="980" y2="445" stroke="#64748b" stroke-width="1.5"/>
+<line x1="980" y1="445" x2="980" y2="470" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="220" y1="445" x2="980" y2="445" stroke="#64748b" stroke-width="1.5"/>
+<rect x="80" y="470" width="280" height="80" rx="8" fill="#e6f4f4" stroke="#2e8b8b" stroke-width="1.5"/>
+<text x="220" y="496" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1a5c5c">Agent Runtime</text>
+<text x="220" y="514" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#2e8b8b">Any LLM provider</text>
+<text x="220" y="530" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#2e8b8b">Anthropic · Groq · Ollama · Any</text>
+<rect x="460" y="470" width="280" height="80" rx="8" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="600" y="496" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#475569">Division Config</text>
+<text x="600" y="514" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#475569">YAML governance rules</text>
+<text x="600" y="530" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#475569">Tiers · Budgets · Secrets</text>
+<rect x="840" y="470" width="280" height="80" rx="8" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="980" y="496" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#475569">Communication Channels</text>
+<text x="980" y="514" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#475569">Email · Discord · Telegram</text>
+<text x="980" y="530" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#475569">Bidirectional agents</text>
+<line x1="220" y1="550" x2="220" y2="600" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="980" y1="550" x2="980" y2="600" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="80" y="600" width="280" height="70" rx="8" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="220" y="624" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569">SQLite per Agent</text>
+<text x="220" y="640" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#94a3b8">No external database</text>
+<text x="220" y="655" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#94a3b8">All data local + portable</text>
+<rect x="840" y="600" width="280" height="70" rx="8" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="980" y="624" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569">Audit Trail (WAL)</text>
+<text x="980" y="640" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#94a3b8">Append-only · Integrity-verified</text>
+<text x="980" y="655" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#94a3b8">Tampered entries detected</text>
+<text x="600" y="712" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#94a3b8">Supported LLM Providers</text>
+<rect x="100" y="720" width="150" height="36" rx="18" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="175" y="743" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#475569">Anthropic</text>
+<rect x="270" y="720" width="150" height="36" rx="18" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="345" y="743" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#475569">Google</text>
+<rect x="440" y="720" width="150" height="36" rx="18" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="515" y="743" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#475569">Groq</text>
+<rect x="610" y="720" width="150" height="36" rx="18" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="685" y="743" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#475569">Cloudflare</text>
+<rect x="780" y="720" width="150" height="36" rx="18" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="855" y="743" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#475569">Ollama</text>
+<rect x="950" y="720" width="150" height="36" rx="18" fill="#f1f5f9" stroke="#d1e7e7" stroke-width="1.5"/>
+<text x="1025" y="743" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#475569">Any OpenAI-compatible</text>
+<text x="600" y="886" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#94a3b8">sidjua.com · AGPL-3.0 Open Source · v1.0.0</text>
+</svg>

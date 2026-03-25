@@ -1,0 +1,92 @@
+{
+  "memory": {
+    "search": {
+      "no_results": "No results found for: \"{query}\"",
+      "results_header": "Search results for: \"{query}\" ({count} found)",
+      "result_entry": "[{rank}] score={score} | {source}{reference}"
+    },
+    "import": {
+      "start": "Importing from: {path}",
+      "conversations_found": "  {count} conversations found",
+      "ingesting": "Ingesting into knowledge pipeline...",
+      "progress": "\r  chunks: {completed}/{total} ({failed} failed)   ",
+      "complete": "\nImport complete:",
+      "complete_conversations": "  Conversations: {count}",
+      "complete_chunks": "  Chunks written: {count}",
+      "complete_tokens": "  Total tokens:   {tokens}",
+      "complete_cost": "  Cost estimate:  {cost}",
+      "embedding_provider": "Embedding provider: {provider} ({model}, {dimensions} dimensions)",
+      "already_exists": "Collection \"{name}\" already exists with {count} chunks. Use --force to reimport.",
+      "dimension_mismatch": "Collection \"{name}\" has {existing}-dim embeddings but current embedder uses {required}-dim. Clear and re-import: sidjua memory clear {name} && sidjua memory import <zip>"
+    },
+    "status": {
+      "header": "Memory collection: {id}",
+      "status_line": "  Status:      {status}",
+      "chunks_line": "  Chunks:      {count}",
+      "tokens_line": "  Tokens:      {tokens}",
+      "sources_line": "  Sources:     {count} {label}",
+      "last_import_line": "  Last import: {date}",
+      "embedder_line": "  Embedder:    {provider} ({model}, {dimensions} dims)",
+      "not_found": "Memory collection '{name}' not found.\nRun: sidjua memory import <file>\n",
+      "no_collections": "No memory collections found."
+    },
+    "embedder": {
+      "cloudflare_active": "Using Cloudflare Workers AI (@cf/baai/bge-base-en-v1.5, free, 768 dims). For better quality, set OPENAI_API_KEY.",
+      "openai_active": "Using OpenAI {model} ({dimensions} dimensions).",
+      "fallback_bm25": "No embedding provider available. Using keyword search (BM25) only. Set OPENAI_API_KEY or SIDJUA_CF_ACCOUNT_ID+SIDJUA_CF_TOKEN for semantic search.",
+      "collection_not_found": "Memory collection '{name}' not found. Run: sidjua memory import <file>"
+    }
+  },
+  "memory_re_embed": {
+    "start": "Re-embedding collection \"{name}\" with {provider} ({model})...",
+    "progress": "\rRe-embedding: {current}/{total} chunks...",
+    "split": "Chunk {id} too large ({tokens} tokens, max {max}). Splitting into {parts} parts.",
+    "complete": "Re-embed complete: {total} chunks ({split_count} split into {new_parts} new parts). Embedder: {provider} ({dimensions} dims).",
+    "no_collections": "No collections found to re-embed.",
+    "no_embedder": "No embedding provider available. Set OPENAI_API_KEY or configure Cloudflare Workers AI (SIDJUA_CF_ACCOUNT_ID + SIDJUA_CF_TOKEN)."
+  },
+  "memory_clear": {
+    "confirm": "Clearing all chunks and vectors for collection \"{name}\"...",
+    "complete": "Collection \"{name}\" cleared: {chunks} chunks and {vectors} vectors deleted.",
+    "not_found": "Collection \"{name}\" not found.",
+    "reset_ok": "Collection metadata reset."
+  },
+  "startup": {
+    "embedder_hint_openai": "Embedder: OpenAI {model} ({dimensions} dims) — semantic search active.",
+    "embedder_hint_cloudflare": "Embedder: Cloudflare Workers AI (free, 768 dims) — semantic search active.",
+    "embedder_hint_none": "Embedder: BM25 keyword search only. For semantic search: export OPENAI_API_KEY=sk-... or configure Cloudflare (SIDJUA_CF_ACCOUNT_ID + SIDJUA_CF_TOKEN)."
+  },
+  "init": {
+    "header": "SIDJUA — Initializing workspace...",
+    "workspace_name": "Workspace name",
+    "memory_header": "Memory & Knowledge",
+    "memory_description": "SIDJUA can remember agent conversations and search them later.",
+    "memory_openai": "Activate with OpenAI embeddings (recommended)",
+    "memory_cloudflare": "Activate with Cloudflare embeddings (free)",
+    "memory_bm25": "BM25 only (keyword search, no semantic search)",
+    "memory_skip": "Skip memory for now",
+    "memory_activate_later": "Can activate later with: sidjua memory activate",
+    "provider_header": "AI Provider",
+    "provider_description": "SIDJUA needs an AI provider to power your agents.",
+    "provider_guide_note": "The built-in Guide agent works without any key.",
+    "provider_groq": "Groq — free, fast, no credit card",
+    "provider_google": "Google AI Studio — free, smart, no credit card",
+    "provider_openai": "OpenAI — paid, best quality",
+    "provider_anthropic": "Anthropic — paid, best quality",
+    "provider_other": "Other — enter provider and key manually",
+    "provider_skip": "Skip for now — only Guide agent available",
+    "provider_add_later": "Can add later with: sidjua config provider",
+    "enter_key": "Enter your {provider} API key",
+    "summary_workspace": "Workspace created: {name}",
+    "summary_memory": "Memory: {mode}",
+    "summary_provider": "Provider: {provider} ({model})",
+    "summary_guide": "Guide agent ready — try: sidjua chat guide"
+  },
+  "errors": {
+    "embedding_failed": "Embedding failed: {error}. Falling back to keyword search.",
+    "import_failed": "Import failed: {error}",
+    "collection_not_found": "Collection \"{name}\" not found.",
+    "api_key_missing": "API key for {provider} not configured.",
+    "file_not_found": "Error: file not found: {path}"
+  }
+}

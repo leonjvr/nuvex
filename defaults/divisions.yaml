@@ -1,0 +1,19 @@
+# SIDJUA Default Configuration — Personal Mode
+# Customize this file for your deployment
+# Documentation: https://sidjua.com/docs/configuration
+#
+# After editing, apply changes with:
+#   docker compose exec sidjua sidjua apply
+
+schema_version: "1.0"
+
+company:
+  name: "My SIDJUA Instance"
+  size: "personal"
+
+divisions:
+  - code: default
+    name:
+      en: Default Division
+    scope: General-purpose AI agent workspace
+    active: true

@@ -1,0 +1,12 @@
+rules:
+  - id: no_pii_export
+    description: "No PII in external communications"
+    action_types: ["email.send", "web.post", "data.export"]
+    check: "parameters.contains_pii != true"
+    enforcement: hard
+
+  - id: log_external_access
+    description: "Log all external data access"
+    action_types: ["web.fetch", "api.call"]
+    check: "always"
+    enforcement: soft

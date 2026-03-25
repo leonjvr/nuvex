@@ -1,0 +1,93 @@
+name: github
+type: deterministic
+protocol: rest
+base_url: "https://api.github.com"
+auth:
+  type: bearer
+  secret_ref: "github-token"
+actions:
+  list_issues:
+    method: GET
+    path: "/repos/{owner}/{repo}/issues"
+    params:
+      owner:
+        type: string
+        required: true
+      repo:
+        type: string
+        required: true
+      state:
+        type: string
+        required: false
+    governance:
+      require_approval: false
+      budget_per_call: 0.00
+      rate_limit: "30/minute"
+      risk_level: low
+  create_issue:
+    method: POST
+    path: "/repos/{owner}/{repo}/issues"
+    params:
+      owner:
+        type: string
+        required: true
+      repo:
+        type: string
+        required: true
+      title:
+        type: string
+        required: true
+      body:
+        type: string
+        required: false
+      labels:
+        type: object
+        required: false
+    governance:
+      require_approval: false
+      budget_per_call: 0.00
+      rate_limit: "10/minute"
+      risk_level: medium
+  create_release:
+    method: POST
+    path: "/repos/{owner}/{repo}/releases"
+    params:
+      owner:
+        type: string
+        required: true
+      repo:
+        type: string
+        required: true
+      tag_name:
+        type: string
+        required: true
+      name:
+        type: string
+        required: true
+      body:
+        type: string
+        required: false
+      draft:
+        type: string
+        required: false
+    governance:
+      require_approval: true
+      budget_per_call: 0.00
+      rate_limit: "5/hour"
+      risk_level: high
+  list_pulls:
+    method: GET
+    path: "/repos/{owner}/{repo}/pulls"
+    params:
+      owner:
+        type: string
+        required: true
+      repo:
+        type: string
+        required: true
+    governance:
+      require_approval: false
+      budget_per_call: 0.00
+      rate_limit: "30/minute"
+      risk_level: low
+enabled: true

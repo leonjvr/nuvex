@@ -1,0 +1,295 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Götz Kohlberg. All rights reserved.
+// Dual licensed: AGPL-3.0 + SIDJUA Commercial License. See LICENSE.
+
+/**
+ * REST adapter — uses native fetch() (Node 22+).
+ * Injects auth headers; retries on 429/503/504 with 1s/2s/4s backoff.
+ */
+
+import type {
+  ToolAdapter,
+  ToolAction,
+  ToolCapability,
+  ToolResult,
+  ToolType,
+  RestToolConfig,
+} from "../types.js";
+import { createLogger } from "../../core/logger.js";
+import { SidjuaError } from "../../core/error-codes.js";
+
+const logger = createLogger("rest-adapter");
+
+
+const RETRY_STATUS_CODES = new Set([429, 503, 504]);
+const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
+const MAX_ATTEMPTS = 3;
+
+
+const PRIVATE_IP_PATTERNS = [
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^127\./,
+  /^0\./,
+  /^::1$/,
+  /^fc00:/i,
+  /^fd[0-9a-f]{2}:/i,
+  /^fe80:/i,
+  /^localhost$/i,
+];
+
+/** Returns true when the URL hostname resolves to a private or loopback address. */
+function isPrivateUrl(urlStr: string): boolean {
+  try {
+    const url = new URL(urlStr);
+    const host = url.hostname;
+    return PRIVATE_IP_PATTERNS.some((p) => p.test(host));
+  } catch (_parseErr) {
+    return true; // Unparseable URLs are rejected
+  }
+}
+
+/**
+ * Enforce SSRF protection on a URL.
+ * Throws SidjuaError if the URL is private/local or not in the configured allowlist.
+ */
+function assertAllowedUrl(urlStr: string): void {
+  if (isPrivateUrl(urlStr)) {
+    const host = (() => { try { return new URL(urlStr).hostname; } catch (_e) { return urlStr; } })();
+    throw SidjuaError.from("REST-SEC-001", `Request to private or local address blocked: ${host}`);
+  }
+
+  const allowList = process.env["SIDJUA_REST_ALLOWLIST"]
+    ?.split(",")
+    .map((d) => d.trim())
+    .filter(Boolean) ?? [];
+
+  if (allowList.length > 0) {
+    const host = new URL(urlStr).hostname;
+    if (!allowList.includes(host)) {
+      throw SidjuaError.from("REST-SEC-002", `Request domain not in allowlist: ${host}`);
+    }
+  }
+}
+
+
+export class RestAdapter implements ToolAdapter {
+  readonly id: string;
+  readonly type: ToolType = "rest";
+
+  private readonly config: RestToolConfig;
+  private readonly capabilities: ToolCapability[];
+  private connected = false;
+
+  constructor(id: string, config: RestToolConfig, capabilities: ToolCapability[]) {
+    this.id = id;
+    this.config = config;
+    this.capabilities = capabilities;
+  }
+
+  // -------------------------------------------------------------------------
+  // connect
+  // -------------------------------------------------------------------------
+
+  async connect(): Promise<void> {
+    // REST is stateless — nothing to establish
+    this.connected = true;
+  }
+
+  // -------------------------------------------------------------------------
+  // execute
+  // -------------------------------------------------------------------------
+
+  async execute(action: ToolAction): Promise<ToolResult> {
+    const start = Date.now();
+    const params = action.params;
+
+    const url =
+      typeof params["path"] === "string"
+        ? this.config.base_url + params["path"]
+        : this.config.base_url;
+
+    const headers = this.buildAuthHeaders();
+    headers["Content-Type"] = "application/json";
+
+    const capability = action.capability.toLowerCase();
+
+    let fetchInit: RequestInit;
+
+    switch (capability) {
+      case "get":
+        fetchInit = { method: "GET", headers };
+        break;
+
+      case "post":
+        fetchInit = {
+          method: "POST",
+          headers,
+          body: JSON.stringify(params["body"] ?? {}),
+        };
+        break;
+
+      case "put":
+        fetchInit = {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(params["body"] ?? {}),
+        };
+        break;
+
+      case "delete":
+        fetchInit = { method: "DELETE", headers };
+        break;
+
+      default:
+        return {
+          success: false,
+          error: `Unknown REST capability: ${action.capability}`,
+          duration_ms: Date.now() - start,
+        };
+    }
+
+    // Reject requests to private/local addresses (SSRF protection)
+    assertAllowedUrl(url);
+
+    const timeoutMs = this.config.timeout_ms ?? 30_000;
+
+    // Retry loop
+    let lastError: string | undefined;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        const delay = RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]!;
+        await sleep(delay);
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      let response: Response;
+      try {
+        response = await fetch(url, { ...fetchInit, signal: controller.signal });
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        // Network-level error (including timeout abort) — do not retry
+        return {
+          success: false,
+          error: lastError,
+          duration_ms: Date.now() - start,
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+
+      if (!RETRY_STATUS_CODES.has(response.status)) {
+        // Terminal response (success or non-retryable error)
+        const duration_ms = Date.now() - start;
+        let data: unknown;
+        try {
+          data = await response.json();
+        } catch (e: unknown) {
+          logger.debug("rest-adapter", "REST response body not JSON — using text response", { metadata: { error: e instanceof Error ? e.message : String(e) } });
+          data = null;
+        }
+
+        // Use conditional spread to satisfy exactOptionalPropertyTypes
+        return {
+          success: response.ok,
+          ...(response.ok ? { data } : { error: response.statusText }),
+          duration_ms,
+        };
+      }
+
+      // Retryable status — record and loop
+      lastError = `HTTP ${response.status}: ${response.statusText}`;
+    }
+
+    // All attempts exhausted
+    return {
+      success: false,
+      error: lastError ?? "Max retries exceeded",
+      duration_ms: Date.now() - start,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // healthCheck
+  // -------------------------------------------------------------------------
+
+  async healthCheck(): Promise<boolean> {
+    const headers = this.buildAuthHeaders();
+    const url = this.config.base_url + "/health";
+
+    try {
+      // Try /health first, fall back to base_url
+      let response = await fetch(url, { method: "GET", headers });
+      if (response.ok) return true;
+
+      response = await fetch(this.config.base_url, { method: "GET", headers });
+      return response.ok;
+    } catch (e: unknown) {
+      logger.warn("rest-adapter", "REST adapter health check failed — adapter may be unavailable", { metadata: { error: e instanceof Error ? e.message : String(e) } });
+      return false;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // disconnect
+  // -------------------------------------------------------------------------
+
+  async disconnect(): Promise<void> {
+    // No-op — REST is stateless
+    this.connected = false;
+  }
+
+  // -------------------------------------------------------------------------
+  // getCapabilities
+  // -------------------------------------------------------------------------
+
+  getCapabilities(): ToolCapability[] {
+    return this.capabilities;
+  }
+
+  // -------------------------------------------------------------------------
+  // Private helpers
+  // -------------------------------------------------------------------------
+
+  /** Build Authorization / custom headers from the configured auth block. */
+  private buildAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    const auth = this.config.auth;
+
+    if (auth == null) {
+      return headers;
+    }
+
+    switch (auth.type) {
+      case "bearer":
+        if (auth.token != null) {
+          headers["Authorization"] = `Bearer ${auth.token}`;
+        }
+        break;
+
+      case "basic": {
+        const user = auth.username ?? "";
+        const pass = auth.password ?? "";
+        const b64 = Buffer.from(`${user}:${pass}`).toString("base64");
+        headers["Authorization"] = `Basic ${b64}`;
+        break;
+      }
+
+      case "header":
+        if (auth.header_name != null && auth.header_value != null) {
+          headers[auth.header_name] = auth.header_value;
+        }
+        break;
+    }
+
+    return headers;
+  }
+}
+
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

@@ -1,0 +1,8 @@
+{
+  "ruleset_version": "1.0",
+  "compatible_sidjua_min": "0.10.0",
+  "compatible_sidjua_max": "0.x.x",
+  "released": "2026-03-14T00:00:00Z",
+  "rules_count": 10,
+  "changelog": "Initial governance ruleset"
+}
