@@ -208,6 +208,174 @@ This should not happen with the default Docker setup (the entrypoint passes `--h
 
 ---
 
+## Docker: Quick Diagnostics
+
+Before diving into platform-specific sections, run these checks to narrow down the problem:
+
+```bash
+# Container status
+docker compose ps
+
+# Application logs
+docker logs sidjua
+
+# Health endpoint (should return {"status":"ok",...})
+curl http://localhost:4200/api/v1/health
+
+# Is port 4200 already in use by something else?
+lsof -i :4200          # macOS / Linux
+netstat -tlnp | grep 4200   # Linux alternative
+```
+
+If the container is not listed by `docker compose ps`, check `docker compose logs` for startup errors.
+
+---
+
+## Docker: Windows + WSL2
+
+### Docker Desktop must be running with WSL2 backend
+
+Open Docker Desktop → Settings → General and confirm **"Use the WSL 2 based engine"** is checked. The Docker daemon is not available in WSL2 without this — commands will fail with `Cannot connect to the Docker daemon`.
+
+If Docker Desktop is installed but the daemon is not reachable:
+1. Start Docker Desktop from the Windows Start Menu
+2. Wait for the whale icon in the system tray to stop animating
+3. Re-run your `docker compose` command
+
+### Memory limits
+
+WSL2 allocates up to 50 % of total RAM by default, which may be too little for SIDJUA + an LLM provider. Create or edit `%USERPROFILE%\.wslconfig`:
+
+```ini
+[wsl2]
+memory=4GB
+swap=2GB
+```
+
+Restart WSL2: `wsl --shutdown` in PowerShell, then reopen your WSL2 terminal.
+
+### Volume permission errors
+
+WSL2 mounts Windows drives under `/mnt/c/`, `/mnt/d/`, etc. Docker volumes work best when the workspace is inside the WSL2 filesystem (e.g. `~/sidjua`), not on a Windows path. If you clone into `C:\Users\…` and bind-mount it from WSL2, you may see `permission denied` on SQLite files.
+
+**Fix:** Move the project into the WSL2 home directory:
+```bash
+cp -r /mnt/c/Users/you/sidjua ~/sidjua
+cd ~/sidjua && docker compose up -d
+```
+
+### Windows Firewall blocking port 4200
+
+Windows Defender Firewall may block inbound connections to the WSL2 IP on port 4200. If `curl http://localhost:4200/api/v1/health` times out:
+1. Open **Windows Security → Firewall & network protection → Allow an app through firewall**
+2. Add an inbound rule for TCP port 4200, or temporarily disable the private network firewall for testing
+
+### seccomp profile not found
+
+`seccomp-profile.json` must be in the same directory as `docker-compose.yml`. If the file is missing, Docker will fail to start the container with a `no such file or directory` error.
+
+Download it from the repository:
+```bash
+curl -O https://raw.githubusercontent.com/GoetzKohlberg/sidjua/main/seccomp-profile.json
+```
+
+If seccomp is not supported on your platform, comment out the `security_opt` line in `docker-compose.yml` (see the Ubuntu section below).
+
+---
+
+## Docker: Ubuntu / Linux
+
+### Use Docker CE, not docker.io
+
+The `docker.io` package from Ubuntu's default repositories is often outdated. Install Docker CE from Docker's official repository:
+
+```bash
+# Quick install script (review before running)
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+### User must be in the `docker` group
+
+Running `docker` commands as root works but is not recommended. Add your user to the `docker` group and start a new shell session:
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker    # or log out and back in
+```
+
+### Rootless Docker is not supported
+
+SIDJUA's seccomp profile requires root-level privileges when applied. Rootless Docker setups will fail to start the container with a seccomp error. Use standard (rooted) Docker CE.
+
+If you must use rootless Docker, comment out the `security_opt` line in `docker-compose.yml`:
+
+```yaml
+# security_opt:
+#   - seccomp:./seccomp-profile.json
+```
+
+### AppArmor may block the container
+
+On Ubuntu 22.04+ with AppArmor enabled, the default profile may deny some syscalls needed by SIDJUA. If the container starts but crashes immediately:
+
+```bash
+docker logs sidjua | grep -i apparmor
+```
+
+If AppArmor is the cause, you can run the container with `--security-opt apparmor=unconfined` (add to `docker-compose.yml` under `security_opt`) for diagnostics, then configure a proper AppArmor profile for production.
+
+### Port conflict — another service on port 4200
+
+```bash
+ss -tlnp | grep 4200    # find what is using the port
+```
+
+Override the port without editing `docker-compose.yml`:
+
+```bash
+SIDJUA_PORT=4201 docker compose up -d
+```
+
+Add `SIDJUA_PORT=4201` to your `.env` file to make it permanent.
+
+---
+
+## Docker: macOS
+
+### Docker Desktop for Mac — Apple Silicon (M1/M2/M3)
+
+SIDJUA ships multi-arch images (`linux/amd64` and `linux/arm64`). On Apple Silicon, Docker Desktop will pull the native `arm64` image automatically — no Rosetta emulation needed. If you see architecture warnings, ensure Docker Desktop is up to date (≥ 4.15).
+
+### File sharing — volume mount access
+
+Docker Desktop on macOS requires explicit permission to access directories outside your home folder. If `docker compose up` fails with a volume-related error:
+
+1. Open Docker Desktop → Settings → Resources → File Sharing
+2. Add the directory containing `docker-compose.yml`
+3. Click **Apply & Restart**
+
+### VirtioFS vs gRPC-FUSE
+
+Docker Desktop ≥ 4.6 supports **VirtioFS** for file sharing, which is significantly faster than the older gRPC-FUSE backend. Enable it in Docker Desktop → Settings → General → **"Use VirtioFS for file sharing"**. This is especially noticeable if SIDJUA is writing frequently to SQLite on a bind-mounted volume.
+
+---
+
+## Docker: Common Error Reference
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `seccomp-profile.json: no such file or directory` | Missing seccomp profile | Download from repo root or comment out `security_opt` in `docker-compose.yml` |
+| `port already in use` | Port 4200 occupied | Set `SIDJUA_PORT=<other>` in `.env` |
+| `permission denied` on volumes | UID mismatch or wrong path | `docker compose down -v` then re-up; or fix ownership with `sudo chown -R 1001:1001 ./data` |
+| Health check failed (`unhealthy`) | Server not started, DB not init | Check `docker logs sidjua`; run `docker compose exec sidjua sidjua apply` |
+| `SIDJUA_API_KEY not set` | Missing env var | `docker compose exec sidjua sidjua api-key generate`, then add to `.env` |
+| `Cannot connect to the Docker daemon` | Docker Desktop not running (WSL2/Mac) | Start Docker Desktop and wait for the daemon to be ready |
+| `exec format error` | Wrong image arch | Pull the latest image: `docker compose pull` |
+
+---
+
 ## CLI Errors
 
 ### Symptom: `sidjua: command not found`
