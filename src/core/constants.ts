@@ -22,3 +22,11 @@ export const MAX_AGENTS_FREE_SOFT_LIMIT = 80;
  * Example: if the primary exhausts 2 attempts, the failover gets at most 1.
  */
 export const MAX_TOTAL_PROVIDER_RETRIES = 3;
+
+/**
+ * Fallback model ID used when no provider has been configured.
+ * Both start.ts (CLI) and cli-server.ts (Docker) must import this
+ * constant rather than hardcoding a model string inline.
+ * DUAL PATH: any change here applies to both startup code paths.
+ */
+export const DEFAULT_FALLBACK_MODEL = "auto";
