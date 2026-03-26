@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { RefreshCw, X, Plus } from 'lucide-react';
+import { useTranslation } from '../hooks/useTranslation';
 
 import { useAgents }    from '../hooks/useAgents';
 import { useAgent }     from '../hooks/useAgent';
@@ -80,6 +81,8 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
   const agentRes = useAgent(agentId);
   const agent    = agentRes.data?.agent;
   const { client } = useAppConfig();
+
+  const { t } = useTranslation();
 
   const [actioning,   setActioning]   = useState<'start' | 'stop' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -175,7 +178,7 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
             {agent.name}
           </h2>
           <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-            {agent.division} · Tier {agent.tier}
+            {agent.division} · {t(`agent.tier.${agent.tier}`)}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -374,14 +377,9 @@ function DetailRow({ label, value, color }: { label: string; value: string; colo
 }
 
 
-const TIER_DESCRIPTIONS: Record<number, string> = {
-  1: 'T1 — Strategic reasoning; requires the most capable LLM.',
-  2: 'T2 — Mid-level reasoning; standard LLMs recommended.',
-  3: 'T3 — Simple, repetitive tasks; free-tier LLMs are fine.',
-};
-
 function StarterAgentDetail({ agent, onClose, providerConfigured }: { agent: StarterAgent; onClose: () => void; providerConfigured: boolean }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -408,7 +406,7 @@ function StarterAgentDetail({ agent, onClose, providerConfigured }: { agent: Sta
               {agent.name}
             </h2>
             <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
-              {TIER_DESCRIPTIONS[agent.tier] ?? `Tier ${agent.tier}`}
+              {t(`agent.tier.desc.${agent.tier}`)}
             </p>
           </div>
         </div>
@@ -599,25 +597,27 @@ function YourTeamPanel() {
         />
       )}
 
-      {/* Info banner */}
-      <div style={{
-        background:   'var(--color-info-bg)',
-        border:       '1px solid var(--color-info-border)',
-        borderRadius: 'var(--radius-md)',
-        padding:      '12px 16px',
-        fontSize:     '13px',
-        color:        'var(--color-info)',
-        lineHeight:   1.5,
-      }}>
-        These 6 agents are your starter team. They become fully operational once you{' '}
-        <button
-          onClick={() => navigate('/settings')}
-          style={{ background: 'none', border: 'none', color: 'var(--color-info)', cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit', padding: 0 }}
-        >
-          configure an LLM provider
-        </button>
-        {' '}in Settings. The <strong>Guide</strong> agent is your first point of contact — start there to learn how SIDJUA works.
-      </div>
+      {/* Info banner — only shown when no provider is configured yet */}
+      {llmStatus !== 'configured' && (
+        <div style={{
+          background:   'var(--color-info-bg)',
+          border:       '1px solid var(--color-info-border)',
+          borderRadius: 'var(--radius-md)',
+          padding:      '12px 16px',
+          fontSize:     '13px',
+          color:        'var(--color-info)',
+          lineHeight:   1.5,
+        }}>
+          These 6 agents are your starter team. They become fully operational once you{' '}
+          <button
+            onClick={() => navigate('/settings')}
+            style={{ background: 'none', border: 'none', color: 'var(--color-info)', cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit', padding: 0 }}
+          >
+            configure an LLM provider
+          </button>
+          {' '}in Settings. The <strong>Guide</strong> agent is your first point of contact — start there to learn how SIDJUA works.
+        </div>
+      )}
     </div>
   );
 }

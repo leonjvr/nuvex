@@ -618,5 +618,11 @@
   "cli.start.runtime_mode": "  Runtime:  {mode} (checkpoint every {interval}s)\n",
   "email.threads_table_missing": "Tabella dei thread e-mail non trovata. Esegui `sidjua email setup` o avvia prima l'adattatore di messaggistica.",
   "_meta.locale": "it",
-  "_meta.version": "1.0"
+  "_meta.version": "1.0",
+  "agent.tier.1": "Responsabile di dipartimento",
+  "agent.tier.2": "Responsabile di team",
+  "agent.tier.3": "Lavoratore",
+  "agent.tier.desc.1": "T1 — Strategic reasoning; requires the most capable LLM.",
+  "agent.tier.desc.2": "T2 — Mid-level reasoning; standard LLMs recommended.",
+  "agent.tier.desc.3": "T3 — Simple, repetitive tasks; free-tier LLMs are fine."
 }

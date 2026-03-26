@@ -618,5 +618,11 @@
   "gui.shutdown_reminder": "Always run 'sidjua shutdown' before turning off your computer.",
   "cli.start.crash_recovery": "▸ Crash recovery: {tasks} interrupted task(s) recovered.\n",
   "cli.start.runtime_mode": "  Runtime:  {mode} (checkpoint every {interval}s)\n",
-  "email.threads_table_missing": "Tabla de hilos de correo no encontrada. Ejecuta `sidjua email setup` o inicia primero el adaptador de mensajería."
+  "email.threads_table_missing": "Tabla de hilos de correo no encontrada. Ejecuta `sidjua email setup` o inicia primero el adaptador de mensajería.",
+  "agent.tier.1": "Jefe de departamento",
+  "agent.tier.2": "Jefe de equipo",
+  "agent.tier.3": "Trabajador",
+  "agent.tier.desc.1": "T1 — Strategic reasoning; requires the most capable LLM.",
+  "agent.tier.desc.2": "T2 — Mid-level reasoning; standard LLMs recommended.",
+  "agent.tier.desc.3": "T3 — Simple, repetitive tasks; free-tier LLMs are fine."
 }

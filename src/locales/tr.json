@@ -618,5 +618,11 @@
   "cli.start.runtime_mode": "  Runtime:  {mode} (checkpoint every {interval}s)\n",
   "email.threads_table_missing": "E-posta dizisi tablosu bulunamadı. `sidjua email setup` komutunu çalıştırın veya önce mesajlaşma bağdaştırıcısını başlatın.",
   "_meta.locale": "tr",
-  "_meta.version": "1.0"
+  "_meta.version": "1.0",
+  "agent.tier.1": "Department Head",
+  "agent.tier.2": "Team Lead",
+  "agent.tier.3": "Worker",
+  "agent.tier.desc.1": "T1 — Strategic reasoning; requires the most capable LLM.",
+  "agent.tier.desc.2": "T2 — Mid-level reasoning; standard LLMs recommended.",
+  "agent.tier.desc.3": "T3 — Simple, repetitive tasks; free-tier LLMs are fine."
 }

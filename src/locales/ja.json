@@ -618,5 +618,11 @@
   "cli.start.runtime_mode": "  Runtime:  {mode} (checkpoint every {interval}s)\n",
   "email.threads_table_missing": "メールスレッドテーブルが見つかりません。`sidjua email setup` を実行するか、先にメッセージングアダプターを起動してください。",
   "_meta.locale": "ja",
-  "_meta.version": "1.0"
+  "_meta.version": "1.0",
+  "agent.tier.1": "部門長",
+  "agent.tier.2": "チームリーダー",
+  "agent.tier.3": "ワーカー",
+  "agent.tier.desc.1": "T1 — Strategic reasoning; requires the most capable LLM.",
+  "agent.tier.desc.2": "T2 — Mid-level reasoning; standard LLMs recommended.",
+  "agent.tier.desc.3": "T3 — Simple, repetitive tasks; free-tier LLMs are fine."
 }
