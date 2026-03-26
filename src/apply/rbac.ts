@@ -25,6 +25,7 @@ import { stringify } from "yaml";
 import type { ParsedConfig } from "../types/config.js";
 import type { RBACConfig, AgentAssignment, RoleDefinition, RoleAssignment } from "../types/apply.js";
 import { ApplyError, type StepResult } from "../types/apply.js";
+import type { Database } from "../utils/db.js";
 import { logger } from "../utils/logger.js";
 
 
@@ -86,8 +87,8 @@ export function getAgentTier(agentId: string): 1 | 2 | 3 | null {
 }
 
 
-export function generateRBAC(config: ParsedConfig): RBACConfig {
-  // Collect: agent → [divisions it heads]
+export function generateRBAC(config: ParsedConfig, db: Database | null = null): RBACConfig {
+  // Collect: agent → [divisions it heads] (from divisions.yaml head.agent)
   const agentDivisions = new Map<string, string[]>();
   for (const div of config.activeDivisions) {
     if (!div.head.agent) continue;
@@ -101,28 +102,71 @@ export function generateRBAC(config: ParsedConfig): RBACConfig {
     .filter((d) => d.head.agent && getAgentTier(d.head.agent) === 1)
     .map((d) => d.code);
 
+  // Load all registered agents from agent_definitions DB → division_agent role
+  // agent_id → division mapping (non-fatal if table is missing or DB is null)
+  const dbAgents: Array<{ id: string; division: string; tier: number }> = [];
+  if (db !== null) {
+    try {
+      const rows = db.prepare<[], { id: string; division: string; tier: number }>(
+        "SELECT id, division, tier FROM agent_definitions",
+      ).all() as Array<{ id: string; division: string; tier: number }>;
+      dbAgents.push(...rows);
+    } catch (_err) {
+      // Table may not exist yet — non-fatal; head-agents still processed
+    }
+  }
+
   const assignments: AgentAssignment[] = [];
 
-  for (const [agent, divisions] of agentDivisions) {
-    const tier = getAgentTier(agent);
-    const roles: RoleAssignment[] = [];
+  // Track which agents already have assignments (to merge correctly)
+  const agentAssignmentMap = new Map<string, RoleAssignment[]>();
 
-    // Division head roles
+  // Head agents → division_head + cross-division reader
+  for (const [agent, divisions] of agentDivisions) {
+    const tier  = getAgentTier(agent);
+    const roles = agentAssignmentMap.get(agent) ?? [];
+
     for (const divCode of divisions) {
       roles.push({ role: "division_head", division: divCode });
     }
 
-    // Cross-division reader based on tier
     if (tier === 1) {
-      // T1: read all active divisions
       roles.push({ role: "cross_division_reader", divisions: ["*"] });
     } else if (tier === 2 && t1HeadedDivisions.length > 0) {
-      // T2: read T1-headed divisions (strategic oversight)
       roles.push({ role: "cross_division_reader", divisions: [...t1HeadedDivisions] });
     }
-    // T3 and unknown tiers: no cross-division reader
 
-    assignments.push({ agent, roles });
+    agentAssignmentMap.set(agent, roles);
+  }
+
+  // DB agents → division_agent role for their registered division
+  for (const row of dbAgents) {
+    const roles = agentAssignmentMap.get(row.id) ?? [];
+
+    // Add division_agent if not already a head of this division
+    const alreadyHead = roles.some(
+      (r) => r.role === "division_head" && "division" in r && r.division === row.division,
+    );
+    if (!alreadyHead) {
+      roles.push({ role: "division_agent", division: row.division });
+    }
+
+    // Cross-division reader by DB tier (for agents not in divisions.yaml head)
+    if (!agentDivisions.has(row.id)) {
+      if (row.tier === 1) {
+        roles.push({ role: "cross_division_reader", divisions: ["*"] });
+      } else if (row.tier === 2 && t1HeadedDivisions.length > 0) {
+        roles.push({ role: "cross_division_reader", divisions: [...t1HeadedDivisions] });
+      }
+    }
+
+    agentAssignmentMap.set(row.id, roles);
+  }
+
+  for (const [agent, roles] of agentAssignmentMap) {
+    if (roles.length > 0) {
+      assignments.push({ agent, roles });
+    }
   }
 
   return {
@@ -134,11 +178,11 @@ export function generateRBAC(config: ParsedConfig): RBACConfig {
 }
 
 
-export function applyRBAC(config: ParsedConfig, workDir: string): StepResult {
+export function applyRBAC(config: ParsedConfig, workDir: string, db: Database | null = null): StepResult {
   const start = Date.now();
 
   try {
-    const rbac = generateRBAC(config);
+    const rbac = generateRBAC(config, db);
     const outPath = join(workDir, ".system", "rbac.yaml");
 
     const yaml =

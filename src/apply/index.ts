@@ -310,7 +310,7 @@ export async function apply(options: ApplyOptions): Promise<ApplyResult> {
     if (shouldRun(onlyStep, "RBAC")) {
       const stepStart = Date.now();
       try {
-        const result = applyRBAC(config, options.workDir);
+        const result = applyRBAC(config, options.workDir, db);
         steps.push({ ...result, duration_ms: Date.now() - stepStart });
       } catch (err) {
         steps.push({
