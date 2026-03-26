@@ -21,6 +21,7 @@ import {
   mkdirSync,
   existsSync,
   chmodSync,
+  unlinkSync,
 } from "node:fs";
 import { join }                                             from "node:path";
 import { createCipheriv, createDecipheriv, randomBytes }   from "node:crypto";
@@ -215,13 +216,17 @@ function storedToConfig(stored: StoredConfig, masterKey: Buffer): ProviderConfig
  * Returns null if no configuration has been saved yet.
  */
 export function getProviderConfig(): ProviderConfig | null {
+  // Always call getMasterKey() first — it reads the key file from disk and sets
+  // _memoryMode to "fs" when the key file is found. Without this call, _memoryMode
+  // stays "memory" after process restart and null is returned even though a saved
+  // config exists on disk (causes "Invalid API key" / "no_provider" errors after restart).
+  const masterKey = getMasterKey();
+
   if (_memoryMode === "memory") {
     return _memoryConfig;
   }
 
-  const masterKey  = getMasterKey();
   const configPath = getConfigPath();
-
   if (configPath === null || !existsSync(configPath)) {
     return _memoryConfig;
   }
@@ -328,12 +333,24 @@ export function getProviderForAgent(agentId: string): ConfiguredProvider | null 
 
 /**
  * Reset cached state (for testing only).
- * Respects SIDJUA_EPHEMERAL — if set, resets to memory mode.
+ *
+ * Clears in-memory state AND removes the on-disk provider config file so that
+ * subsequent calls to getProviderConfig() return null regardless of prior test runs.
+ * The master key file is left in place (it is the encryption key, not the config).
+ *
+ * This function must never be called from production code.
  */
 export function resetProviderConfigState(): void {
   _memoryConfig = null;
   _masterKey    = null;
-  _memoryMode   = process.env["SIDJUA_EPHEMERAL"] === "true" ? "memory" : "memory";
-  // NOTE: always reset to "memory" so tests start fresh without disk side-effects.
-  // getMasterKey() will flip to "fs" on first successful disk access.
+  _memoryMode   = "memory";
+
+  // Remove the on-disk provider config so getProviderConfig() returns null after
+  // reset, even though getMasterKey() now reads from disk on every call.
+  try {
+    const configPath = getConfigPath();
+    if (configPath !== null && existsSync(configPath)) {
+      unlinkSync(configPath);
+    }
+  } catch (_e) { /* ignore — test environment may not have write access */ }
 }
