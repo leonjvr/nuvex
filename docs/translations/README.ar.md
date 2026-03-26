@@ -9,8 +9,8 @@
 > المنصة الوحيدة للوكلاء التي تُطبَّق فيها الحوكمة بالبنية المعمارية، لا بالأمل في أن يتصرف النموذج بشكل صحيح.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Docker](https://img.shields.io/badge/Docker-sidjua%2Fsidjua-blue)](https://hub.docker.com/r/sidjua/sidjua)
-[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/sidjua-dev/sidjua/releases)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fgoetzkohlberg%2Fsidjua-blue)](https://ghcr.io/goetzkohlberg/sidjua)
+[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/GoetzKohlberg/sidjua/releases)
 
 ---
 
@@ -272,7 +272,7 @@ divisions:
 **أمر Docker واحد** للإنتاج:
 
 ```bash
-docker run -p 4200:4200 sidjua/sidjua:latest
+docker run -p 4200:4200 ghcr.io/goetzkohlberg/sidjua:latest
 ```
 
 يُنشأ مفتاح API تلقائيًا عند أول تشغيل ويُطبَع في سجلات الحاوية.
@@ -420,7 +420,7 @@ sidjua api-key generate
 ```yaml
 services:
   sidjua:
-    image: sidjua/sidjua:latest
+    image: ghcr.io/goetzkohlberg/sidjua:latest
     ports:
       - "4200:4200"
     volumes:
@@ -481,7 +481,7 @@ sidjua provider list
 ## المجتمع
 
 - **Discord**: [sidjua.com/discord](https://sidjua.com/discord)
-- **مشاكل GitHub**: [github.com/sidjua-dev/sidjua/issues](https://github.com/sidjua-dev/sidjua/issues)
+- **مشاكل GitHub**: [github.com/GoetzKohlberg/sidjua/issues](https://github.com/GoetzKohlberg/sidjua/issues)
 - **البريد الإلكتروني**: contact@sidjua.com
 - **الوثائق**: [sidjua.com/docs](https://sidjua.com/docs)
 

@@ -9,8 +9,8 @@
 > La seule plateforme d'agents où la gouvernance est imposée par l'architecture, et non par l'espoir que le modèle se comporte correctement.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Docker](https://img.shields.io/badge/Docker-sidjua%2Fsidjua-blue)](https://hub.docker.com/r/sidjua/sidjua)
-[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/sidjua-dev/sidjua/releases)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fgoetzkohlberg%2Fsidjua-blue)](https://ghcr.io/goetzkohlberg/sidjua)
+[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/GoetzKohlberg/sidjua/releases)
 
 ---
 
@@ -283,7 +283,7 @@ parallèle.
 **Une seule commande Docker** pour la production :
 
 ```bash
-docker run -p 4200:4200 sidjua/sidjua:latest
+docker run -p 4200:4200 ghcr.io/goetzkohlberg/sidjua:latest
 ```
 
 La clé API est générée automatiquement au premier démarrage et affichée dans les journaux du
@@ -433,7 +433,7 @@ sidjua api-key generate
 ```yaml
 services:
   sidjua:
-    image: sidjua/sidjua:latest
+    image: ghcr.io/goetzkohlberg/sidjua:latest
     ports:
       - "4200:4200"
     volumes:
@@ -494,7 +494,7 @@ Feuille de route complète sur [sidjua.com/roadmap](https://sidjua.com/roadmap).
 ## Communauté
 
 - **Discord** : [sidjua.com/discord](https://sidjua.com/discord)
-- **GitHub Issues** : [github.com/sidjua-dev/sidjua/issues](https://github.com/sidjua-dev/sidjua/issues)
+- **GitHub Issues** : [github.com/GoetzKohlberg/sidjua/issues](https://github.com/GoetzKohlberg/sidjua/issues)
 - **Email** : contact@sidjua.com
 - **Documentation** : [sidjua.com/docs](https://sidjua.com/docs)
 

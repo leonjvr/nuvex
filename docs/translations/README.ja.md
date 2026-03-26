@@ -7,8 +7,8 @@
 > モデルが適切に振る舞うことを期待するのではなく、アーキテクチャによってガバナンスが強制される唯一のエージェント プラットフォーム。
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Docker](https://img.shields.io/badge/Docker-sidjua%2Fsidjua-blue)](https://hub.docker.com/r/sidjua/sidjua)
-[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/sidjua-dev/sidjua/releases)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fgoetzkohlberg%2Fsidjua-blue)](https://ghcr.io/goetzkohlberg/sidjua)
+[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/GoetzKohlberg/sidjua/releases)
 
 ---
 
@@ -229,7 +229,7 @@ SIDJUA はこれらの制約をアーキテクチャレベルで実施します 
 **単一の Docker コマンド**で本番環境へ：
 
 ```bash
-docker run -p 4200:4200 sidjua/sidjua:latest
+docker run -p 4200:4200 ghcr.io/goetzkohlberg/sidjua:latest
 ```
 
 API キーは初回起動時に自動生成され、コンテナログに出力されます。環境変数は不要。設定は不要。データベースサーバーは不要 — SIDJUA は SQLite を使用し、エージェントごとに 1 つのデータベースファイル。
@@ -357,7 +357,7 @@ sidjua api-key generate
 ```yaml
 services:
   sidjua:
-    image: sidjua/sidjua:latest
+    image: ghcr.io/goetzkohlberg/sidjua:latest
     ports:
       - "4200:4200"
     volumes:
@@ -417,7 +417,7 @@ sidjua provider list
 ## コミュニティ
 
 - **Discord**: [sidjua.com/discord](https://sidjua.com/discord)
-- **GitHub Issues**: [github.com/sidjua-dev/sidjua/issues](https://github.com/sidjua-dev/sidjua/issues)
+- **GitHub Issues**: [github.com/GoetzKohlberg/sidjua/issues](https://github.com/GoetzKohlberg/sidjua/issues)
 - **メール**: contact@sidjua.com
 - **ドキュメント**: [sidjua.com/docs](https://sidjua.com/docs)
 

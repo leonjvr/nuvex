@@ -9,8 +9,8 @@
 > Ang tanging plataporma ng agent kung saan ang pamamahala ay ipinapatupad ng arkitektura, hindi ng pag-asa na maayos na kikilos ang modelo.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Docker](https://img.shields.io/badge/Docker-sidjua%2Fsidjua-blue)](https://hub.docker.com/r/sidjua/sidjua)
-[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/sidjua-dev/sidjua/releases)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fgoetzkohlberg%2Fsidjua-blue)](https://ghcr.io/goetzkohlberg/sidjua)
+[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/GoetzKohlberg/sidjua/releases)
 
 ---
 
@@ -287,7 +287,7 @@ nang sabay-sabay.
 **Iisang Docker command** hanggang produksyon:
 
 ```bash
-docker run -p 4200:4200 sidjua/sidjua:latest
+docker run -p 4200:4200 ghcr.io/goetzkohlberg/sidjua:latest
 ```
 
 Ang API key ay awtomatikong nabubuo sa unang pagsisimula at naka-print sa mga log ng container.
@@ -439,7 +439,7 @@ sidjua api-key generate
 ```yaml
 services:
   sidjua:
-    image: sidjua/sidjua:latest
+    image: ghcr.io/goetzkohlberg/sidjua:latest
     ports:
       - "4200:4200"
     volumes:
@@ -501,7 +501,7 @@ Sa malapit na hinaharap:
 ## Komunidad
 
 - **Discord**: [sidjua.com/discord](https://sidjua.com/discord)
-- **GitHub Issues**: [github.com/sidjua-dev/sidjua/issues](https://github.com/sidjua-dev/sidjua/issues)
+- **GitHub Issues**: [github.com/GoetzKohlberg/sidjua/issues](https://github.com/GoetzKohlberg/sidjua/issues)
 - **Email**: contact@sidjua.com
 - **Docs**: [sidjua.com/docs](https://sidjua.com/docs)
 
