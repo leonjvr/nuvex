@@ -26,6 +26,7 @@ import type { AgentRole }          from "../../defaults/loader.js";
 import { loadDefaultRoles }        from "../../defaults/loader.js";
 import { getToolDefinitions,
          executeToolCall }         from "./agent-tools.js";
+import type { AgentVisibilityContext } from "./agent-tools.js";
 import type { Database }           from "better-sqlite3";
 import { runAuditMigrations }      from "../../core/audit/audit-migrations.js";
 
@@ -390,7 +391,11 @@ export function registerChatRoutes(app: Hono, services: ChatRouteServices = {}):
     const apiKey     = provider.api_key;
     const model      = provider.model ?? "llama-3.3-70b-versatile";
 
-    const toolDefs = getToolDefinitions(agentId);
+    const agentVisCtx: AgentVisibilityContext | undefined =
+      effectiveRole !== null
+        ? { tier: effectiveRole.tier, division: effectiveRole.division }
+        : undefined;
+    const toolDefs = getToolDefinitions(agentId, agentVisCtx);
 
     return streamSSE(c, async (stream) => {
       const controller = new AbortController();
