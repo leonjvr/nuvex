@@ -73,6 +73,10 @@ export function createSystemRoutes(getApiKey?: () => string): Hono {
    * Public endpoint — returns the local API key so the GUI can authenticate.
    * Restricted to loopback connections (localhost / 127.0.0.1 / ::1) via Host
    * header check; external hosts receive 403.
+   *
+   * DEPRECATED: Use window.__SIDJUA_BOOTSTRAP__ (P281) — the key is now injected
+   * server-side into index.html, eliminating the need for this extra HTTP round-trip.
+   * Retained for backwards compatibility with older GUI builds and external tooling.
    */
   app.get("/gui-bootstrap", (c) => {
     const host     = (c.req.header("host") ?? "").split(":")[0]!.toLowerCase();
