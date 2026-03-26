@@ -24,7 +24,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import Database               from "better-sqlite3";
 import type { SecretsProvider } from "../../types/apply.js";
 import { createLogger } from "../../core/logger.js";
-import { hasTable }     from "../../api/utils/has-table.js";
+import { hasTable }     from "../../core/db/helpers.js";
 import type { CallerContext } from "../caller-context.js";
 import { requireScope, CALLER_CONTEXT_KEY } from "../middleware/require-scope.js";
 

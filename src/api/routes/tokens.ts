@@ -3,7 +3,7 @@
 // Dual licensed: AGPL-3.0 + SIDJUA Commercial License. See LICENSE.
 
 /**
- * SIDJUA — P269: Token Management REST Endpoints
+ * SIDJUA — Token Management REST Endpoints
  *
  *   GET    /api/v1/tokens              — list tokens (readonly, no hashes)
  *   GET    /api/v1/tokens/:id          — get token by ID

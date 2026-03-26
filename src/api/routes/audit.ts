@@ -21,7 +21,7 @@ import Database from "better-sqlite3";
 import { Hono } from "hono";
 import { SidjuaError }          from "../../core/error-codes.js";
 import { createLogger }          from "../../core/logger.js";
-import { hasTable }              from "../utils/has-table.js";
+import { hasTable }              from "../../core/db/helpers.js";
 import { AuditService }          from "../../core/audit/audit-service.js";
 import { sanitizeLikePattern }   from "../../utils/sql-utils.js";
 import type { AuditFilters }     from "../../core/audit/audit-service.js";

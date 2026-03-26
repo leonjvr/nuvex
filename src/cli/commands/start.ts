@@ -331,14 +331,14 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
         const agentRegistryForDelegation = registry ?? new (await import("../../agent-lifecycle/agent-registry.js")).AgentRegistry(db);
         const delegationPolicyResolver   = new DelegationPolicyResolver(agentRegistryForDelegation);
         const delegationService          = new DelegationService(
-          taskStore as never,
+          taskStore,
           sharedEventBus,
           delegationPolicyResolver,
           agentRegistryForDelegation,
         );
         const resultAggregator = new ResultAggregator(
           sharedEventBus,
-          taskStore as never,
+          taskStore,
           delegationService,
           responseRouter,
         );

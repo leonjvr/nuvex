@@ -38,7 +38,7 @@ export interface TaskStoreLike {
     parent_id: string;
     root_id: string;
     division: string;
-    tier: number;
+    tier: 1 | 2 | 3;
     title: string;
     description: string;
     assigned_agent: string;
@@ -48,7 +48,7 @@ export interface TaskStoreLike {
     cost_budget: number;
     ttl_seconds: number;
     sub_tasks_expected: number;
-    metadata?: unknown;
+    metadata?: Record<string, unknown>;
   }): { id: string };
   update(taskId: string, fields: { sub_tasks_expected?: number }): { id: string };
 }

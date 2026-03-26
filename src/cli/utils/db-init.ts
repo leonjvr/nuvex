@@ -49,6 +49,7 @@ import { openDatabase }      from "../../utils/db.js";
 import { PHASE9_SCHEMA_SQL } from "../../orchestrator/types.js";
 import { TOKEN_SCHEMA_SQL }  from "../../api/token-store.js";
 import { runKnowledgeMigrations } from "../../knowledge-pipeline/migration.js";
+import { validateWorkDir }    from "../../utils/path-utils.js";
 import Database from "better-sqlite3";
 import { createLogger } from "../../core/logger.js";
 
@@ -73,6 +74,8 @@ export interface CliDbOptions {
  * @returns The open database, or `null` on failure (caller should `return 1`).
  */
 export function openCliDatabase(opts: CliDbOptions): InstanceType<typeof Database> | null {
+  validateWorkDir(opts.workDir);
+
   const dbFile = join(opts.workDir, ".system", "sidjua.db");
 
   if (!existsSync(dbFile)) {
