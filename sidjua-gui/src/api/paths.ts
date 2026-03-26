@@ -27,6 +27,7 @@ export const API_PATHS = {
   agent:             (id: string)   => `${API_PREFIX}/agents/${id}`,
   agentStart:        (id: string)   => `${API_PREFIX}/agents/${id}/start`,
   agentStop:         (id: string)   => `${API_PREFIX}/agents/${id}/stop`,
+  agentPatch:        (id: string)   => `${API_PREFIX}/agents/${id}`,
 
   // Tasks
   tasks:             ()             => `${API_PREFIX}/tasks`,
