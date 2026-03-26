@@ -66,7 +66,7 @@ function AgentRow({ agent, isSelected, isFlashing, onClick }: AgentRowProps) {
         {agent.division}
       </td>
       <td style={{ padding: '12px 8px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
-        {agent.model}
+        {agent.resolved_model ?? agent.model}
       </td>
       <td style={{ padding: '12px 8px', fontSize: '12px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
         {formatRelative(agent.updated_at)}
@@ -76,7 +76,7 @@ function AgentRow({ agent, isSelected, isFlashing, onClick }: AgentRowProps) {
 }
 
 
-function AgentDetail({ agentId, onClose }: { agentId: string; onClose: () => void }) {
+function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClose: () => void; liveStatus?: AgentLifecycleStatus }) {
   const agentRes = useAgent(agentId);
   const agent    = agentRes.data?.agent;
   const { client } = useAppConfig();
@@ -147,8 +147,10 @@ function AgentDetail({ agentId, onClose }: { agentId: string; onClose: () => voi
     );
   }
 
-  const canStart = agent.status === 'stopped' || agent.status === 'error';
-  const canStop  = agent.status === 'active'  || agent.status === 'idle';
+  // Use live SSE-updated status (from agentMap) when available; fall back to API fetch.
+  const displayStatus = liveStatus ?? agent.status;
+  const canStart = displayStatus === 'stopped' || displayStatus === 'error';
+  const canStop  = displayStatus === 'active'  || displayStatus === 'idle';
 
   return (
     <PanelShell onClose={onClose}>
@@ -162,7 +164,7 @@ function AgentDetail({ agentId, onClose }: { agentId: string; onClose: () => voi
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <StatusBadge status={agent.status} />
+          <StatusBadge status={displayStatus} />
           {canStart && (
             <button
               onClick={() => { void handleAction('start'); }}
@@ -219,7 +221,7 @@ function AgentDetail({ agentId, onClose }: { agentId: string; onClose: () => voi
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', marginBottom: '16px' }}>
         <DetailRow label="Provider" value={agent.provider} />
-        <DetailRow label="Model"    value={agent.model} />
+        <DetailRow label="Model"    value={agent.resolved_model ?? agent.model} />
         <DetailRow label="Created"  value={formatRelative(agent.created_at)} />
         <DetailRow label="Updated"  value={formatRelative(agent.updated_at)} />
         <DetailRow label="Tasks done"   value={String(doneTotal)} />
@@ -642,7 +644,7 @@ export function Agents() {
       list = list.filter((a) =>
         a.name.toLowerCase().includes(q) ||
         a.division.toLowerCase().includes(q) ||
-        a.model.toLowerCase().includes(q),
+        (a.resolved_model ?? a.model).toLowerCase().includes(q),
       );
     }
     return list.sort((a, b) => a.name.localeCompare(b.name));
@@ -844,7 +846,11 @@ export function Agents() {
 
       {/* Detail panel */}
       {selectedId && (
-        <AgentDetail agentId={selectedId} onClose={() => setSelectedId(null)} />
+        <AgentDetail
+          agentId={selectedId}
+          onClose={() => setSelectedId(null)}
+          liveStatus={agentMap.get(selectedId)?.status}
+        />
       )}
     </div>
   );

@@ -60,6 +60,8 @@ export interface Agent {
   tier: number;
   provider: string;
   model: string;
+  /** Resolved model: "auto" resolved to actual provider+model, or same as model. */
+  resolved_model?: string;
   skill_path: string;
   status: AgentLifecycleStatus;
   created_at: string;

@@ -17,6 +17,7 @@ import { createLogger }   from "../../core/logger.js";
 import { DIVISION_RE, validateDivisionName } from "../../core/validation/division.js";
 import { reqId } from "../utils/request-id.js";
 import { requireScope } from "../middleware/require-scope.js";
+import { getProviderForAgent } from "../../core/provider-config.js";
 import type {
   AgentDefinitionRow,
   AgentLifecycleStatus,
@@ -75,6 +76,26 @@ export function validateDivision(input: string): string {
 
 const logger = createLogger("api-agents");
 
+/**
+ * Enrich an AgentDefinitionRow with a `resolved_model` field.
+ * When `model` is "auto" or empty, resolve the actual model from the
+ * provider config; otherwise pass model through as-is.
+ */
+function withResolvedModel(agent: AgentDefinitionRow): AgentDefinitionRow & { resolved_model: string } {
+  let resolved = agent.model;
+  if (!resolved || resolved === "auto") {
+    try {
+      const prov = getProviderForAgent(agent.id);
+      if (prov) {
+        resolved = prov.model ?? prov.provider_id;
+      }
+    } catch {
+      // Non-fatal — provider config may not be set up yet
+    }
+  }
+  return { ...agent, resolved_model: resolved };
+}
+
 
 export interface AgentRegistryLike {
   list(filters?: RegistryFilters): AgentDefinitionRow[];
@@ -113,7 +134,7 @@ export function registerAgentRoutes(app: Hono, services: AgentRouteServices): vo
     }
     if (divisionParam !== undefined) filters.division = validateDivision(divisionParam);
 
-    const agents = registry.list(filters);
+    const agents = registry.list(filters).map(withResolvedModel);
     return c.json({ agents });
   });
 
@@ -127,7 +148,7 @@ export function registerAgentRoutes(app: Hono, services: AgentRouteServices): vo
       throw SidjuaError.from("AGT-001", `Agent ${id} not found`);
     }
 
-    return c.json({ agent });
+    return c.json({ agent: withResolvedModel(agent) });
   });
 
   // ---- POST /api/v1/agents/:id/start -------------------------------------
