@@ -586,7 +586,7 @@ site, webhook inbound triggers.
 communication, security penetration test.
 
 **V2.0 Enterprise (H2 2026)** — SSO/LDAP/SAML, high availability, MOODEX (patented),
-compliance packs, tamper-proof audit export.
+compliance packs, tamper-evident audit export.
 
 ---
 
