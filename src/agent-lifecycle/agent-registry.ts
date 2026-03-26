@@ -21,13 +21,14 @@ import type {
 } from "./types.js";
 import { SidjuaError } from "../core/error-codes.js";
 import { createLogger } from "../core/logger.js";
+import { MAX_AGENTS_FREE, MAX_AGENTS_FREE_SOFT_LIMIT } from "../core/constants.js";
 
 const logger = createLogger("agent-registry");
 
-/** Warn when active agent count reaches this threshold. */
-export const FREE_TIER_AGENT_SOFT_LIMIT = 80;
-/** Hard block: agent creation fails when active agent count reaches this value. */
-export const FREE_TIER_AGENT_HARD_LIMIT = 100;
+/** @deprecated Use MAX_AGENTS_FREE from src/core/constants.ts */
+export const FREE_TIER_AGENT_SOFT_LIMIT = MAX_AGENTS_FREE_SOFT_LIMIT;
+/** @deprecated Use MAX_AGENTS_FREE from src/core/constants.ts */
+export const FREE_TIER_AGENT_HARD_LIMIT = MAX_AGENTS_FREE;
 
 
 export class AgentRegistry {
@@ -50,18 +51,18 @@ export class AgentRegistry {
       .get() as { count: number } | undefined;
     const activeCount = countRow?.count ?? 0;
 
-    if (activeCount >= FREE_TIER_AGENT_HARD_LIMIT) {
+    if (activeCount >= MAX_AGENTS_FREE) {
       throw SidjuaError.from(
         "LIMIT-001",
-        `Free tier agent limit reached (${FREE_TIER_AGENT_HARD_LIMIT}). Remove unused agents or upgrade to Sidjua Enterprise for unlimited agents.`,
+        `Agent limit reached (${MAX_AGENTS_FREE} for Free tier). Remove unused agents or upgrade to Sidjua Enterprise for unlimited agents.`,
       );
     }
 
-    if (activeCount >= FREE_TIER_AGENT_SOFT_LIMIT) {
+    if (activeCount >= MAX_AGENTS_FREE_SOFT_LIMIT) {
       logger.warn(
         "agent_limit_warning",
-        `Agent count at ${activeCount}/${FREE_TIER_AGENT_HARD_LIMIT}. Free tier supports max ${FREE_TIER_AGENT_HARD_LIMIT} agents. Sidjua Enterprise supports unlimited agents.`,
-        { metadata: { active_count: activeCount, hard_limit: FREE_TIER_AGENT_HARD_LIMIT } },
+        `Agent count at ${activeCount}/${MAX_AGENTS_FREE}. Free tier supports max ${MAX_AGENTS_FREE} agents. Sidjua Enterprise supports unlimited agents.`,
+        { metadata: { active_count: activeCount, limit: MAX_AGENTS_FREE } },
       );
     }
 

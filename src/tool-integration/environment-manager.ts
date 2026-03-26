@@ -19,6 +19,7 @@ import type {
   PlatformType,
 } from "./types.js";
 import { createLogger } from "../core/logger.js";
+import { validateSshHost } from "../core/outbound-validator.js";
 
 const logger = createLogger("environment-manager");
 
@@ -220,6 +221,13 @@ export class EnvironmentManager {
         connected: false,
         error: "SSH key secret resolution not available in CLI context",
       };
+    }
+
+    // SSRF guard — reject private/loopback hosts before opening a connection
+    try {
+      validateSshHost(host);
+    } catch (e: unknown) {
+      return { connected: false, error: e instanceof Error ? e.message : String(e) };
     }
 
     const start = Date.now();

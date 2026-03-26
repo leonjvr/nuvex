@@ -28,6 +28,7 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "../utils/db.js";
 import { logger as defaultLogger, type Logger } from "../utils/logger.js";
 import { reportError } from "../core/telemetry/telemetry-reporter.js";
+import { MAX_TOTAL_PROVIDER_RETRIES } from "../core/constants.js";
 import type {
   EventBus,
   LLMProvider,
@@ -116,9 +117,12 @@ export class ProviderRegistry {
     const start = Date.now();
     let response: ProviderCallResponse;
 
+    // xAI-ARCH-H3: track primary attempt count to cap total retries
+    let primaryAttempts = 0;
+
     try {
       response = await this.retryHandler.withRetry(
-        () => provider.call(request),
+        () => { primaryAttempts++; return provider.call(request); },
         { provider: providerName, callId },
       );
     } catch (primaryErr) {
@@ -132,7 +136,9 @@ export class ProviderRegistry {
       // Attempt failover if configured and this wasn't already a failover call
       const fallback = this.config.fallbackProvider;
       if (fallback !== undefined && fallback !== providerName) {
-        response = await this.callWithFailover(request, fallback, primaryErr, start);
+        // Remaining attempts = cap - primary attempts (min 1 so failover always tries once)
+        const remainingAttempts = Math.max(1, MAX_TOTAL_PROVIDER_RETRIES - primaryAttempts);
+        response = await this.callWithFailover(request, fallback, primaryErr, start, remainingAttempts);
       } else {
         // Log the failed call before re-throwing
         const latencyMs = Date.now() - start;
@@ -299,12 +305,14 @@ export class ProviderRegistry {
     fallbackName: ProviderName,
     primaryErr: unknown,
     startTime: number,
+    maxAttempts?: number,  // xAI-ARCH-H3: capped remaining attempts
   ): Promise<ProviderCallResponse> {
     this.logger.warn("PROVIDER", "Primary provider failed — attempting failover", {
-      callId:         request.callId,
-      primaryProvider: request.provider,
+      callId:           request.callId,
+      primaryProvider:  request.provider,
       fallbackProvider: fallbackName,
-      primaryError: primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
+      primaryError:     primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
+      maxAttempts,
     });
 
     this.eventBus.emit("provider.failover", {
@@ -319,7 +327,11 @@ export class ProviderRegistry {
     try {
       return await this.retryHandler.withRetry(
         () => fallback.call(failoverRequest),
-        { provider: fallbackName, callId: request.callId },
+        {
+          provider: fallbackName,
+          callId:   request.callId,
+          ...(maxAttempts !== undefined ? { maxAttemptsOverride: maxAttempts } : {}),  // xAI-ARCH-H3
+        },
       );
     } catch (fallbackErr) {
       // Both primary and fallback failed — log the original request as errored

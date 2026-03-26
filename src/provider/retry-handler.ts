@@ -31,6 +31,13 @@ export interface RetryContext {
   provider: string;
   /** Call UUID (for log correlation). */
   callId: string;
+  /**
+   * Override the configured maxAttempts for this specific call.
+   * Used by the failover path to cap total retries across primary + failover
+   * at MAX_TOTAL_PROVIDER_RETRIES (xAI-ARCH-H3).
+   * When omitted, the handler uses its configured maxAttempts.
+   */
+  maxAttemptsOverride?: number;
 }
 
 /**
@@ -56,7 +63,12 @@ export class RetryHandler {
     let lastError: unknown = new Error("No attempts made");
     let delayMs = this.config.initialDelayMs;
 
-    for (let attempt = 1; attempt <= this.config.maxAttempts; attempt++) {
+    // xAI-ARCH-H3: honour per-call cap to bound total primary+failover retries
+    const effectiveMax = context.maxAttemptsOverride !== undefined
+      ? Math.min(context.maxAttemptsOverride, this.config.maxAttempts)
+      : this.config.maxAttempts;
+
+    for (let attempt = 1; attempt <= effectiveMax; attempt++) {
       try {
         return await operation();
       } catch (err) {
@@ -79,11 +91,11 @@ export class RetryHandler {
         }
 
         // Last attempt — throw without scheduling another delay
-        if (attempt === this.config.maxAttempts) {
+        if (attempt === effectiveMax) {
           this.logger.warn("PROVIDER", "All retry attempts exhausted", {
             callId:   context.callId,
             provider: context.provider,
-            attempts: this.config.maxAttempts,
+            attempts: effectiveMax,
             code:     err.code,
           });
           break;
