@@ -281,36 +281,14 @@ export interface TicketRouteServices {
  *   → 429 { error: { code, message } }
  */
 export function registerSseTicketRoutes(app: Hono, services: TicketRouteServices): void {
+  // The requireScope("readonly") middleware (registered above) already validates
+  // the Bearer token against the current and pending keys. The manual re-check
+  // that was here previously duplicated that logic and has been removed (P281).
+  // services.getApiKey / getPendingApiKey are retained for the TicketRouteServices
+  // interface contract and may be used by other consumers.
+  void services;
+
   app.post("/api/v1/sse/ticket", requireScope("readonly"), (c: Context) => {
-    // Authenticate via standard Bearer header
-    const authHeader = c.req.header("Authorization") ?? "";
-    const bearer     = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-
-    // Accept both current and pending keys for zero-downtime rotation,
-    // matching the behaviour of the main auth middleware.
-    const currentKey = services.getApiKey();
-    const pendingKey = services.getPendingApiKey?.() ?? null;
-    const isValidKey = bearer.length > 0 && (
-      timingSafeCompare(bearer, currentKey) ||
-      (pendingKey !== null && timingSafeCompare(bearer, pendingKey))
-    );
-
-    if (!isValidKey) {
-      logger.warn("sse_ticket_auth_fail", "SSE ticket request with invalid credentials", {
-        metadata: {},
-      });
-      return c.json(
-        {
-          error: {
-            code:        "AUTH-001",
-            message:     "Invalid or missing Authorization: Bearer <api-key>",
-            recoverable: false,
-          },
-        },
-        401,
-      );
-    }
-
     // Per-IP rate limit — prevents a single client from exhausting the ticket store
     const clientIp =
       c.req.header("x-forwarded-for") ??

@@ -171,39 +171,41 @@ function isSensitiveKey(key: string): boolean {
 const MAX_LOG_SIZE  = 50 * 1024 * 1024; // 50 MB
 const MAX_LOG_FILES = 5;
 
-// Rotation lock: prevents concurrent rotation calls from stomping each other
-let _rotating = false;
+// Rotation queue: serialises concurrent rotation calls via a Promise chain.
+// Replaces the `_rotating` boolean which was susceptible to race conditions
+// when concurrent writes both passed the flag check before either set it
+// (xAI-ROAST). Each rotation is appended to the chain; the chain never grows
+// unboundedly because we only enqueue when the file actually exceeds the limit.
+let _rotationChain: Promise<void> = Promise.resolve();
 
 function checkRotation(filePath: string): void {
-  if (_rotating) return;
   try {
     const stats = statSync(filePath);
-    if (stats.size >= MAX_LOG_SIZE) void rotateLog(filePath);
+    if (stats.size >= MAX_LOG_SIZE) {
+      // Chain next rotation after the current one completes (serialised, not concurrent)
+      _rotationChain = _rotationChain
+        .then(() => rotateLog(filePath))
+        .catch((e: unknown) => { void e; /* cleanup-ignore: rotation error — cannot use logger inside logger */ });
+    }
   } catch (e: unknown) { void e; /* cleanup-ignore: log file may not exist yet — cannot use logger inside logger */ }
 }
 
 async function rotateLog(filePath: string): Promise<void> {
-  if (_rotating) return;
-  _rotating = true;
-  try {
-    // Close current stream so we can rename the file
-    const stream = _fileStreams.get(filePath);
-    if (stream !== undefined) {
-      try { stream.end(); } catch (e: unknown) { void e; /* cleanup-ignore: stream end failure during log rotation — cannot use logger inside logger */ }
-      _fileStreams.delete(filePath);
-    }
-    // Rotate in reverse order: .5 → delete, .4 → .5, …, .1 → .2, current → .1
-    for (let i = MAX_LOG_FILES - 1; i >= 1; i--) {
-      const older = `${filePath}.${i + 1}`;
-      const newer = `${filePath}.${i}`;
-      try { unlinkSync(older); } catch (e: unknown) { void e; /* cleanup-ignore: older log file may not exist — expected during rotation */ }
-      try { await renameAsync(newer, older); } catch (e: unknown) { void e; /* cleanup-ignore: log rotation rename is best-effort — cannot use logger inside logger */ }
-    }
-    try { await renameAsync(filePath, `${filePath}.1`); } catch (e: unknown) { void e; /* cleanup-ignore: log rotation rename is best-effort — cannot use logger inside logger */ }
-    // Stream will be recreated on next write via getFileStream()
-  } finally {
-    _rotating = false;
+  // Close current stream so we can rename the file
+  const stream = _fileStreams.get(filePath);
+  if (stream !== undefined) {
+    try { stream.end(); } catch (e: unknown) { void e; /* cleanup-ignore: stream end failure during log rotation — cannot use logger inside logger */ }
+    _fileStreams.delete(filePath);
   }
+  // Rotate in reverse order: .5 → delete, .4 → .5, …, .1 → .2, current → .1
+  for (let i = MAX_LOG_FILES - 1; i >= 1; i--) {
+    const older = `${filePath}.${i + 1}`;
+    const newer = `${filePath}.${i}`;
+    try { unlinkSync(older); } catch (e: unknown) { void e; /* cleanup-ignore: older log file may not exist — expected during rotation */ }
+    try { await renameAsync(newer, older); } catch (e: unknown) { void e; /* cleanup-ignore: log rotation rename is best-effort — cannot use logger inside logger */ }
+  }
+  try { await renameAsync(filePath, `${filePath}.1`); } catch (e: unknown) { void e; /* cleanup-ignore: log rotation rename is best-effort — cannot use logger inside logger */ }
+  // Stream will be recreated on next write via getFileStream()
 }
 
 /** Open write streams keyed by file path (non-blocking file I/O) */
@@ -283,6 +285,8 @@ export function resetLogger(): void {
     try { stream.end(); } catch (e: unknown) { void e; /* cleanup-ignore: stream end failure during logger reset — cannot use logger inside logger */ }
   }
   _fileStreams.clear();
+  // Reset rotation queue so tests start with a clean chain
+  _rotationChain = Promise.resolve();
 }
 
 

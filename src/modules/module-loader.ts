@@ -129,6 +129,8 @@ export const ALLOWED_MODULE_CAPABILITIES = new Set<string>([
  *
  * Throws SEC-013 if any tool claims a capability outside the allowed set.
  * Call before writing module files to disk so a bad manifest is rejected early.
+ *
+ * Synchronous; returns void. Marked as future async upgrade point (xAI-ARCH-C3).
  */
 export function validateModuleCapabilities(manifest: ModuleManifest): void {
   const tools = manifest.tools ?? [];
@@ -347,7 +349,7 @@ export async function installModule(workDir: string, id: string, secretSource?: 
     throw new Error(`Unknown module: ${id}. Available: ${AVAILABLE_MODULES.join(", ")}`);
   }
 
-  // Validate tool capabilities against governance whitelist before touching disk
+  // Validate tool capabilities against governance whitelist before touching disk (xAI-ARCH-C3)
   validateModuleCapabilities(manifest);
 
   const installPath = join(workDir, ".system", "modules", id);
