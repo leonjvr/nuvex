@@ -16,7 +16,7 @@ import { Hono } from "hono";
 import { SidjuaError }      from "../../core/error-codes.js";
 import { createLogger }     from "../../core/logger.js";
 import { reqId }            from "../utils/request-id.js";
-import { hasTable }         from "../utils/has-table.js";
+import { hasTable }         from "../../core/db/helpers.js";
 import { notFound }         from "../utils/responses.js";
 import {
   listSnapshots,

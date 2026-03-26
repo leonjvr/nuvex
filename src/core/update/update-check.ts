@@ -21,6 +21,7 @@ import {
 } from "node:fs";
 import { join, dirname } from "node:path";
 import type { UpdateProvider } from "./update-provider.js";
+import { semverGt }            from "./version-utils.js";
 import { createLogger } from "../logger.js";
 
 // ---------------------------------------------------------------------------
@@ -204,19 +205,3 @@ export function performStartupCheck(
 }
 
 
-function semverGt(a: string, b: string): boolean {
-  const parse = (s: string): number[] =>
-    s.split(".").map((p) => parseInt(p.replace(/[^0-9]/g, ""), 10) || 0);
-
-  const pa = parse(a);
-  const pb = parse(b);
-  const len = Math.max(pa.length, pb.length);
-
-  for (let i = 0; i < len; i++) {
-    const va = pa[i] ?? 0;
-    const vb = pb[i] ?? 0;
-    if (va > vb) return true;
-    if (va < vb) return false;
-  }
-  return false;
-}

@@ -12,6 +12,7 @@
  */
 
 import { resolve }              from "node:path";
+import { statSync, existsSync } from "node:fs";
 import type { Command }         from "commander";
 import {
   importOpenClaw,
@@ -53,8 +54,18 @@ export function registerImportCommands(program: Command): void {
       model?:    string;
       workDir:   string;
     }) => {
+      const configPath = resolve(opts.config);
+      if (!existsSync(configPath)) {
+        process.stderr.write(`✗ Config file not found: ${opts.config}\n`);
+        process.exit(1);
+      }
+      const MAX_CONFIG_SIZE = 1 * 1024 * 1024; // 1 MB
+      if (statSync(configPath).size > MAX_CONFIG_SIZE) {
+        process.stderr.write(`✗ Config file exceeds 1 MB limit\n`);
+        process.exit(1);
+      }
       const importOpts: OpenClawImportOptions = {
-        configPath: resolve(opts.config),
+        configPath,
         workDir:    resolve(opts.workDir),
         dryRun:     opts.dryRun,
         noSecrets:  opts.noSecrets,

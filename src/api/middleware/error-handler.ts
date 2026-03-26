@@ -36,7 +36,10 @@ function writeToErrorLog(entry: Record<string, unknown>): void {
  * Prevents internal directory layout from leaking in production error messages.
  */
 function sanitizePath(msg: string): string {
-  return msg.replace(/\/[^\s:,'"}\]]{2,}/g, "[path]");
+  // Strip absolute paths (/home/user/...) and relative paths (./foo, ../bar)
+  return msg
+    .replace(/\/[^\s:,'"}\]]{2,}/g, "[path]")
+    .replace(/\.\.?\/[^\s:,'"}\]]+/g, "[path]");
 }
 
 

@@ -37,7 +37,7 @@ const logger = createLogger("migrate-embeddings-cmd");
 
 export function registerMigrateEmbeddingsCommands(program: Command): void {
   program
-    .command("migrate-embeddings")
+    .command("migrate-embeddings", { hidden: true })
     .description("Re-embed all knowledge chunks with a new embedding model (experimental)")
     .option("--experimental",        "Required: acknowledge this command is experimental and may change")
     .option("--resume",              "Resume an interrupted migration")

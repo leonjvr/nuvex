@@ -102,7 +102,7 @@ export function registerChatCommands(program: Command): void {
 export async function runChatCommand(opts: ChatCommandOptions): Promise<number> {
   const { workDir, agent } = opts;
 
-  // Normalize: treat "guide" as deprecated alias for ceo-assistant
+  // Accepted agents: "guide" (default interactive assistant) and "ceo-assistant"
   const resolvedAgent = agent === "guide" ? "guide" : (agent === "ceo-assistant" ? "ceo-assistant" : agent);
 
   // Only guide and ceo-assistant are supported

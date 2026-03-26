@@ -12,7 +12,7 @@
 import Database from "better-sqlite3";
 import { Hono } from "hono";
 import { createLogger } from "../../core/logger.js";
-import { hasTable } from "../utils/has-table.js";
+import { hasTable } from "../../core/db/helpers.js";
 import { notFound } from "../utils/responses.js";
 import { requireScope } from "../middleware/require-scope.js";
 

@@ -24,6 +24,30 @@ const execFileAsync = promisify(execFile);
 
 
 /**
+ * Validate a CLI --work-dir argument.
+ *
+ * Rejects paths that resolve to known system-critical directories to prevent
+ * a malicious `--work-dir /etc` from operating on sensitive paths.
+ *
+ * @throws SidjuaError SEC-010 if workDir resolves to a system-critical path.
+ */
+const SYSTEM_CRITICAL_PATHS = new Set([
+  "/", "/etc", "/usr", "/usr/local", "/bin", "/sbin",
+  "/proc", "/sys", "/dev", "/boot", "/lib", "/lib64",
+]);
+
+export function validateWorkDir(workDir: string): void {
+  const resolved = resolve(workDir);
+  if (SYSTEM_CRITICAL_PATHS.has(resolved)) {
+    throw SidjuaError.from(
+      "SEC-010",
+      `--work-dir "${workDir}" resolves to a system-critical path "${resolved}" — operation denied`,
+    );
+  }
+}
+
+
+/**
  * Assert that `filePath` is within `baseDir` (or equal to it).
  *
  * Both paths are resolved with `path.resolve()` before comparison so that
