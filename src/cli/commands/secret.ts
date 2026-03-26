@@ -132,6 +132,10 @@ export function registerSecretCommands(program: Command): void {
         }
 
         if (opts.reveal) {
+          if (!process.stdout.isTTY) {
+            err("--reveal requires an interactive terminal (stdout is not a TTY)");
+            process.exit(1);
+          }
           // Write a real audit event to the DB before revealing the plaintext secret.
           const auditDbPath = join(opts.workDir, ".system", "sidjua.db");
           const auditDb = openDatabase(auditDbPath);

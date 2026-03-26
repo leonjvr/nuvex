@@ -32,6 +32,10 @@ export function registerEmailCommands(program: Command): void {
     .option("--work-dir <path>", "Workspace directory", process.cwd())
     .option("--reveal", "Show credential values unmasked", false)
     .action(async (opts: { workDir: string; reveal: boolean }) => {
+      if (opts.reveal && !process.stdout.isTTY) {
+        process.stderr.write("--reveal requires an interactive terminal (stdout is not a TTY)\n");
+        process.exit(1);
+      }
       const code = await runEmailStatus({ workDir: resolve(opts.workDir), reveal: opts.reveal });
       process.exit(code);
     });

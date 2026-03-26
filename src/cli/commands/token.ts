@@ -82,11 +82,16 @@ export function registerTokenCommands(program: Command): void {
           ...(expiresAt     !== undefined ? { expiresAt }               : {}),
         });
 
-        out(`Token created: ${id}\n`);
-        out(`\n`);
-        out(`  Token: ${rawToken}\n`);
-        out(`\n`);
-        out(`WARNING: This token will not be shown again. Store it securely.\n`);
+        if (!process.stdout.isTTY) {
+          // Non-interactive: print just the raw token for scripting (TOKEN=$(sidjua token create ...))
+          out(rawToken + "\n");
+        } else {
+          out(`Token created: ${id}\n`);
+          out(`\n`);
+          out(`  Token: ${rawToken}\n`);
+          out(`\n`);
+          out(`WARNING: This token will not be shown again. Store it securely.\n`);
+        }
         out(`\n`);
         out(`  Scope:  ${opts.scope}\n`);
         out(`  Label:  ${opts.label.trim()}\n`);
