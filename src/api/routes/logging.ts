@@ -23,18 +23,66 @@ import {
   setComponentLevel,
   type LogLevel,
 } from "../../core/logger.js";
+import {
+  loadTelemetryConfig,
+  saveTelemetryConfig,
+  getTelemetryReporter,
+} from "../../core/telemetry/telemetry-reporter.js";
 
 const logger = createLogger("api-logging");
 
 const VALID_LEVELS = new Set<string>(["debug", "info", "warn", "error", "fatal", "off"]);
 
 
-export function registerLoggingRoutes(app: Hono): void {
+export function registerLoggingRoutes(app: Hono, workDir: string = process.cwd()): void {
   // ---- GET /api/v1/logging/status ----------------------------------------
 
-  app.get("/api/v1/logging/status", requireScope("readonly"), (c) => {
+  app.get("/api/v1/logging/status", requireScope("readonly"), async (c) => {
     const status = getLoggerStatus();
-    return c.json(status);
+    let errorLogging = true; // default: on
+    try {
+      const cfg = await loadTelemetryConfig(workDir);
+      errorLogging = cfg.mode !== "off";
+    } catch {
+      // Non-fatal — telemetry config may not exist yet
+    }
+    return c.json({ ...status, errorLogging });
+  });
+
+  // ---- PATCH /api/v1/logging — toggle error reporting --------------------
+
+  app.patch("/api/v1/logging", requireScope("operator"), async (c) => {
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json() as Record<string, unknown>;
+    } catch {
+      throw SidjuaError.from("INPUT-001", "Request body must be valid JSON");
+    }
+
+    if (typeof body["errorLogging"] !== "boolean") {
+      throw SidjuaError.from("INPUT-001", "errorLogging must be a boolean");
+    }
+
+    const enabled = body["errorLogging"] as boolean;
+    const mode    = enabled ? "auto" : "off";
+
+    try {
+      const cfg = await loadTelemetryConfig(workDir);
+      await saveTelemetryConfig(workDir, { ...cfg, mode });
+      getTelemetryReporter()?.updateConfig({ mode });
+    } catch (err) {
+      throw SidjuaError.from(
+        "SERVER-500",
+        `Failed to save error logging config: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    logger.info("error_logging_changed", `Error logging set to ${mode}`, {
+      correlationId: reqId(c),
+      metadata: { mode },
+    });
+
+    return c.json({ errorLogging: enabled });
   });
 
   // ---- PUT /api/v1/logging/:component ------------------------------------

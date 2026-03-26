@@ -242,10 +242,11 @@ export interface GovernanceHistory {
 // ---- Logging ---------------------------------------------------------------
 
 export interface LoggingStatus {
-  global:     string;
-  format:     'json' | 'text';
-  output:     'stdout' | 'file' | 'both';
-  components: Record<string, string>;
+  global:       string;
+  format:       'json' | 'text';
+  output:       'stdout' | 'file' | 'both';
+  components:   Record<string, string>;
+  errorLogging: boolean;
 }
 
 // ---- Provider catalog ------------------------------------------------------

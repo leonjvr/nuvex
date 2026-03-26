@@ -42,6 +42,7 @@ export const API_PATHS = {
 
   // Logging
   loggingStatus:     ()             => `${API_PREFIX}/logging/status`,
+  loggingPatch:      ()             => `${API_PREFIX}/logging`,
 
   // Costs
   costs:             ()             => `${API_PREFIX}/costs`,
