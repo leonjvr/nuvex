@@ -40,7 +40,7 @@ export function generateRoutingTable(config: ParsedConfig): RoutingTable {
     });
   }
 
-  const defaultAgent = findHighestTierAgent(config) ?? "opus-t1";
+  const defaultAgent = findHighestTierAgent(config) ?? "guide";
 
   return {
     schema_version: "1.0",
