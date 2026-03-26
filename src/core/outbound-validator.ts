@@ -35,7 +35,7 @@ export function validateOutboundUrl(raw: string): void {
   let parsed: URL;
   try {
     parsed = new URL(raw);
-  } catch {
+  } catch (_err) {
     throw SidjuaError.from("SSRF-001", `Invalid URL: ${raw}`);
   }
 

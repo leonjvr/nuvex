@@ -611,5 +611,11 @@
   "gui.shutdown_reminder": "",
   "cli.start.crash_recovery": "",
   "cli.start.runtime_mode": "",
-  "email.threads_table_missing": ""
+  "email.threads_table_missing": "",
+  "agent.tier.1": "",
+  "agent.tier.2": "",
+  "agent.tier.3": "",
+  "agent.tier.desc.1": "",
+  "agent.tier.desc.2": "",
+  "agent.tier.desc.3": ""
 }

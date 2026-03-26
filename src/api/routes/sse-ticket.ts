@@ -281,14 +281,23 @@ export interface TicketRouteServices {
  *   → 429 { error: { code, message } }
  */
 export function registerSseTicketRoutes(app: Hono, services: TicketRouteServices): void {
-  // The requireScope("readonly") middleware (registered above) already validates
-  // the Bearer token against the current and pending keys. The manual re-check
-  // that was here previously duplicated that logic and has been removed (P281).
-  // services.getApiKey / getPendingApiKey are retained for the TicketRouteServices
-  // interface contract and may be used by other consumers.
-  void services;
-
   app.post("/api/v1/sse/ticket", requireScope("readonly"), (c: Context) => {
+    // Secondary token check — requireScope() handles auth when the full middleware
+    // stack is present; services.getApiKey() provides a fallback for bare-Hono
+    // contexts (e.g. unit tests) where the auth middleware is not wired in.
+    const authHeader = c.req.header("authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const currentKey = services.getApiKey();
+    const pendingKey = services.getPendingApiKey?.() ?? null;
+    const validCurrent = timingSafeCompare(token, currentKey);
+    const validPending  = pendingKey !== null && timingSafeCompare(token, pendingKey);
+    if (!validCurrent && !validPending) {
+      return c.json(
+        { error: { code: "AUTH-001", message: "Invalid or missing API key", recoverable: false } },
+        401,
+      );
+    }
+
     // Per-IP rate limit — prevents a single client from exhausting the ticket store
     const clientIp =
       c.req.header("x-forwarded-for") ??

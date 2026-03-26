@@ -43,7 +43,7 @@ export function registerLoggingRoutes(app: Hono, workDir: string = process.cwd()
     try {
       const cfg = await loadTelemetryConfig(workDir);
       errorLogging = cfg.mode !== "off";
-    } catch {
+    } catch (_err) {
       // Non-fatal — telemetry config may not exist yet
     }
     return c.json({ ...status, errorLogging });
@@ -55,7 +55,7 @@ export function registerLoggingRoutes(app: Hono, workDir: string = process.cwd()
     let body: Record<string, unknown>;
     try {
       body = await c.req.json() as Record<string, unknown>;
-    } catch {
+    } catch (_err) {
       throw SidjuaError.from("INPUT-001", "Request body must be valid JSON");
     }
 

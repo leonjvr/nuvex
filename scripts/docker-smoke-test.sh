@@ -9,13 +9,13 @@
 #   ./scripts/docker-smoke-test.sh [IMAGE_TAG]
 #
 # Examples:
-#   ./scripts/docker-smoke-test.sh                       # default: sidjua/sidjua:1.0.0
+#   ./scripts/docker-smoke-test.sh                       # default: ghcr.io/goetzkohlberg/sidjua:1.0.0
 #   ./scripts/docker-smoke-test.sh sidjua/sidjua:latest
 #   IMAGE=my-custom-tag ./scripts/docker-smoke-test.sh
 
 set -e
 
-IMAGE="${1:-${IMAGE:-sidjua/sidjua:1.0.0}}"
+IMAGE="${1:-${IMAGE:-ghcr.io/goetzkohlberg/sidjua:1.0.0}}"
 CONTAINER="sidjua-smoke-test"
 PORT="${SIDJUA_PORT:-4200}"
 BASE_URL="http://localhost:${PORT}"

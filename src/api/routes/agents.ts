@@ -89,7 +89,7 @@ function withResolvedModel(agent: AgentDefinitionRow): AgentDefinitionRow & { re
       if (prov) {
         resolved = prov.model ?? prov.provider_id;
       }
-    } catch {
+    } catch (_err) {
       // Non-fatal — provider config may not be set up yet
     }
   }
@@ -165,7 +165,7 @@ export function registerAgentRoutes(app: Hono, services: AgentRouteServices): vo
     let body: Record<string, unknown>;
     try {
       body = await c.req.json() as Record<string, unknown>;
-    } catch {
+    } catch (_err) {
       throw SidjuaError.from("INPUT-001", "Request body must be valid JSON");
     }
 
