@@ -29,7 +29,7 @@ import Database                                          from "better-sqlite3";
 import { createCipheriv, createDecipheriv, randomBytes,
          createHash }                                    from "node:crypto";
 import { hostname }                                      from "node:os";
-import { readFileSync, writeFileSync, mkdirSync }         from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { join, dirname }                                 from "node:path";
 import { createLogger }                                  from "../core/logger.js";
 import { openDatabase }                                  from "../utils/db.js";
@@ -72,6 +72,9 @@ class FileMasterKeySource implements MasterKeySource {
   storeKey(key: Buffer): void {
     mkdirSync(dirname(this.keyPath), { recursive: true });
     writeFileSync(this.keyPath, key, { mode: 0o600 });
+    // Explicit chmod as a second line of defence — ensures 0o600 even when
+    // the process umask would otherwise widen the permissions.
+    chmodSync(this.keyPath, 0o600);
   }
 }
 
