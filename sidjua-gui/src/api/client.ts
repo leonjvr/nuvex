@@ -368,4 +368,10 @@ export class SidjuaApiClient {
   completeFirstRun(): Promise<FirstRunCompleteResponse> {
     return this.post(API_PATHS.firstRunComplete());
   }
+
+  // ---- Apply configuration (#4, #10) --------------------------------------
+
+  triggerApply(): Promise<{ success: boolean; steps: number; duration: number; summary: Array<{ step: string; success: boolean; summary: string }> }> {
+    return this.post(API_PATHS.apply());
+  }
 }

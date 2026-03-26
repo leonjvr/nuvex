@@ -11,6 +11,7 @@
 
 import Database from "better-sqlite3";
 import { Hono, type Context } from "hono";
+import { join } from "node:path";
 import { createLogger } from "../../core/logger.js";
 import { requireScope } from "../middleware/require-scope.js";
 
@@ -50,6 +51,7 @@ import type { ScheduleRouteServices, CronSchedulerLike, TaskStoreLike as Schedul
 export type { ScheduleRouteServices, CronSchedulerLike, ScheduleTaskStoreLike };
 import { registerTokenRoutes }           from "./tokens.js";
 import type { TokenStore }               from "../token-store.js";
+import { apply }                         from "../../apply/index.js";
 
 import type { AgentRegistryLike }   from "./agents.js";
 import type { SecretRouteServices }    from "./secrets.js";
@@ -220,6 +222,33 @@ export function registerAllRoutes(app: Hono, services: AllRouteServices = {}): v
   if (services.tokenStore !== null && services.tokenStore !== undefined) {
     registerTokenRoutes(app, { tokenStore: services.tokenStore });
   }
+
+  // ── Apply endpoint — POST /api/v1/apply ──────────────────────────────────
+  // Runs `sidjua apply --force` in-process. Same logic as the CLI command.
+  // Idempotent — safe to call on every config change.
+  app.post("/api/v1/apply", requireScope("operator"), async (c) => {
+    const configPath = join(workDir, "divisions.yaml");
+    try {
+      const result = await apply({
+        configPath,
+        workDir,
+        dryRun:  false,
+        verbose: false,
+        force:   true,
+      });
+      return c.json({
+        success:  result.success,
+        steps:    result.steps.length,
+        duration: result.duration_ms,
+        summary:  result.steps.map((s) => ({ step: s.step, success: s.success, summary: s.summary })),
+      }, result.success ? 200 : 500);
+    } catch (err: unknown) {
+      return c.json({
+        success: false,
+        error:   err instanceof Error ? err.message : String(err),
+      }, 500);
+    }
+  });
 
   // ── Detailed health endpoint (authenticated) ──────────────────────────────
   // GET /api/v1/health/details — returns per-component status.
