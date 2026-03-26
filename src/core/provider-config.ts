@@ -20,6 +20,7 @@ import {
   writeFileSync,
   mkdirSync,
   existsSync,
+  chmodSync,
 } from "node:fs";
 import { join }                                             from "node:path";
 import { createCipheriv, createDecipheriv, randomBytes }   from "node:crypto";
@@ -113,6 +114,7 @@ function getMasterKey(): Buffer {
     try {
       mkdirSync(configDir, { recursive: true });
       writeFileSync(keyPath, newKey.toString("hex"), { mode: 0o600 });
+      chmodSync(keyPath, 0o600); // belt-and-suspenders: enforce 0o600 regardless of umask
       _masterKey  = newKey;
       _memoryMode = "fs";
       logger.info("provider_config", "Generated new provider master key", { metadata: { path: keyPath } });

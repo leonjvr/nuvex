@@ -35,6 +35,9 @@ services:
       - sidjua-data:/app/data
       - sidjua-config:/app/config
       - sidjua-logs:/app/logs
+      # IMPORTANT: master.key (provider API key encryption) lives in this volume.
+      # Deleting the sidjua-system volume makes encrypted provider keys unreadable.
+      # You will need to re-enter all provider API keys after a volume wipe.
       - sidjua-system:/app/.system
       - sidjua-workspace:/app/agents
       - sidjua-governance:/app/governance
