@@ -254,7 +254,7 @@ async function toolCreateAgentRole(
 ): Promise<ToolCallResult> {
   const roleId       = params["role_id"];
   const name         = params["name"];
-  const description  = params["description"];
+  const description  = typeof params["description"] === "string" ? params["description"] : "";
   const tier         = params["tier"] ?? 3;
   const division     = params["division"] ?? "workspace";
   const capabilities = params["capabilities"];
@@ -265,9 +265,6 @@ async function toolCreateAgentRole(
   }
   if (typeof name !== "string" || name.trim() === "") {
     return { success: false, error: "name is required" };
-  }
-  if (typeof description !== "string" || description.trim() === "") {
-    return { success: false, error: "description is required" };
   }
   if (tier !== 1 && tier !== 2 && tier !== 3) {
     return { success: false, error: "tier must be 1, 2, or 3" };
@@ -386,7 +383,7 @@ function toolCreateDivision(
 ): ToolCallResult {
   const id          = params["id"];
   const name        = params["name"];
-  const description = params["description"];
+  const description = typeof params["description"] === "string" ? params["description"] : "";
   const dailyLimit  = typeof params["daily_limit_usd"] === "number" ? params["daily_limit_usd"] : 5.0;
   const monthlyCap  = typeof params["monthly_cap_usd"] === "number" ? params["monthly_cap_usd"] : 50.0;
   const protected_  = params["protected"] === true;
@@ -396,9 +393,6 @@ function toolCreateDivision(
   }
   if (typeof name !== "string" || name.trim() === "") {
     return { success: false, error: "name is required" };
-  }
-  if (typeof description !== "string" || description.trim() === "") {
-    return { success: false, error: "description is required" };
   }
   if (dailyLimit <= 0) {
     return { success: false, error: "daily_limit_usd must be a positive number" };
@@ -619,7 +613,7 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
         description: "Create a new agent role YAML definition file.",
         parameters: {
           type:       "object",
-          required:   ["role_id", "name", "description"],
+          required:   ["role_id", "name"],
           properties: {
             role_id:      { type: "string",  description: "Lowercase slug e.g. 'data-analyst'" },
             name:         { type: "string",  description: "Human-readable name" },
@@ -642,7 +636,7 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
         description: "Create a new division (organizational unit) with a budget.",
         parameters: {
           type:       "object",
-          required:   ["id", "name", "description"],
+          required:   ["id", "name"],
           properties: {
             id:              { type: "string",  description: "Lowercase slug e.g. 'engineering'" },
             name:            { type: "string",  description: "Human-readable name" },

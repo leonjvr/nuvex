@@ -27,6 +27,7 @@ import { loadDefaultRoles }        from "../../defaults/loader.js";
 import { getToolDefinitions,
          executeToolCall }         from "./agent-tools.js";
 import type { Database }           from "better-sqlite3";
+import { runAuditMigrations }      from "../../core/audit/audit-migrations.js";
 
 const logger = createLogger("chat-routes");
 
@@ -62,9 +63,11 @@ export function clearChatState(): void {
 }
 
 
+let _auditTableEnsured = false;
+
 /**
  * Write a single row to audit_events.
- * Non-fatal: if the table is missing or the write fails, the error is swallowed.
+ * Lazily ensures the audit table exists. Non-fatal — logs failures at debug level.
  */
 function writeAuditEvent(
   db:        Database | null,
@@ -75,13 +78,17 @@ function writeAuditEvent(
 ): void {
   if (db === null) return;
   try {
+    if (!_auditTableEnsured) {
+      runAuditMigrations(db);
+      _auditTableEnsured = true;
+    }
     db.prepare(
       `INSERT INTO audit_events
          (id, agent_id, division, event_type, rule_id, action, severity, details)
        VALUES (?, ?, '', ?, '', ?, 'low', ?)`,
     ).run(randomUUID(), agentId, eventType, action, JSON.stringify(details));
   } catch (_e) {
-    // Non-fatal: audit table may not exist yet
+    logger.debug("audit write failed", { error: _e instanceof Error ? _e.message : String(_e) });
   }
 }
 
