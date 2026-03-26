@@ -14,8 +14,10 @@ import type {
   CapabilityDescription,
   ToolCapability,
   ToolConfig,
+  ToolAccess,
 } from "./types.js";
 import type { ToolRegistry } from "./tool-registry.js";
+import { getFilteredToolDescriptions, type AgentVisibilityContext } from "./tool-visibility.js";
 
 
 const CREDENTIAL_KEY_PATTERN = /token|password|secret|key/i;
@@ -56,12 +58,29 @@ export class ToolDescriptionGen {
   // -------------------------------------------------------------------------
 
   /**
-   * Generate descriptions for all active tools accessible to an agent.
-   * V1: no DB-level access control filtering; returns all active tools.
+   * Generate descriptions for tools accessible to an agent.
+   *
+   * When `agentContext` and `grantedIds` are provided the list is filtered by
+   * tier, division, and classification before descriptions are built — so the
+   * agent only receives metadata for tools it is authorised to use.
+   * Without context the full active-tool list is returned (backward-compatible).
    */
-  generateForAgent(_agentId: string, _tierLevel: number): ToolDescription[] {
+  generateForAgent(
+    _agentId:     string,
+    _tierLevel:   number,
+    agentContext?: AgentVisibilityContext,
+    grantedIds?:   ReadonlySet<string>,
+    accessRules?:  ToolAccess[],
+  ): ToolDescription[] {
     const activeTools = this.registry.list("active");
-    return activeTools.map((tool) => this.generate(tool.id));
+    const descriptions = activeTools.map((tool) => this.generate(tool.id));
+
+    if (agentContext === undefined || grantedIds === undefined) {
+      // No context provided — return all active tools (backward compatibility)
+      return descriptions;
+    }
+
+    return getFilteredToolDescriptions(agentContext, descriptions, grantedIds, accessRules ?? []);
   }
 
   // -------------------------------------------------------------------------

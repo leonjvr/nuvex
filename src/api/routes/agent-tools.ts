@@ -31,6 +31,10 @@ import { sha256hex }                                   from "../../core/crypto-u
 import type { Database as BetterSqliteDb }             from "../../utils/db.js";
 import type { CallerContext }                          from "../caller-context.js";
 import type { Database }                               from "better-sqlite3";
+import { isToolVisibleForAgent, type AgentVisibilityContext } from "../../tool-integration/tool-visibility.js";
+import type { ToolAccess }                             from "../../tool-integration/types.js";
+
+export type { AgentVisibilityContext };
 
 export type { CallerContext };
 
@@ -809,12 +813,26 @@ export async function executeToolCall(
 
 /**
  * Return OpenAI-compatible tool definitions for an agent's authorized tools.
+ *
+ * When `agentContext` and `accessRules` are provided, tools are filtered by
+ * tier, division, and classification (ARC-102) in addition to the grant set.
+ * Without context, only the grant set is checked (backward-compatible).
  */
-export function getToolDefinitions(agentId: string): Array<Record<string, unknown>> {
+export function getToolDefinitions(
+  agentId:      string,
+  agentContext?: AgentVisibilityContext,
+  accessRules?:  ToolAccess[],
+): Array<Record<string, unknown>> {
   const allowed = getAllowedTools(agentId);
+
+  const canSee = (toolName: string): boolean =>
+    agentContext !== undefined
+      ? isToolVisibleForAgent(toolName, agentContext, allowed, accessRules ?? [])
+      : allowed.has(toolName);
+
   const defs: Array<Record<string, unknown>> = [];
 
-  if (allowed.has("list_agents")) {
+  if (canSee("list_agents")) {
     defs.push({
       type: "function",
       function: {
@@ -825,7 +843,7 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
     });
   }
 
-  if (allowed.has("list_divisions")) {
+  if (canSee("list_divisions")) {
     defs.push({
       type: "function",
       function: {
@@ -836,7 +854,7 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
     });
   }
 
-  if (allowed.has("create_agent_role")) {
+  if (canSee("create_agent_role")) {
     defs.push({
       type: "function",
       function: {
@@ -859,7 +877,7 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
     });
   }
 
-  if (allowed.has("update_agent_role")) {
+  if (canSee("update_agent_role")) {
     defs.push({
       type: "function",
       function: {
@@ -882,7 +900,7 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
     });
   }
 
-  if (allowed.has("create_division")) {
+  if (canSee("create_division")) {
     defs.push({
       type: "function",
       function: {
@@ -904,7 +922,7 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
     });
   }
 
-  if (allowed.has("update_division")) {
+  if (canSee("update_division")) {
     defs.push({
       type: "function",
       function: {
@@ -927,7 +945,7 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
     });
   }
 
-  if (allowed.has("ask_agent")) {
+  if (canSee("ask_agent")) {
     defs.push({
       type: "function",
       function: {
