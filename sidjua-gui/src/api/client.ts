@@ -325,6 +325,9 @@ export class SidjuaApiClient {
   governanceStatus():  Promise<GovernanceStatus>  { return this.get(API_PATHS.governanceStatus()); }
   governanceHistory(): Promise<GovernanceHistory> { return this.get(API_PATHS.governanceHistory()); }
   loggingStatus():     Promise<LoggingStatus>     { return this.get(API_PATHS.loggingStatus()); }
+  setErrorLogging(enabled: boolean): Promise<{ errorLogging: boolean }> {
+    return this.patch(API_PATHS.loggingPatch(), { errorLogging: enabled });
+  }
 
   getProviderCatalog(): Promise<ProviderCatalogResponse> { return this.get(API_PATHS.providerCatalog()); }
   getProviderConfig():  Promise<ProviderConfigResponse>  { return this.get(API_PATHS.providerConfig()); }

@@ -2,10 +2,12 @@
 // Copyright (c) 2026 Götz Kohlberg. All rights reserved.
 // Dual licensed: AGPL-3.0 + SIDJUA Commercial License. See LICENSE.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAppConfig } from '../lib/config';
 import type { AppConfig, BuildInfo } from '../lib/config';
+import type { LoggingStatus } from '../api/types';
+import { useApi } from '../hooks/useApi';
 import { useTheme } from '../hooks/useTheme';
 import { useTranslation } from '../hooks/useTranslation';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
@@ -787,7 +789,7 @@ function SettingsHelpPanel() {
 
 
 export function Settings() {
-  const { config, status, setConfig, testConnection, buildInfo } = useAppConfig();
+  const { config, status, client, setConfig, testConnection, buildInfo } = useAppConfig();
   const { theme, setTheme } = useTheme();
   const { t } = useTranslation();
   const toast = useToast();
@@ -797,6 +799,36 @@ export function Settings() {
   const [providerKey,   setProviderKey]   = useState(0); // force re-render on provider save
   const [showStartOver, setShowStartOver] = useState(false);
   const [showApiKey,    setShowApiKey]    = useState(false);
+
+  // Error logging toggle
+  const loggingRes = useApi<LoggingStatus>((c) => c.loggingStatus());
+  const [errorLogging,       setErrorLogging]       = useState<boolean | null>(null);
+  const [errorLoggingBusy,   setErrorLoggingBusy]   = useState(false);
+  const [errorLoggingError,  setErrorLoggingError]  = useState<string | null>(null);
+  const errorLoggingInitRef = useRef(false);
+
+  useEffect(() => {
+    if (loggingRes.data?.errorLogging !== undefined && !errorLoggingInitRef.current) {
+      setErrorLogging(loggingRes.data.errorLogging);
+      errorLoggingInitRef.current = true;
+    }
+  }, [loggingRes.data]);
+
+  async function handleErrorLoggingToggle(): Promise<void> {
+    if (!client || errorLogging === null || errorLoggingBusy) return;
+    const next = !errorLogging;
+    setErrorLogging(next);          // optimistic
+    setErrorLoggingBusy(true);
+    setErrorLoggingError(null);
+    try {
+      await client.setErrorLogging(next);
+    } catch (err: unknown) {
+      setErrorLogging(!next);       // revert on failure
+      setErrorLoggingError(err instanceof Error ? err.message : 'Update failed');
+    } finally {
+      setErrorLoggingBusy(false);
+    }
+  }
 
   function handleChange(field: keyof AppConfig) {
     return (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1041,31 +1073,56 @@ export function Settings() {
             padding:      '14px 16px',
             display:      'flex',
             flexDirection: 'column',
-            gap:          '6px',
+            gap:          '8px',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
-                {t('gui.settings.error_logging')}
-              </span>
-              <span style={{
-                fontSize:     '12px',
-                fontWeight:   600,
-                color:        'var(--color-success)',
-                background:   'var(--color-success-bg, rgba(34,197,94,0.1))',
-                borderRadius: 'var(--radius-sm)',
-                padding:      '2px 8px',
-              }}>
-                {t('gui.settings.error_logging_active')}
-              </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
+                  {t('gui.settings.error_logging')}
+                </span>
+                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '4px 0 0' }}>
+                  {t('gui.settings.error_logging_desc')}
+                </p>
+              </div>
+              {/* Toggle switch */}
+              <button
+                role="switch"
+                aria-checked={errorLogging ?? false}
+                disabled={errorLogging === null || errorLoggingBusy}
+                onClick={() => { void handleErrorLoggingToggle(); }}
+                title={errorLogging ? 'Click to disable error logging' : 'Click to enable error logging'}
+                style={{
+                  flexShrink:      0,
+                  width:           '44px',
+                  height:          '24px',
+                  borderRadius:    '12px',
+                  border:          'none',
+                  background:      errorLogging ? 'var(--color-success)' : 'var(--color-border)',
+                  cursor:          errorLogging === null || errorLoggingBusy ? 'default' : 'pointer',
+                  position:        'relative',
+                  transition:      'background 0.2s ease',
+                  opacity:         errorLogging === null || errorLoggingBusy ? 0.6 : 1,
+                }}
+              >
+                <span style={{
+                  position:    'absolute',
+                  top:         '3px',
+                  left:        errorLogging ? '23px' : '3px',
+                  width:       '18px',
+                  height:      '18px',
+                  borderRadius: '50%',
+                  background:  'white',
+                  transition:  'left 0.2s ease',
+                  boxShadow:   '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </button>
             </div>
-            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
-              {t('gui.settings.error_logging_desc')}{' '}
-              <code style={{ fontSize: '11px', color: 'var(--color-text)' }}>{t('gui.settings.error_logging_path')}</code>.{' '}
+            {errorLoggingError && (
+              <p style={{ fontSize: '12px', color: 'var(--color-danger)', margin: 0 }}>{errorLoggingError}</p>
+            )}
+            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>
               {t('gui.settings.error_logging_retrieve')}{' '}
-              <code style={{ fontSize: '11px', color: 'var(--color-text)' }}>{t('gui.settings.error_logging_retrieve_cmd')}</code>.{' '}
-              {t('gui.settings.error_logging_disable')}{' '}
-              <code style={{ fontSize: '11px', color: 'var(--color-text)' }}>SIDJUA_ERROR_LOG=</code>{' '}
-              {t('gui.settings.error_logging_future')}
+              <code style={{ fontSize: '11px' }}>{t('gui.settings.error_logging_retrieve_cmd')}</code>.
             </p>
           </div>
         </section>

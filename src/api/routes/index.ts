@@ -183,8 +183,8 @@ export function registerAllRoutes(app: Hono, services: AllRouteServices = {}): v
   // Selftest routes (no DB required)
   registerSelftestApiRoutes(app, workDir);
 
-  // Logging routes (no deps)
-  registerLoggingRoutes(app);
+  // Logging routes
+  registerLoggingRoutes(app, workDir);
 
   // Integration Gateway routes (optional)
   if (services.integration !== null && services.integration !== undefined) {
