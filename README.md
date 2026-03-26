@@ -75,7 +75,7 @@ node dist/index.js --help
 
 No external database required. SIDJUA uses SQLite. Qdrant is optional (semantic search only).
 
-See [docs/INSTALLATION.md](docs/INSTALLATION.md) for the complete guide with directory layout, environment variables, per-OS troubleshooting, and Docker volume reference.
+See [docs/INSTALLATION.md](docs/INSTALLATION.md) for the complete guide with directory layout, environment variables, per-OS troubleshooting, and Docker volume reference. For Docker-specific issues on Windows/WSL2, Ubuntu, and macOS see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ---
 
@@ -596,6 +596,7 @@ compliance packs, tamper-proof audit export.
 - **GitHub Issues**: [github.com/GoetzKohlberg/sidjua/issues](https://github.com/GoetzKohlberg/sidjua/issues)
 - **Email**: contact@sidjua.com
 - **Docs**: [sidjua.com/docs](https://sidjua.com/docs)
+- **Troubleshooting**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 If you find a bug, open an issue — we move fast.
 
