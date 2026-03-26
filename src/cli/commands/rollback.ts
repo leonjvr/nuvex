@@ -162,7 +162,10 @@ async function runRollback(
 
       // Rollback in reverse order (only migrations not in the restored system)
       const { openDatabase } = await import("../../utils/db.js");
-      const db = openDatabase(getCanonicalDbPath(process.cwd()));
+      // Derive workDir from the already-resolved paths.system.root (= <workDir>/.system)
+      // so the correct DB is opened regardless of the process working directory.
+      const workDir = join(paths.system.root, "..");
+      const db = openDatabase(getCanonicalDbPath(workDir));
       try {
         const toReverse = [...currentState.appliedMigrations].reverse();
         for (const m of toReverse) {

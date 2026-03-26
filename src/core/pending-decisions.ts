@@ -75,15 +75,24 @@ export function getPendingDecisions(db: Database): PendingDecision[] {
   }>(
     "SELECT id, task_id, type, payload, created_at, processed, processed_at FROM pending_decisions WHERE processed = 0 ORDER BY created_at ASC",
   ).all();
-  return rows.map((r) => ({
-    id:           r.id,
-    task_id:      r.task_id,
-    type:         r.type,
-    payload:      JSON.parse(r.payload) as Record<string, unknown>,
-    created_at:   r.created_at,
-    processed:    r.processed === 1,
-    processed_at: r.processed_at,
-  }));
+  const results: PendingDecision[] = [];
+  for (const r of rows) {
+    try {
+      const payload = JSON.parse(r.payload) as Record<string, unknown>;
+      results.push({
+        id:           r.id,
+        task_id:      r.task_id,
+        type:         r.type,
+        payload,
+        created_at:   r.created_at,
+        processed:    r.processed === 1,
+        processed_at: r.processed_at,
+      });
+    } catch (_err) {
+      logger.warn("pending-decisions", `Malformed pending decision row id=${r.id} — skipping`, {});
+    }
+  }
+  return results;
 }
 
 /**

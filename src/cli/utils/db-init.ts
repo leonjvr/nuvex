@@ -9,6 +9,38 @@
  *
  * Also exports hasTable() for pre-flight schema checks in routes and commands,
  * replacing fragile "no such table" error-message matching.
+ *
+ * ## DB Connection Lifecycle
+ *
+ * ### Ownership
+ * The caller owns the returned connection and MUST close it.
+ * `openCliDatabase` never holds a reference after returning.
+ *
+ * ### When to open
+ * Open exactly once per CLI invocation, before the first DB read or write.
+ * Do NOT re-open mid-command (use a single connection for the full command).
+ *
+ * ### When to close
+ * Close in a `finally` block after ALL async work that uses the DB completes:
+ *
+ *   ```typescript
+ *   const db = openCliDatabase({ workDir });
+ *   if (!db) return 1;
+ *   try {
+ *     // ... all DB operations, including any await-ed polling loops ...
+ *     exitCode = await doWork(db);
+ *   } finally {
+ *     db.close();           // runs after awaits resolve, not while they're pending
+ *   }
+ *   return exitCode;
+ *   ```
+ *
+ * ### Anti-patterns
+ * - `return await somePoller(store)` inside try/finally is safe because the
+ *   finally runs after the awaited promise resolves — but an explicit
+ *   `exitCode` variable is preferred for clarity (see run.ts).
+ * - Never pass `process.cwd()` to DB path helpers — use `opts.workDir` so
+ *   commands work correctly when the CWD differs from the workspace root.
  */
 
 import { existsSync } from "node:fs";

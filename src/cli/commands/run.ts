@@ -196,16 +196,18 @@ export async function runRunCommand(opts: RunCommandOptions): Promise<number> {
       data:           { priority: taskPriority },
     });
 
+    // Keep DB open through the entire pollTaskCompletion lifecycle.
+    // exitCode is assigned before the finally-block runs — db.close() only
+    // executes after the await fully resolves (not while polling is in flight).
+    let exitCode = 0;
     if (opts.wait) {
-      // --wait: poll task status until terminal state or timeout
-      return await pollTaskCompletion(task.id, opts, store);
+      exitCode = await pollTaskCompletion(task.id, opts, store);
+    } else {
+      if (!opts.json) {
+        process.stdout.write(`Use 'sidjua tasks ${task.id}' to track progress.\n`);
+      }
     }
-
-    if (!opts.json) {
-      process.stdout.write(`Use 'sidjua tasks ${task.id}' to track progress.\n`);
-    }
-
-    return 0;
+    return exitCode;
   } finally {
     db.close();
   }
