@@ -8,7 +8,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fgoetzkohlberg%2Fsidjua-blue)](https://ghcr.io/goetzkohlberg/sidjua)
-[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/GoetzKohlberg/sidjua/releases)
+[![Version](https://img.shields.io/badge/version-1.0.1-green)](https://github.com/GoetzKohlberg/sidjua/releases)
 
 ---
 
@@ -226,7 +226,7 @@ before their actions:
 | Bidirectional Email | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Discord Gateway | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Hierarchical Agents | ✅ Divisions + Tiers | Basic | Basic | Graph | ❌ |
-| Budget Tracking | ✅ Per-Agent Limits (hard enforcement V1.0.1) | ❌ | ❌ | ❌ | ❌ |
+| Budget Enforcement | ✅ Per-Agent Limits (fail-closed) | ❌ | ❌ | ❌ | ❌ |
 | Sandbox Isolation | ✅ bubblewrap (Linux) | ❌ | ❌ | ❌ | ❌ |
 | Audit Integrity | ✅ WAL + tamper-evident | ❌ | ❌ | ❌ | ❌ |
 | License | AGPL-3.0 | MIT | MIT | MIT | Mixed |
@@ -316,8 +316,7 @@ Telegram/Discord/Email. No single point of failure.
 Per-schedule governance: max cost per run, max runs per day, approval workflows.
 DeadlineWatcher: deadline monitoring with configurable warning thresholds.
 CLI: `sidjua schedule list/create/enable/disable/delete/show/history`.
-REST API: full CRUD at `/api/v1/schedules`. Scheduled cost caps are tracked;
-hard enforcement arrives in V1.1.
+REST API: full CRUD at `/api/v1/schedules`. Scheduled cost caps are tracked with fail-closed enforcement.
 
 ### Operations
 
@@ -345,18 +344,18 @@ SIDJUA provides native Docker images for:
 
 Use the installer script to automatically detect and load the correct image:
 ```bash
-bash scripts/install-docker.sh 1.0.0
+bash scripts/install-docker.sh 1.0.1
 ```
 
 #### Error Logging & Privacy
 
-SIDJUA V1.0.0 ships with error logging enabled by default. This helps us identify
+SIDJUA ships with error logging enabled by default. This helps us identify
 and fix issues quickly during the initial release period.
 
 - API keys and secrets are **automatically redacted** and never stored in full
 - All logs are stored **locally only** at `/data/logs/sidjua-error.log`
 - No data is sent externally without your explicit consent
-- User-configurable logging (enable/disable) will be available in V1.0.1
+- User-configurable logging (enable/disable) available in Settings UI
 - To disable immediately: `docker run -e SIDJUA_LOG_LEVEL=none ...`
 
 To share logs for support: `docker cp sidjua:/data/logs/sidjua-error.log .`
