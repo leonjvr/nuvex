@@ -72,4 +72,7 @@ export const API_PATHS = {
   locale:                ()             => `${API_PREFIX}/locale`,
   localeStrings:         (code: string) => `${API_PREFIX}/locale/${code}`,
   localeSet:             ()             => `${API_PREFIX}/config/locale`,
+
+  // Apply configuration
+  apply:                 ()             => `${API_PREFIX}/apply`,
 } as const;

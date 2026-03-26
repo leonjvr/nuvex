@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Play } from 'lucide-react';
 
 import { useAppConfig }  from '../lib/config';
 import { useApi }        from '../hooks/useApi';
@@ -98,25 +98,15 @@ function AgentSwitcher({
 
 function ChatHeader({
   agent,
-  onClear,
+  onApply,
+  applyState,
   onBack,
 }: {
-  agent:   StarterAgentShape;
-  onClear: () => void;
-  onBack:  () => void;
+  agent:      StarterAgentShape;
+  onApply:    () => void;
+  applyState: 'idle' | 'running' | 'success' | 'error';
+  onBack:     () => void;
 }) {
-  const [confirmClear, setConfirmClear] = useState(false);
-
-  function handleClearClick() {
-    if (confirmClear) {
-      onClear();
-      setConfirmClear(false);
-    } else {
-      setConfirmClear(true);
-      setTimeout(() => setConfirmClear(false), 3000);
-    }
-  }
-
   return (
     <div style={{
       display:      'flex',
@@ -161,24 +151,39 @@ function ChatHeader({
       </div>
 
       <button
-        onClick={handleClearClick}
-        aria-label="Clear conversation"
-        title={confirmClear ? 'Click again to confirm' : 'Clear conversation'}
+        onClick={onApply}
+        disabled={applyState === 'running'}
+        aria-label="Apply configuration"
+        title="Apply configuration"
         style={{
           display:      'inline-flex',
           alignItems:   'center',
           gap:          '5px',
           padding:      '5px 10px',
           borderRadius: 'var(--radius-md)',
-          border:       `1px solid ${confirmClear ? 'var(--color-danger)' : 'var(--color-border)'}`,
+          border:       `1px solid ${
+            applyState === 'success' ? 'var(--color-success, #15803d)' :
+            applyState === 'error'   ? 'var(--color-danger, #dc2626)' :
+            'var(--color-border)'
+          }`,
           background:   'transparent',
-          color:        confirmClear ? 'var(--color-danger)' : 'var(--color-text-muted)',
-          cursor:       'pointer',
+          color:        applyState === 'success' ? 'var(--color-success, #15803d)' :
+                        applyState === 'error'   ? 'var(--color-danger, #dc2626)' :
+                        'var(--color-text-muted)',
+          cursor:       applyState === 'running' ? 'not-allowed' : 'pointer',
           fontSize:     '12px',
+          opacity:      applyState === 'running' ? 0.6 : 1,
         }}
       >
-        <Trash2 size={12} />
-        {confirmClear ? 'Confirm' : 'Clear'}
+        {applyState === 'running' ? (
+          <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        ) : (
+          <Play size={12} />
+        )}
+        {applyState === 'running' ? 'Applying…' :
+         applyState === 'success' ? 'Applied ✓' :
+         applyState === 'error'   ? 'Failed ✗' :
+         'Apply'}
       </button>
     </div>
   );
@@ -542,6 +547,7 @@ export function Chat() {
   const [isStreaming, setIsStreaming]  = useState(false);
   const [convId,      setConvId]      = useState<string | null>(null);
   const [showAll,     setShowAll]     = useState(false);
+  const [applyState,  setApplyState]  = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const abortRef                      = useRef<AbortController | null>(null);
 
   const agents = (agentsRes.data?.agents ?? [])
@@ -763,15 +769,17 @@ export function Chat() {
     }
   }, [client, baseUrl, agentId, convId, isStreaming]);
 
-  async function handleClear() {
-    if (!client) return;
+  async function handleApply() {
+    if (!client || applyState === 'running') return;
+    setApplyState('running');
     try {
-      await client.clearChatHistory(agentId);
+      await client.triggerApply();
+      setApplyState('success');
     } catch (_err: unknown) {
-      // best-effort
+      setApplyState('error');
     }
-    setMessages([]);
-    setConvId(null);
+    // Reset badge after 3 s
+    setTimeout(() => setApplyState('idle'), 3000);
   }
 
   if (!client) {
@@ -878,7 +886,8 @@ export function Chat() {
       {/* Chat header */}
       <ChatHeader
         agent={currentAgent}
-        onClear={() => { void handleClear(); }}
+        onApply={() => { void handleApply(); }}
+        applyState={applyState}
         onBack={() => navigate('/agents')}
       />
 
