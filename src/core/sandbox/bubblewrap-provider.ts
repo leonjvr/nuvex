@@ -152,10 +152,24 @@ export class BubblewrapProvider implements SandboxProvider {
       );
     }
 
+    // When no domains are explicitly allowed, enforce full network denial.
+    // This is the sandbox equivalent of --unshare-net: the MITM proxy blocks all
+    // outbound connections since there are no entries in the allowlist.
+    const networkDenyAll = agentConfig.network.allowedDomains.length === 0;
+    if (networkDenyAll) {
+      logger.info(
+        "sandbox_network_deny_all",
+        "No allowed domains configured — all outbound network traffic blocked for this execution",
+        { metadata: { agentId: agentConfig.agentId } },
+      );
+    }
+
     const customConfig: Partial<SandboxRuntimeConfig> = {
       network: {
         allowedDomains: agentConfig.network.allowedDomains,
-        deniedDomains:  agentConfig.network.deniedDomains,
+        // Deny-all: proxy blocks everything when allowedDomains is empty;
+        // explicit deniedDomains are layered on top for partial-allow policies.
+        deniedDomains:  networkDenyAll ? [] : agentConfig.network.deniedDomains,
       },
       filesystem: {
         denyRead:   agentConfig.filesystem.denyRead,
