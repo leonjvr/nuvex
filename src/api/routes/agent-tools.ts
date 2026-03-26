@@ -8,7 +8,7 @@
  * Provides tool execution for agents with REST endpoint and shared executor.
  *
  * Authorization matrix:
- *   HR:    create_agent_role, create_division, list_agents, list_divisions, ask_agent
+ *   HR:    create_agent_role, update_agent_role, create_division, update_division, list_agents, list_divisions, ask_agent
  *   Guide: list_agents, list_divisions, ask_agent
  *   All:   ask_agent
  *
@@ -18,7 +18,7 @@
 import { Hono }                                        from "hono";
 import { requireScope }                               from "../middleware/require-scope.js";
 import { existsSync, mkdirSync, readdirSync,
-         writeFileSync }                               from "node:fs";
+         readFileSync, writeFileSync }                 from "node:fs";
 import { join }                                        from "node:path";
 import { createLogger }                                from "../../core/logger.js";
 import { SidjuaError }                                 from "../../core/error-codes.js";
@@ -43,12 +43,12 @@ const MAX_AGENT_FILES   = 100;
 const ASK_AGENT_COST_ESTIMATE_USD = 0.001;
 
 const TOOL_GRANTS: Readonly<Record<string, ReadonlySet<string>>> = {
-  hr:    new Set(["create_agent_role", "create_division", "list_agents", "list_divisions", "ask_agent"]),
+  hr:    new Set(["create_agent_role", "update_agent_role", "create_division", "update_division", "list_agents", "list_divisions", "ask_agent"]),
   guide: new Set(["list_agents", "list_divisions", "ask_agent"]),
 };
 
 /** Tools that mutate system configuration — require operator-level caller. */
-const MUTATION_TOOLS = new Set(["create_agent_role", "create_division"]);
+const MUTATION_TOOLS = new Set(["create_agent_role", "update_agent_role", "create_division", "update_division"]);
 
 /** Returns the set of tools this agent is authorized to call. */
 export function getAllowedTools(agentId: string): ReadonlySet<string> {
@@ -444,6 +444,235 @@ function toolCreateDivision(
   }
 }
 
+async function toolUpdateAgentRole(
+  params:        Record<string, unknown>,
+  workDir:       string,
+  callerAgentId: string,
+  db?:           Database | null,
+): Promise<ToolCallResult> {
+  const roleId = params["role_id"];
+  if (typeof roleId !== "string" || !/^[a-z0-9-]+$/.test(roleId)) {
+    return { success: false, error: "role_id must be a lowercase alphanumeric slug (hyphens allowed)" };
+  }
+  if (params["tier"] !== undefined && params["tier"] !== 1 && params["tier"] !== 2 && params["tier"] !== 3) {
+    return { success: false, error: "tier must be 1, 2, or 3" };
+  }
+
+  const definitionsDir = join(workDir, "agents", "definitions");
+  const targetPath     = join(definitionsDir, `${roleId}.yaml`);
+  if (!existsSync(targetPath)) {
+    return { success: false, error: `Agent role "${roleId}" not found at ${targetPath}` };
+  }
+
+  // Parse current YAML via simple line-based key extraction (no yaml dep needed here)
+  let existing: string;
+  try {
+    existing = readFileSync(targetPath, "utf-8");
+  } catch (err) {
+    return { success: false, error: `Failed to read role file: ${err instanceof Error ? err.message : String(err)}` };
+  }
+
+  // Build updated YAML by replacing or keeping existing lines
+  const updatedFields: string[] = [];
+
+  function patchLine(yaml: string, key: string, newVal: string | undefined): string {
+    if (newVal === undefined) return yaml;
+    const re = new RegExp(`^(  ${key}:).*$`, "m");
+    if (re.test(yaml)) {
+      return yaml.replace(re, `$1 ${newVal}`);
+    }
+    // Append under `role:` block if key not present
+    return yaml.replace(/^(role:\n)/m, `$1  ${key}: ${newVal}\n`);
+  }
+
+  let updated = existing;
+
+  if (typeof params["name"] === "string" && params["name"].trim() !== "") {
+    updated = patchLine(updated, "name", params["name"].trim());
+    updatedFields.push("name");
+  }
+  if (typeof params["description"] === "string") {
+    const escaped = params["description"].replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    updated = patchLine(updated, "description", `"${escaped}"`);
+    updatedFields.push("description");
+  }
+  if (params["tier"] === 1 || params["tier"] === 2 || params["tier"] === 3) {
+    updated = patchLine(updated, "tier", String(params["tier"]));
+    updatedFields.push("tier");
+  }
+  if (typeof params["division"] === "string" && params["division"].trim() !== "") {
+    updated = patchLine(updated, "division", params["division"].trim());
+    updatedFields.push("division");
+  }
+  if (typeof params["model"] === "string" && params["model"].trim() !== "") {
+    // model is nested under recommended_model → just append a comment-style field for now
+    updated = patchLine(updated, "model", params["model"].trim());
+    updatedFields.push("model");
+  }
+  if (typeof params["system_prompt"] === "string") {
+    const escaped = params["system_prompt"].replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    updated = patchLine(updated, "system_prompt", `"${escaped}"`);
+    updatedFields.push("system_prompt");
+  }
+
+  if (updatedFields.length === 0) {
+    return { success: false, error: "No updatable fields provided (name, description, tier, division, model, system_prompt)" };
+  }
+
+  try {
+    writeFileSync(targetPath, updated, "utf-8");
+
+    // Sync updated fields to DB
+    if (db !== null && db !== undefined) {
+      try {
+        const typedDb = db as unknown as BetterSqliteDb;
+        runMigrations105(typedDb);
+        const setClauses: string[] = ["config_yaml = ?", "config_hash = ?", "updated_at = ?"];
+        const now = new Date().toISOString();
+        const runArgs: unknown[] = [updated, sha256hex(updated).slice(0, 16), now];
+        if (updatedFields.includes("name"))     { setClauses.push("name = ?");     runArgs.push(String(params["name"]).trim()); }
+        if (updatedFields.includes("tier"))     { setClauses.push("tier = ?");     runArgs.push(params["tier"]); }
+        if (updatedFields.includes("division")) { setClauses.push("division = ?"); runArgs.push(String(params["division"]).trim()); }
+        runArgs.push(roleId);
+        typedDb.prepare(`UPDATE agent_definitions SET ${setClauses.join(", ")} WHERE id = ?`).run(...runArgs);
+      } catch (dbErr) {
+        logger.warn("agent_role_db_sync", `DB sync skipped: ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`, {
+          metadata: { role_id: roleId },
+        });
+      }
+    }
+
+    logger.info("agent_role_updated", `Updated agent role ${roleId}`, {
+      metadata: { role_id: roleId, fields: updatedFields },
+    });
+    recordAuditEvent({
+      type:      "CONFIG_MUTATION",
+      agentId:   callerAgentId,
+      toolName:  "update_agent_role",
+      allowed:   true,
+      paramKeys: Object.keys(params),
+      timestamp: new Date().toISOString(),
+      subtype:   "update_agent_role",
+      targetId:  roleId,
+    });
+    return { success: true, data: { role_id: roleId, updated_fields: updatedFields } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+
+function toolUpdateDivision(
+  params:        Record<string, unknown>,
+  workDir:       string,
+  callerAgentId: string,
+): ToolCallResult {
+  const id = params["id"];
+  if (typeof id !== "string" || !/^[a-z0-9-]+$/.test(id)) {
+    return { success: false, error: "id must be a lowercase alphanumeric slug (hyphens allowed)" };
+  }
+
+  // Resolve the division YAML file — check governance/divisions/ first, then config/
+  const govPath    = join(workDir, "governance", "divisions", `${id}.yaml`);
+  const configPath = join(workDir, "config", "divisions", `${id}.yaml`);
+  const targetPath = existsSync(govPath) ? govPath : existsSync(configPath) ? configPath : null;
+
+  if (targetPath === null) {
+    return { success: false, error: `Division "${id}" not found. Run list_divisions to see existing divisions.` };
+  }
+
+  let existing: string;
+  try {
+    existing = readFileSync(targetPath, "utf-8");
+  } catch (err) {
+    return { success: false, error: `Failed to read division file: ${err instanceof Error ? err.message : String(err)}` };
+  }
+
+  const updatedFields: string[] = [];
+
+  function patchLine(yaml: string, key: string, newVal: string | undefined): string {
+    if (newVal === undefined) return yaml;
+    const re = new RegExp(`^(  ${key}:).*$`, "m");
+    if (re.test(yaml)) {
+      return yaml.replace(re, `$1 ${newVal}`);
+    }
+    return yaml.replace(/^(division:\n)/m, `$1  ${key}: ${newVal}\n`);
+  }
+
+  let updated = existing;
+
+  if (typeof params["name"] === "string" && params["name"].trim() !== "") {
+    updated = patchLine(updated, "name", params["name"].trim());
+    updatedFields.push("name");
+  }
+  if (typeof params["description"] === "string") {
+    const escaped = params["description"].replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    updated = patchLine(updated, "description", `"${escaped}"`);
+    updatedFields.push("description");
+  }
+  if (typeof params["scope"] === "string" && params["scope"].trim() !== "") {
+    updated = patchLine(updated, "scope", params["scope"].trim());
+    updatedFields.push("scope");
+  }
+  if (typeof params["active"] === "boolean") {
+    updated = patchLine(updated, "active", String(params["active"]));
+    updatedFields.push("active");
+  }
+  if (typeof params["head_role"] === "string" && params["head_role"].trim() !== "") {
+    updated = patchLine(updated, "head_role", params["head_role"].trim());
+    updatedFields.push("head_role");
+  }
+  if (typeof params["head_agent"] === "string" && params["head_agent"].trim() !== "") {
+    // head_agent is nested under head: — patch with indented key
+    const headRe = /^(    agent:).*$/m;
+    if (headRe.test(updated)) {
+      updated = updated.replace(headRe, `$1 ${params["head_agent"].trim()}`);
+    } else {
+      // Ensure head: block exists
+      const headBlockRe = /^(  head:\n)/m;
+      if (headBlockRe.test(updated)) {
+        updated = updated.replace(headBlockRe, `$1    agent: ${params["head_agent"].trim()}\n`);
+      } else {
+        updated = updated.replace(/^(division:\n)/m, `$1  head:\n    agent: ${params["head_agent"].trim()}\n`);
+      }
+    }
+    updatedFields.push("head_agent");
+  }
+
+  if (updatedFields.length === 0) {
+    return { success: false, error: "No updatable fields provided (name, description, scope, active, head_role, head_agent)" };
+  }
+
+  try {
+    writeFileSync(targetPath, updated, "utf-8");
+
+    logger.info("division_updated", `Updated division ${id}`, {
+      metadata: { division_id: id, fields: updatedFields },
+    });
+    recordAuditEvent({
+      type:      "CONFIG_MUTATION",
+      agentId:   callerAgentId,
+      toolName:  "update_division",
+      allowed:   true,
+      paramKeys: Object.keys(params),
+      timestamp: new Date().toISOString(),
+      subtype:   "update_division",
+      targetId:  id,
+    });
+    return {
+      success: true,
+      data: {
+        division_id:    id,
+        updated_fields: updatedFields,
+        note:           "Run sidjua apply to activate the changes.",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+
 async function toolAskAgent(
   params:        Record<string, unknown>,
   callerAgentId: string,
@@ -565,11 +794,13 @@ export async function executeToolCall(
   }
 
   switch (toolName) {
-    case "list_agents":       return toolListAgents();
-    case "list_divisions":    return toolListDivisions();
-    case "create_agent_role": return toolCreateAgentRole(params, ctx.workDir, agentId, ctx.db);
-    case "create_division":   return toolCreateDivision(params, ctx.workDir, agentId);
-    case "ask_agent":         return toolAskAgent(params, agentId, ctx);
+    case "list_agents":        return toolListAgents();
+    case "list_divisions":     return toolListDivisions();
+    case "create_agent_role":  return toolCreateAgentRole(params, ctx.workDir, agentId, ctx.db);
+    case "update_agent_role":  return toolUpdateAgentRole(params, ctx.workDir, agentId, ctx.db);
+    case "create_division":    return toolCreateDivision(params, ctx.workDir, agentId);
+    case "update_division":    return toolUpdateDivision(params, ctx.workDir, agentId);
+    case "ask_agent":          return toolAskAgent(params, agentId, ctx);
     default:
       return { success: false, error: `Unknown tool: ${toolName}` };
   }
@@ -628,6 +859,29 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
     });
   }
 
+  if (allowed.has("update_agent_role")) {
+    defs.push({
+      type: "function",
+      function: {
+        name:        "update_agent_role",
+        description: "Update an existing agent role YAML definition. Only the fields you pass are changed.",
+        parameters: {
+          type:       "object",
+          required:   ["role_id"],
+          properties: {
+            role_id:      { type: "string",  description: "Slug of the role to update e.g. 'data-analyst'" },
+            name:         { type: "string",  description: "New human-readable name" },
+            description:  { type: "string",  description: "New description of what this agent does" },
+            tier:         { type: "number",  enum: [1, 2, 3], description: "New capability tier" },
+            division:     { type: "string",  description: "New division this agent belongs to" },
+            model:        { type: "string",  description: "Preferred LLM model identifier" },
+            system_prompt: { type: "string", description: "Custom system prompt override" },
+          },
+        },
+      },
+    });
+  }
+
   if (allowed.has("create_division")) {
     defs.push({
       type: "function",
@@ -644,6 +898,29 @@ export function getToolDefinitions(agentId: string): Array<Record<string, unknow
             daily_limit_usd: { type: "number",  description: "Daily budget limit in USD" },
             monthly_cap_usd: { type: "number",  description: "Monthly budget cap in USD" },
             protected:       { type: "boolean", description: "If true, division cannot be deleted" },
+          },
+        },
+      },
+    });
+  }
+
+  if (allowed.has("update_division")) {
+    defs.push({
+      type: "function",
+      function: {
+        name:        "update_division",
+        description: "Update an existing division's metadata. Only the fields you pass are changed. Run sidjua apply afterwards to activate.",
+        parameters: {
+          type:       "object",
+          required:   ["id"],
+          properties: {
+            id:         { type: "string",  description: "Division slug to update e.g. 'engineering'" },
+            name:       { type: "string",  description: "New human-readable name" },
+            description: { type: "string", description: "New description of what this division handles" },
+            scope:      { type: "string",  description: "New scope identifier" },
+            active:     { type: "boolean", description: "Set to false to deactivate this division" },
+            head_role:  { type: "string",  description: "New head role slug" },
+            head_agent: { type: "string",  description: "New head agent ID (e.g. 'hr-t1')" },
           },
         },
       },
