@@ -23,7 +23,7 @@ import { existsSync, readFileSync, realpathSync, writeFileSync, unlinkSync, mkdi
 import { join, dirname, extname, resolve as resolvePath } from "node:path";
 import { assertWithinDirectory } from "../utils/path-utils.js";
 import { redactPii } from "../core/telemetry/pii-redactor.js";
-import { createLogger }   from "../core/logger.js";
+import { createLogger, configureLogger } from "../core/logger.js";
 import { loadKeyState, persistKeyState } from "./key-store.js";
 import { registerAllRoutes } from "./routes/index.js";
 import { openDatabase } from "../utils/db.js";
@@ -427,6 +427,9 @@ export function registerServerCommands(program: Command): void {
       const errorLogPath: string | undefined = process.env["SIDJUA_ERROR_LOG"];
       if (errorLogPath !== undefined && errorLogPath !== "") {
         const errorLog: string = errorLogPath; // capture for closure narrowing
+        // Route structured logger warn/error output to the error log file so
+        // runtime errors from all components appear alongside uncaught exceptions.
+        configureLogger({ filePath: errorLog, output: "both" });
         try { mkdirSync(dirname(errorLog), { recursive: true }); } catch (_e) { /* ignore */ }
         // Create the file at startup so operators can verify it exists before any errors occur
         try {

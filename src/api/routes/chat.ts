@@ -89,7 +89,9 @@ function writeAuditEvent(
        VALUES (?, ?, '', ?, '', ?, 'low', ?)`,
     ).run(randomUUID(), agentId, eventType, action, JSON.stringify(details));
   } catch (_e) {
-    logger.debug("chat-routes", `audit write failed: ${_e instanceof Error ? _e.message : String(_e)}`);
+    logger.warn("chat-routes", "audit write failed", {
+      metadata: { eventType, agentId, error: _e instanceof Error ? _e.message : String(_e) },
+    });
   }
 }
 

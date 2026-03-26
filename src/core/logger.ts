@@ -371,7 +371,8 @@ function formatEntry(entry: LogEntry): string {
 
 function writeEntry(entry: LogEntry): void {
   const line = formatEntry(entry) + "\n";
-  const isErr = entry.level === "error" || entry.level === "fatal";
+  const isErr        = entry.level === "error" || entry.level === "fatal";
+  const isWarnOrAbove = entry.level === "warn" || isErr;
 
   if (_globalOutput === "stdout" || _globalOutput === "both") {
     if (isErr) {
@@ -381,10 +382,15 @@ function writeEntry(entry: LogEntry): void {
     }
   }
 
-  if ((_globalOutput === "file" || _globalOutput === "both") && _globalFilePath !== undefined) {
-    checkRotation(_globalFilePath);  // Rotate before write if file is too large
+  // Always write warn/error/fatal to file when a log file is configured — these
+  // must be visible in the error log regardless of the global output mode setting.
+  // Lower-severity levels follow the output mode (file/both).
+  const filePath = _globalFilePath;
+  if (filePath !== undefined &&
+      (isWarnOrAbove || _globalOutput === "file" || _globalOutput === "both")) {
+    checkRotation(filePath);  // Rotate before write if file is too large
     try {
-      getFileStream(_globalFilePath).write(line);
+      getFileStream(filePath).write(line);
     } catch (err) {
       // Fall back to stderr so audit trail loss is visible
       process.stderr.write(`[SIDJUA] Log write failed: ${err instanceof Error ? err.message : "unknown"}\n`);

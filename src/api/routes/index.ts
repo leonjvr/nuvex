@@ -41,6 +41,7 @@ import { registerAgentToolRoutes }     from "./agent-tools.js";
 import { registerWorkspaceConfigRoutes } from "./workspace-config.js";
 import { registerLocaleRoutes }          from "./locale.js";
 import { registerDaemonRoutes }          from "./daemon.js";
+import { registerBackupRoutes }          from "./backup.js";
 import type { DaemonManagerLike }        from "./daemon.js";
 export type { DaemonManagerLike };
 import { registerMessagingRoutes }       from "./messaging.js";
@@ -78,6 +79,7 @@ export {
   registerSelftestApiRoutes,
   registerIntegrationRoutes,
   registerDaemonRoutes,
+  registerBackupRoutes,
   registerMessagingRoutes,
   registerScheduleRoutes,
   registerTokenRoutes,
@@ -196,6 +198,9 @@ export function registerAllRoutes(app: Hono, services: AllRouteServices = {}): v
 
   // Daemon lifecycle routes
   registerDaemonRoutes(app, services.daemonManager ?? null);
+
+  // Backup routes (always register — no DB required)
+  registerBackupRoutes(app, workDir);
 
   // Messaging gateway routes
   registerMessagingRoutes(app, services.messaging ?? {});

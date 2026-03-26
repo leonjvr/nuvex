@@ -129,14 +129,28 @@ export class ModuleSandboxExecutor {
       );
     }
 
-    // xAI-ARCH-H2: Thread module network policy to the sandbox provider.
+    // Thread module network policy to the sandbox provider.
     // Build an AgentSandboxConfig from the policy so that when the sandbox wraps
     // shell commands (e.g. via wrapCommand), it enforces the module's allowedDomains.
     // For inline JS tool functions, isolation relies on the bubblewrap HTTP proxy
     // allowlist which is seeded with these same domains at initialization time.
-    // moduleSandboxConfig is used by callers invoking wrapCommand for shell tools
+    // Shell-executing tool callers must pass this config to provider.wrapCommand().
     const moduleSandboxConfig = buildModuleSandboxConfig(request.agentId, policy);
-    void moduleSandboxConfig; // available to callers via buildModuleSandboxConfig()
+    if (!isSandboxed && policy.allowedDomains.length > 0) {
+      // Sandbox provider is "none" — network isolation cannot be enforced for this module.
+      // Log a warning so operators know the policy is declared but not active.
+      logger.warn(
+        "module_sandbox_network_not_enforced",
+        `Module "${request.moduleName}" has a network allowlist but sandbox provider is "none" — network isolation inactive`,
+        {
+          metadata: {
+            moduleName:     request.moduleName,
+            allowedDomains: policy.allowedDomains,
+            agentId:        request.agentId,
+          },
+        },
+      );
+    }
     if (isSandboxed) {
       logger.info(
         "module_sandbox_policy_applied",
