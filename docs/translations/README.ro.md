@@ -9,8 +9,8 @@
 > Singura platformă de agenți unde guvernanța este aplicată prin arhitectură, nu prin speranța că modelul se va comporta corect.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Docker](https://img.shields.io/badge/Docker-sidjua%2Fsidjua-blue)](https://hub.docker.com/r/sidjua/sidjua)
-[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/sidjua-dev/sidjua/releases)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fgoetzkohlberg%2Fsidjua-blue)](https://ghcr.io/goetzkohlberg/sidjua)
+[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/GoetzKohlberg/sidjua/releases)
 
 ---
 
@@ -282,7 +282,7 @@ Modelul de adaptor multi-canal suportă Telegram, Discord, ntfy și Email
 **O singură comandă Docker** pentru producție:
 
 ```bash
-docker run -p 4200:4200 sidjua/sidjua:latest
+docker run -p 4200:4200 ghcr.io/goetzkohlberg/sidjua:latest
 ```
 
 Cheia API este generată automat la prima pornire și tipărită în jurnalele containerului.
@@ -431,7 +431,7 @@ sidjua api-key generate
 ```yaml
 services:
   sidjua:
-    image: sidjua/sidjua:latest
+    image: ghcr.io/goetzkohlberg/sidjua:latest
     ports:
       - "4200:4200"
     volumes:
@@ -492,7 +492,7 @@ Pe termen scurt:
 ## Comunitate
 
 - **Discord**: [sidjua.com/discord](https://sidjua.com/discord)
-- **GitHub Issues**: [github.com/sidjua-dev/sidjua/issues](https://github.com/sidjua-dev/sidjua/issues)
+- **GitHub Issues**: [github.com/GoetzKohlberg/sidjua/issues](https://github.com/GoetzKohlberg/sidjua/issues)
 - **Email**: contact@sidjua.com
 - **Documentație**: [sidjua.com/docs](https://sidjua.com/docs)
 

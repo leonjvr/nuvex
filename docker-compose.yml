@@ -14,7 +14,7 @@
 
 services:
   sidjua:
-    image: sidjua/sidjua:1.0.0
+    image: ghcr.io/goetzkohlberg/sidjua:1.0.0
     container_name: sidjua
     restart: unless-stopped
     ports:

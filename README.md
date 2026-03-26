@@ -7,8 +7,8 @@
 > The only agent platform where governance is enforced by architecture, not by hoping the model behaves.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Docker](https://img.shields.io/badge/Docker-sidjua%2Fsidjua-blue)](https://hub.docker.com/r/sidjua/sidjua)
-[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/sidjua-dev/sidjua/releases)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fgoetzkohlberg%2Fsidjua-blue)](https://ghcr.io/goetzkohlberg/sidjua)
+[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/GoetzKohlberg/sidjua/releases)
 
 ---
 
@@ -330,7 +330,7 @@ docker run -d \
   --cap-drop ALL \
   -p 4200:4200 \
   -v sidjua-data:/data \
-  sidjua/sidjua:latest
+  ghcr.io/goetzkohlberg/sidjua:latest
 ```
 
 API key is auto-generated on first start — retrieve it with `docker exec sidjua cat /app/.system/api-key`.
@@ -526,7 +526,7 @@ sidjua api-key generate
 ```yaml
 services:
   sidjua:
-    image: sidjua/sidjua:latest
+    image: ghcr.io/goetzkohlberg/sidjua:latest
     ports:
       - "4200:4200"
     volumes:
@@ -593,7 +593,7 @@ compliance packs, tamper-proof audit export.
 ## Community
 
 - **Discord**: [sidjua.com/discord](https://sidjua.com/discord)
-- **GitHub Issues**: [github.com/sidjua-dev/sidjua/issues](https://github.com/sidjua-dev/sidjua/issues)
+- **GitHub Issues**: [github.com/GoetzKohlberg/sidjua/issues](https://github.com/GoetzKohlberg/sidjua/issues)
 - **Email**: contact@sidjua.com
 - **Docs**: [sidjua.com/docs](https://sidjua.com/docs)
 

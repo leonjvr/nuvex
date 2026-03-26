@@ -9,8 +9,8 @@
 > Het enige agentplatform waar governance wordt afgedwongen door de architectuur, niet door de hoop dat het model zich correct gedraagt.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Docker](https://img.shields.io/badge/Docker-sidjua%2Fsidjua-blue)](https://hub.docker.com/r/sidjua/sidjua)
-[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/sidjua-dev/sidjua/releases)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fgoetzkohlberg%2Fsidjua-blue)](https://ghcr.io/goetzkohlberg/sidjua)
+[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://github.com/GoetzKohlberg/sidjua/releases)
 
 ---
 
@@ -281,7 +281,7 @@ parallel.
 **Eén Docker-opdracht** naar productie:
 
 ```bash
-docker run -p 4200:4200 sidjua/sidjua:latest
+docker run -p 4200:4200 ghcr.io/goetzkohlberg/sidjua:latest
 ```
 
 De API-sleutel wordt automatisch gegenereerd bij de eerste start en afgedrukt in de container-logs.
@@ -430,7 +430,7 @@ sidjua api-key generate
 ```yaml
 services:
   sidjua:
-    image: sidjua/sidjua:latest
+    image: ghcr.io/goetzkohlberg/sidjua:latest
     ports:
       - "4200:4200"
     volumes:
@@ -491,7 +491,7 @@ Op korte termijn:
 ## Gemeenschap
 
 - **Discord**: [sidjua.com/discord](https://sidjua.com/discord)
-- **GitHub Issues**: [github.com/sidjua-dev/sidjua/issues](https://github.com/sidjua-dev/sidjua/issues)
+- **GitHub Issues**: [github.com/GoetzKohlberg/sidjua/issues](https://github.com/GoetzKohlberg/sidjua/issues)
 - **E-mail**: contact@sidjua.com
 - **Documentatie**: [sidjua.com/docs](https://sidjua.com/docs)
 
