@@ -92,6 +92,56 @@ function serveGuiFile(c: Context, dir: string, filename: string): Response {
   return c.newResponse(body, 200, { "Content-Type": mime });
 }
 
+/**
+ * Serve index.html with the API key injected server-side (P281).
+ *
+ * The bootstrap payload is written into `window.__SIDJUA_BOOTSTRAP__` before
+ * `</head>` so the GUI can read the key without a separate HTTP round-trip.
+ *
+ * Security constraints:
+ *   - Key is injected ONLY for loopback requests (Host: localhost / 127.0.0.1 / ::1).
+ *   - Non-local requests receive an empty payload `{}`.
+ *   - Response is always `Cache-Control: no-store, no-cache` to prevent the key
+ *     from being stored in browser or proxy caches.
+ */
+function serveIndexHtmlWithBootstrap(
+  c: Context,
+  guiDist: string,
+  getApiKey: () => string,
+): Response {
+  const filePath = join(guiDist, "index.html");
+  let realPath: string;
+  try {
+    realPath = realpathSync(filePath);
+  } catch (_e) {
+    return c.text("Not found", 404);
+  }
+  try {
+    assertWithinDirectory(realPath, guiDist);
+  } catch (_e) {
+    return c.text("Forbidden", 403);
+  }
+
+  const host    = (c.req.header("host") ?? "").split(":")[0]!.toLowerCase();
+  const isLocal = host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1";
+
+  let serverUrl = "";
+  try { serverUrl = new URL(c.req.url).origin; } catch { /* non-fatal — GUI falls back to window.location.origin */ }
+
+  const payload = isLocal
+    ? JSON.stringify({ api_key: getApiKey(), server_url: serverUrl })
+    : JSON.stringify({});
+
+  const script = `<script>window.__SIDJUA_BOOTSTRAP__ = ${payload};</script>`;
+  const html   = readFileSync(realPath, "utf-8").replace("</head>", `  ${script}\n  </head>`);
+
+  return c.newResponse(html, 200, {
+    "Content-Type":  "text/html; charset=utf-8",
+    "Cache-Control": "no-store, no-cache",
+    "Pragma":        "no-cache",
+  });
+}
+
 const logger = createLogger("api-server-cli");
 
 
@@ -358,8 +408,9 @@ export function registerServerCommands(program: Command): void {
       const hasGui  = existsSync(join(guiDist, "index.html"));
 
       if (hasGui) {
-        server.app.get("/",           (c) => serveGuiFile(c, guiDist, "index.html"));
-        server.app.get("/index.html", (c) => serveGuiFile(c, guiDist, "index.html"));
+        const getKey = () => apiKeyState.currentApiKey;
+        server.app.get("/",           (c) => serveIndexHtmlWithBootstrap(c, guiDist, getKey));
+        server.app.get("/index.html", (c) => serveIndexHtmlWithBootstrap(c, guiDist, getKey));
         server.app.get("/favicon.ico",(c) => serveGuiFile(c, guiDist, "favicon.ico"));
         server.app.get("/assets/*",   (c) => {
           const assetPath = c.req.path.replace(/^\/assets\//, "");
@@ -368,7 +419,7 @@ export function registerServerCommands(program: Command): void {
         // SPA fallback — serve index.html for all unmatched non-API routes
         server.app.get("/*", (c) => {
           if (c.req.path.startsWith("/api/")) return c.notFound();
-          return serveGuiFile(c, guiDist, "index.html");
+          return serveIndexHtmlWithBootstrap(c, guiDist, getKey);
         });
       }
 

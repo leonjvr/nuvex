@@ -40,6 +40,15 @@ export interface AppConfigContextValue {
 }
 
 
+// P281: Type declaration for the server-injected bootstrap object.
+interface SidjuaBootstrap {
+  api_key:     string;
+  server_url?: string;
+}
+interface WindowWithBootstrap extends Window {
+  __SIDJUA_BOOTSTRAP__?: SidjuaBootstrap;
+}
+
 const STORAGE_KEY = 'sidjua-config';
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -207,12 +216,23 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
       .catch(() => { /* server not reachable yet — buildInfo stays null */ });
   }, [config.serverUrl]);
 
-  // GUI bootstrap: if apiKey is absent, try to fetch it from the server
-  // (works when the GUI is served from the same origin as the API)
+  // GUI bootstrap: if apiKey is absent, obtain it without manual config.
+  // P281: Check window.__SIDJUA_BOOTSTRAP__ (injected server-side) first —
+  // no extra HTTP round-trip required. Falls back to fetching /api/v1/gui-bootstrap
+  // for environments where server-side injection is unavailable.
   useEffect(() => {
     if (config.apiKey || bootstrapAttempted.current) return;
     bootstrapAttempted.current = true;
 
+    // P281: Use server-injected bootstrap if available
+    const injected = (window as WindowWithBootstrap).__SIDJUA_BOOTSTRAP__;
+    if (typeof injected?.api_key === 'string' && injected.api_key) {
+      const serverUrl = injected.server_url || config.serverUrl || window.location.origin;
+      setConfig({ serverUrl, apiKey: injected.api_key });
+      return;
+    }
+
+    // Fallback: fetch from /api/v1/gui-bootstrap (DEPRECATED: P281 — use server-side injection)
     const serverUrl = config.serverUrl || window.location.origin;
     setBootstrapping(true);
 
