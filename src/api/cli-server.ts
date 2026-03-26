@@ -126,7 +126,7 @@ function serveIndexHtmlWithBootstrap(
   const isLocal = host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1";
 
   let serverUrl = "";
-  try { serverUrl = new URL(c.req.url).origin; } catch { /* non-fatal — GUI falls back to window.location.origin */ }
+  try { serverUrl = new URL(c.req.url).origin; } catch (_err) { /* non-fatal — GUI falls back to window.location.origin */ }
 
   const payload = isLocal
     ? JSON.stringify({ api_key: getApiKey(), server_url: serverUrl })

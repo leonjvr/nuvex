@@ -38,7 +38,7 @@ function getFirstRunCompleted(db: Database): boolean {
       setFirstRunCompleted(db);
       return true;
     }
-  } catch {
+  } catch (_err) {
     // Non-fatal — provider config may not be readable yet
   }
 
