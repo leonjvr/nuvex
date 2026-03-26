@@ -4,6 +4,7 @@ backups/
 .env
 .env.*
 !.env.example
+modules/**/.env
 *.db
 *.db-wal
 *.db-shm

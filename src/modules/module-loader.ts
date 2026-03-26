@@ -33,15 +33,16 @@ import {
 } from "./discord/index.js";
 
 import type { ModuleManifest, ModuleStatus } from "./module-types.js";
+import type { SecretsProvider }              from "../types/apply.js";
 
 const logger = createLogger("module-loader");
 
 /**
- * P272 Task 6: Abstraction over secret sources.
+ * Abstraction over secret sources.
  *
  * Allows module installation to pull secrets from the central SecretsProvider
- * instead of process.env directly, enabling governed secret access.
- * When not provided, `injectEnvSecrets` falls back to process.env.
+ * instead of the process environment directly, enabling governed secret access.
+ * When not provided, `injectEnvSecrets` falls back to `process.env` when not provided.
  */
 export interface SecretEnvSource {
   /** Return the value for the given key, or undefined if not set. */
@@ -472,12 +473,12 @@ async function findMissingSecrets(
  *
  * Uses writeEnvFile() for sanitization + atomic write + 0o600 perms.
  *
- * @param secretSource P272: optional governed secret source; falls back to process.env.
+ * @param secretSource Optional governed secret source; falls back to `process.env` when not provided.
  */
 async function injectEnvSecrets(installPath: string, manifest: ModuleManifest, secretSource?: SecretEnvSource): Promise<void> {
   if (!manifest.secrets || manifest.secrets.length === 0) return;
 
-  // P272 Task 6: Use injected SecretEnvSource when provided; fall back to process.env.
+  // Use injected SecretEnvSource when provided; fall back to the process environment.
   const source: SecretEnvSource = secretSource ?? { get: (k) => process.env[k] };
 
   const existing = await loadModuleSecrets(installPath);
@@ -655,4 +656,105 @@ export function parseDotenv(raw: string): Record<string, string> {
     result[key] = val;
   }
   return result;
+}
+
+
+// ---------------------------------------------------------------------------
+// Central secret store access for modules
+// ---------------------------------------------------------------------------
+
+const MODULE_SECRET_NAMESPACE_PREFIX = "module.";
+
+/**
+ * Remove a single key from a module's .env file, rewriting atomically.
+ * No-op if the file or key does not exist.
+ */
+async function removeFromModuleEnv(installPath: string, secretName: string): Promise<void> {
+  const envPath = join(installPath, ".env");
+  if (!existsSync(envPath)) return;
+  try {
+    const raw     = await readFile(envPath, "utf8");
+    const entries = parseDotenv(raw);
+    if (!(secretName in entries)) return;
+    delete entries[secretName];
+    await writeEnvFile(envPath, entries);
+  } catch (_e) {
+    // Non-fatal — leave the .env file intact on read/write failure
+  }
+}
+
+/**
+ * Retrieve a module secret, preferring the central encrypted secrets store.
+ *
+ * Resolution order:
+ *   1. Central secrets store: `provider.get("module.<moduleName>", secretName)`
+ *   2. `.env` file in the module install directory (legacy; triggers migration)
+ *   3. `undefined` — caller should handle missing secret
+ *
+ * When a value is found in the .env file and a provider is available, the
+ * value is migrated to the central store and removed from the .env file so
+ * that the next call resolves via path (1).
+ *
+ * @param moduleName  Short module identifier (e.g. "discord")
+ * @param secretName  Secret key (e.g. "DISCORD_BOT_TOKEN")
+ * @param installPath Absolute path to the module install directory
+ * @param provider    Central secrets provider; optional — omit in test/env contexts
+ */
+export async function getModuleSecret(
+  moduleName:  string,
+  secretName:  string,
+  installPath: string,
+  provider?:   SecretsProvider,
+): Promise<string | undefined> {
+  const namespace = `${MODULE_SECRET_NAMESPACE_PREFIX}${moduleName}`;
+
+  // Path 1: central store
+  if (provider !== undefined) {
+    try {
+      const stored = await provider.get(namespace, secretName);
+      if (stored !== null && stored !== "") return stored;
+    } catch (_e) {
+      // Fall through to .env fallback on provider error
+    }
+  }
+
+  // Path 2: .env file (legacy)
+  const envPath = join(installPath, ".env");
+  if (existsSync(envPath)) {
+    try {
+      const raw   = await readFile(envPath, "utf8");
+      const env   = parseDotenv(raw);
+      const value = env[secretName];
+
+      if (value !== undefined && value !== "") {
+        logger.warn(
+          "module_secret_env_fallback",
+          `Module "${moduleName}" secret "${secretName}" loaded from .env — migrate to secrets store`,
+          { metadata: { moduleName, secretName } },
+        );
+
+        // Migrate to central store and remove from .env
+        if (provider !== undefined) {
+          try {
+            await provider.ensureNamespace(namespace);
+            await provider.set(namespace, secretName, value);
+            await removeFromModuleEnv(installPath, secretName);
+            logger.info(
+              "module_secret_migrated",
+              `Migrated "${moduleName}/${secretName}" from .env to central secrets store`,
+              { metadata: { moduleName, secretName } },
+            );
+          } catch (_e) {
+            // Migration failure is non-fatal — value already in hand
+          }
+        }
+
+        return value;
+      }
+    } catch (_e) {
+      // Non-fatal — .env unreadable
+    }
+  }
+
+  return undefined;
 }

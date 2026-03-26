@@ -27,6 +27,8 @@ import { createRequire }  from "node:module";
 import { parse as parseYaml } from "yaml";
 import { assertWithinDirectory } from "../../utils/path-utils.js";
 import type { SecretEnvSource } from "../module-loader.js";
+import { getModuleSecret }      from "../module-loader.js";
+import type { SecretsProvider } from "../../types/apply.js";
 
 import { DiscordGateway }    from "./discord-gateway.js";
 import { DiscordClient }     from "./discord-client.js";
@@ -79,8 +81,8 @@ function parseDotenv(raw: string): Record<string, string> {
 /**
  * Load module config from the given install directory.
  *
- * @param secretSource P272 Task 6: optional governed secret source. When provided,
- *   process.env fallback for secrets is replaced by this source. Defaults to process.env.
+ * @param secretSource Optional governed secret source. When provided,
+ *   the environment fallback for secrets is replaced by this source.
  */
 export function loadDaemonConfig(moduleDir: string, secretSource?: SecretEnvSource): LoadedConfig {
   const envSource: SecretEnvSource = secretSource ?? { get: (k) => process.env[k] };
@@ -183,7 +185,7 @@ export interface DaemonOptions {
   pidFile:       string;
   WsFactory?:    WsFactory;
   fetchFn?:      typeof fetch;
-  /** P272 Task 6: governed secret source; defaults to process.env when not provided. */
+  /** Governed secret source; defaults to the process environment when not provided. */
   secretSource?: SecretEnvSource;
 }
 
@@ -271,6 +273,23 @@ export async function startDaemon(opts: DaemonOptions): Promise<Daemon> {
       process.stdout.write("[gateway-daemon] Discord Gateway disconnected\n");
     },
   };
+}
+
+
+/**
+ * Retrieve a Discord module secret from the central encrypted secrets store,
+ * falling back to the module `.env` file with automatic migration.
+ *
+ * @param secretName  Secret key (e.g. "DISCORD_BOT_TOKEN")
+ * @param installPath Absolute path to the Discord module install directory
+ * @param provider    Central secrets provider; optional
+ */
+export async function getDiscordModuleSecret(
+  secretName:  string,
+  installPath: string,
+  provider?:   SecretsProvider,
+): Promise<string | undefined> {
+  return getModuleSecret("discord", secretName, installPath, provider);
 }
 
 
