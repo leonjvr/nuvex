@@ -73,15 +73,19 @@ export async function runApplyCommand(opts: ApplyCommandOptions): Promise<number
   // Resolution order:
   //  1. governance/divisions/ directory (modular per-file format)
   //  2. governance/divisions.yaml       (single-file, legacy)
-  //  3. divisions.yaml                  (workspace root, ancient legacy)
+  //  3. config/divisions.yaml           (Docker / user-customised config dir)
+  //  4. divisions.yaml                  (workspace root, ancient legacy)
   if (!existsSync(configPath)) {
-    const govDirPath = resolve(opts.workDir, "governance", "divisions");
-    const govPath    = resolve(opts.workDir, "governance", "divisions.yaml");
-    const rootPath   = resolve(opts.workDir, "divisions.yaml");
+    const govDirPath    = resolve(opts.workDir, "governance", "divisions");
+    const govPath       = resolve(opts.workDir, "governance", "divisions.yaml");
+    const configDirPath = resolve(opts.workDir, "config", "divisions.yaml");
+    const rootPath      = resolve(opts.workDir, "divisions.yaml");
     if (existsSync(govDirPath) && statSync(govDirPath).isDirectory()) {
       configPath = govDirPath;
     } else if (existsSync(govPath)) {
       configPath = govPath;
+    } else if (existsSync(configDirPath)) {
+      configPath = configDirPath;
     } else if (existsSync(rootPath)) {
       configPath = rootPath;
     } else {
