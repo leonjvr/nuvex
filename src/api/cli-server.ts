@@ -30,6 +30,7 @@ import { openDatabase } from "../utils/db.js";
 import { AgentRegistry } from "../agent-lifecycle/agent-registry.js";
 import { runMigrations105 }   from "../agent-lifecycle/migration.js";
 import { runAuditMigrations } from "../core/audit/audit-migrations.js";
+// DUAL PATH: start.ts (CLI foreground) runs the same migrations. Changes here MUST be mirrored there.
 import {
   createApiServer,
   DEFAULT_SERVER_CONFIG,

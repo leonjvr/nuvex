@@ -45,6 +45,9 @@ import type { AdapterInstanceConfig } from "../../messaging/types.js";
 import { msg }                        from "../../i18n/index.js";
 import { SIDJUA_VERSION }             from "../../version.js";
 import { CheckpointTimer }            from "../../orchestrator/checkpoint-timer.js";
+import { runMigrations105 }           from "../../agent-lifecycle/migration.js";
+import { runAuditMigrations }         from "../../core/audit/audit-migrations.js";
+// DUAL PATH: cli-server.ts (Docker) runs the same migrations. Changes here MUST be mirrored there.
 import { bootstrapOrchestrator }      from "../../orchestrator/bootstrap.js";
 import type { OrchestratorProcess }   from "../../orchestrator/orchestrator.js";
 import { detectDeploymentMode, getCheckpointIntervalMs } from "../../core/deployment-mode.js";
@@ -193,6 +196,9 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
 
     const dbPath = join(systemDir, "sidjua.db");
     const db     = openDatabase(dbPath);
+    // DUAL PATH: cli-server.ts (Docker) runs the same migrations. Keep in sync.
+    runMigrations105(db);
+    runAuditMigrations(db);
     const registry = db !== null ? new AgentRegistry(db) : undefined;
 
     // ── Crash recovery — heal tasks interrupted by unclean shutdown ───────
