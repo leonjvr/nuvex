@@ -902,8 +902,10 @@ export function Agents() {
           borderTop:    agents.length > 0 ? '1px solid var(--color-border)' : 'none',
           background:   'var(--color-surface-alt)',
         }}>
-          {agents.length} agent{agents.length !== 1 ? 's' : ''}
-          {(divisionFilter || statusFilter || search) ? ' (filtered)' : ''}
+          {agents.length > 0
+            ? `${agents.length} agent${agents.length !== 1 ? 's' : ''}${(divisionFilter || statusFilter || search) ? ' (filtered)' : ''}`
+            : 'No agents deployed yet — run \u2018sidjua apply\u2019 to create agents from your workspace'
+          }
         </div>
       </div>
 
