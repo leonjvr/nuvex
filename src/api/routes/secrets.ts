@@ -20,13 +20,13 @@
  *   POST /api/v1/secrets/rotate              body: { ns, key, value }
  */
 
-import { Hono, type Context } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import Database               from "better-sqlite3";
 import type { SecretsProvider } from "../../types/apply.js";
 import { createLogger } from "../../core/logger.js";
 import { hasTable }     from "../../api/utils/has-table.js";
 import type { CallerContext } from "../caller-context.js";
-import { requireScope } from "../middleware/require-scope.js";
+import { requireScope, CALLER_CONTEXT_KEY } from "../middleware/require-scope.js";
 
 // Re-export for backward compatibility — existing imports from this module still work.
 export type { CallerContext };
@@ -62,14 +62,14 @@ export function clearSecretAuditLog(): void {
 /**
  * Returns true if the caller has operator-level (unrestricted) access.
  *
- * SECURITY FIX (P194 IDOR): Requires an explicit `role: "operator"` field.
+ * SECURITY: Requires an explicit `role: "operator"` field.
  * Previously, an empty CallerContext `{}` (role === undefined) was granted
  * operator access, allowing any authenticated API caller without a scoped
  * CallerContext to read secrets from any division namespace — a classic IDOR.
  *
- * The default in `registerSecretRoutes` is now `{ role: "operator" }` (not `{}`),
- * so CLI / admin tooling retains full access, but API callers that receive a
- * scoped CallerContext (e.g., division-scoped agents) are correctly restricted.
+ * The fix: CallerContext MUST be set per-request by the auth middleware.
+ * A missing context is denied at the `requireCallerCtx` guard in registerSecretRoutes.
+ * There is no static fallback — fail-closed (Rule #12).
  */
 function isOperator(ctx: CallerContext): boolean {
   return ctx.role === "operator" || ctx.role === "admin";
@@ -141,12 +141,6 @@ export interface SecretRouteServices {
    * (SELECT DISTINCT namespace) which isn't in the SecretsProvider interface.
    */
   secretsDb: InstanceType<typeof Database>;
-  /**
-   * Caller context for namespace-level authorization.
-   * Defaults to operator access (full access) when not provided, preserving
-   * backwards-compatibility for CLI / admin tooling.
-   */
-  callerContext?: CallerContext;
 }
 
 
@@ -166,38 +160,28 @@ const KEY_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 export function registerSecretRoutes(app: Hono, services: SecretRouteServices): void {
   const { provider, secretsDb } = services;
 
-  // FAIL CLOSED: secret routes require an explicit CallerContext.
-  // Registering without one is a server configuration error — all requests
-  // to secrets endpoints will return 403 until the misconfiguration is fixed.
-  // V1.0: auth middleware sets { role: "operator" } after API key validation.
-  // V1.1: this will be a division-scoped token (ARC-201).
-  if (!services.callerContext) {
-    logger.error(
-      "secrets_misconfigured",
-      "Secret routes registered without CallerContext — all requests denied",
-      {},
-    );
-    const forbidden = (c: Context) =>
-      c.json(
-        { error: { code: "SEC-403", message: "Secret access requires explicit caller context" } },
+  // FAIL CLOSED: all secrets routes require a per-request CallerContext set by
+  // auth middleware. If the context is absent the request is denied immediately —
+  // we never default to operator access (Rule #12).
+  const requireCallerCtx: MiddlewareHandler = async (c, next) => {
+    if ((c.get(CALLER_CONTEXT_KEY) as CallerContext | undefined) === undefined) {
+      logger.warn(
+        "secrets_no_context",
+        "Secret route accessed without CallerContext — denying",
+        {},
+      );
+      return c.json(
+        { error: { code: "SEC-403", message: "Authentication required" } },
         403,
       );
-    app.get("/api/v1/secrets/namespaces", forbidden);
-    app.get("/api/v1/secrets/keys",       forbidden);
-    app.get("/api/v1/secrets/value",      forbidden);
-    app.put("/api/v1/secrets/value",      forbidden);
-    app.delete("/api/v1/secrets/value",   forbidden);
-    app.get("/api/v1/secrets/info",       forbidden);
-    app.post("/api/v1/secrets/rotate",    forbidden);
-    return;
-  }
+    }
+    return next();
+  };
+  app.use("/api/v1/secrets/*", requireCallerCtx);
 
-  // Helper to get CallerContext per-request (dynamic), falling back to static for CLI usage
+  // Return the per-request CallerContext. Safe after the guard above.
   function getCtx(c: import("hono").Context): CallerContext {
-    const fromReq = c.get("callerContext") as CallerContext | undefined;
-    if (fromReq !== undefined) return fromReq;
-    if (services.callerContext !== undefined) return services.callerContext;
-    return {} as CallerContext;
+    return c.get(CALLER_CONTEXT_KEY) as CallerContext;
   }
 
   // ---- GET /api/v1/secrets/namespaces -------------------------------------
