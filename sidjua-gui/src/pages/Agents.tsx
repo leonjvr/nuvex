@@ -20,7 +20,7 @@ import { ActivityFeed }   from '../components/shared/ActivityFeed';
 import { AgentCard }      from '../components/shared/AgentCard';
 import { AgentIcon }      from '../components/shared/AgentIcon';
 import type { ActivityEvent } from '../components/shared/ActivityFeed';
-import type { Agent, AgentLifecycleStatus, TasksResponse, AuditResponse, StarterAgentsResponse, StarterAgent, ProviderConfigResponse } from '../api/types';
+import type { Agent, AgentLifecycleStatus, TasksResponse, AuditResponse, StarterAgentsResponse, StarterAgent, ProviderConfigResponse, ProviderCatalogResponse } from '../api/types';
 
 
 const FLASH_DURATION_MS = 1_500;
@@ -83,6 +83,21 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
 
   const [actioning,   setActioning]   = useState<'start' | 'stop' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Provider/model selection state
+  const catalogRes  = useApi<ProviderCatalogResponse>((c) => c.getProviderCatalog());
+  const [patchError, setPatchError] = useState<string | null>(null);
+
+  async function handleProviderChange(provider: string, model: string): Promise<void> {
+    if (!client || !agent) return;
+    setPatchError(null);
+    try {
+      await client.patchAgent(agentId, { provider, model });
+      agentRes.refetch();
+    } catch (err: unknown) {
+      setPatchError(err instanceof Error ? err.message : 'Update failed');
+    }
+  }
 
   async function handleAction(action: 'start' | 'stop'): Promise<void> {
     if (!client || actioning) return;
@@ -219,9 +234,57 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
         </p>
       )}
 
+      {patchError && (
+        <p style={{ color: 'var(--color-danger)', fontSize: '12px', marginBottom: '10px' }}>{patchError}</p>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', marginBottom: '16px' }}>
-        <DetailRow label="Provider" value={agent.provider} />
-        <DetailRow label="Model"    value={agent.resolved_model ?? agent.model} />
+        {/* Provider dropdown */}
+        <div>
+          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>Provider</p>
+          <select
+            value={agent.provider}
+            onChange={(e) => {
+              const prov = catalogRes.data?.providers.find((p) => p.id === e.target.value);
+              void handleProviderChange(e.target.value, prov?.model ?? agent.model);
+            }}
+            style={{ ...detailSelectStyle, width: '100%' }}
+            aria-label="Agent provider"
+          >
+            {catalogRes.data?.providers.map((p) => (
+              <option key={p.id} value={p.id}>{p.display_name}</option>
+            ))}
+            {/* Always keep current value selectable even if catalog not yet loaded */}
+            {(!catalogRes.data || !catalogRes.data.providers.some((p) => p.id === agent.provider)) && (
+              <option value={agent.provider}>{agent.provider}</option>
+            )}
+          </select>
+        </div>
+
+        {/* Model dropdown — options from selected provider */}
+        <div>
+          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>Model</p>
+          {(() => {
+            const selectedProv = catalogRes.data?.providers.find((p) => p.id === agent.provider);
+            // Catalog entry has a single model; show it plus the current value as options
+            const modelOptions: string[] = selectedProv
+              ? Array.from(new Set([selectedProv.model, agent.model, agent.resolved_model ?? agent.model].filter(Boolean)))
+              : [agent.resolved_model ?? agent.model];
+            return (
+              <select
+                value={agent.resolved_model ?? agent.model}
+                onChange={(e) => { void handleProviderChange(agent.provider, e.target.value); }}
+                style={{ ...detailSelectStyle, width: '100%' }}
+                aria-label="Agent model"
+              >
+                {modelOptions.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            );
+          })()}
+        </div>
+
         <DetailRow label="Created"  value={formatRelative(agent.created_at)} />
         <DetailRow label="Updated"  value={formatRelative(agent.updated_at)} />
         <DetailRow label="Tasks done"   value={String(doneTotal)} />
@@ -856,6 +919,17 @@ export function Agents() {
   );
 }
 
+
+const detailSelectStyle: React.CSSProperties = {
+  padding:      '4px 8px',
+  borderRadius: 'var(--radius-md)',
+  border:       '1px solid var(--color-border)',
+  background:   'var(--color-bg)',
+  color:        'var(--color-text)',
+  fontSize:     '13px',
+  outline:      'none',
+  fontWeight:   500,
+};
 
 const selectStyle: React.CSSProperties = {
   padding:      '6px 10px',

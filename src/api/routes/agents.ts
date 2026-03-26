@@ -101,6 +101,7 @@ export interface AgentRegistryLike {
   list(filters?: RegistryFilters): AgentDefinitionRow[];
   getById(id: string): AgentDefinitionRow | undefined;
   setStatus(id: string, status: AgentLifecycleStatus): void;
+  update(id: string, patch: { name?: string; description?: string; tier?: number; provider?: string; model?: string }): AgentDefinitionRow;
 }
 
 export interface AgentRouteServices {
@@ -149,6 +150,71 @@ export function registerAgentRoutes(app: Hono, services: AgentRouteServices): vo
     }
 
     return c.json({ agent: withResolvedModel(agent) });
+  });
+
+  // ---- PATCH /api/v1/agents/:id ------------------------------------------
+
+  app.patch("/api/v1/agents/:id", requireScope("operator"), async (c) => {
+    const id    = c.req.param("id");
+    const agent = registry.getById(id);
+
+    if (agent === undefined) {
+      throw SidjuaError.from("AGT-001", `Agent ${id} not found`);
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json() as Record<string, unknown>;
+    } catch {
+      throw SidjuaError.from("INPUT-001", "Request body must be valid JSON");
+    }
+
+    const patch: { name?: string; description?: string; tier?: number; provider?: string; model?: string } = {};
+
+    if (body["name"] !== undefined) {
+      if (typeof body["name"] !== "string" || (body["name"] as string).trim() === "") {
+        throw SidjuaError.from("INPUT-001", "name must be a non-empty string");
+      }
+      patch.name = (body["name"] as string).trim();
+    }
+    if (body["description"] !== undefined) {
+      if (typeof body["description"] !== "string") {
+        throw SidjuaError.from("INPUT-001", "description must be a string");
+      }
+      patch.description = body["description"] as string;
+    }
+    if (body["tier"] !== undefined) {
+      const tier = Number(body["tier"]);
+      if (!Number.isInteger(tier) || tier < 1 || tier > 3) {
+        throw SidjuaError.from("INPUT-001", "tier must be 1, 2, or 3");
+      }
+      patch.tier = tier as 1 | 2 | 3;
+    }
+    if (body["provider"] !== undefined) {
+      if (typeof body["provider"] !== "string" || (body["provider"] as string).trim() === "") {
+        throw SidjuaError.from("INPUT-001", "provider must be a non-empty string");
+      }
+      patch.provider = (body["provider"] as string).trim();
+    }
+    if (body["model"] !== undefined) {
+      if (typeof body["model"] !== "string" || (body["model"] as string).trim() === "") {
+        throw SidjuaError.from("INPUT-001", "model must be a non-empty string");
+      }
+      patch.model = (body["model"] as string).trim();
+    }
+
+    if (Object.keys(patch).length === 0) {
+      throw SidjuaError.from("INPUT-001", "No updatable fields provided (name, description, tier, provider, model)");
+    }
+
+    const updated = registry.update(id, patch);
+
+    logger.info("agent_updated", `Agent ${id} updated via API`, {
+      correlationId: reqId(c),
+      metadata: { agent_id: id, fields: Object.keys(patch) },
+    });
+
+    return c.json({ agent: withResolvedModel(updated) });
   });
 
   // ---- POST /api/v1/agents/:id/start -------------------------------------

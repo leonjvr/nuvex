@@ -196,6 +196,25 @@ export class SidjuaApiClient {
     return res.json() as Promise<T>;
   }
 
+  async patch<T>(path: string, body?: unknown, timeoutMs: number = TIMEOUT_MS.default): Promise<T> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method: 'PATCH',
+        headers: this.headers(),
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      throw classifyFetchError(err);
+    }
+    if (!res.ok) {
+      if (res.status === 401) this.onAuthFailure?.();
+      throw classifyHttpError(res.status, await res.text());
+    }
+    return res.json() as Promise<T>;
+  }
+
   async delete<T>(path: string, timeoutMs: number = TIMEOUT_MS.default): Promise<T> {
     let res: Response;
     try {
@@ -253,6 +272,9 @@ export class SidjuaApiClient {
   getAgent(id: string):   Promise<AgentResponse> { return this.get(API_PATHS.agent(validatePathParam(id, 'id'))); }
   startAgent(id: string): Promise<AgentResponse> { return this.post(API_PATHS.agentStart(validatePathParam(id, 'id'))); }
   stopAgent(id: string):  Promise<AgentResponse> { return this.post(API_PATHS.agentStop(validatePathParam(id, 'id'))); }
+  patchAgent(id: string, patch: { name?: string; description?: string; tier?: number; provider?: string; model?: string }): Promise<AgentResponse> {
+    return this.patch(API_PATHS.agentPatch(validatePathParam(id, 'id')), patch);
+  }
 
   listStarterAgents():                    Promise<StarterAgentsResponse> { return this.get(API_PATHS.starterAgents()); }
   getStarterAgent(id: string):            Promise<StarterAgentResponse>  { return this.get(API_PATHS.starterAgent(validatePathParam(id, 'id'))); }
