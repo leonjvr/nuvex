@@ -16,14 +16,14 @@ import type { CLIRequest, CLIResponse } from "../orchestrator/orchestrator.js";
 import { IPC_TOKEN_FILENAME } from "../orchestrator/orchestrator.js";
 
 /**
- * Read the IPC authentication token from the token file alongside the socket.
+ * Read the IPC secret from the secret file alongside the socket.
  * Returns undefined if the file does not exist or cannot be read.
  */
-function readIpcToken(socketPath: string): string | undefined {
-  const tokenPath = join(dirname(socketPath), IPC_TOKEN_FILENAME);
-  if (!existsSync(tokenPath)) return undefined;
+function readIpcSecret(socketPath: string): string | undefined {
+  const secretPath = join(dirname(socketPath), IPC_TOKEN_FILENAME);
+  if (!existsSync(secretPath)) return undefined;
   try {
-    return readFileSync(tokenPath, "utf-8").trim();
+    return readFileSync(secretPath, "utf-8").trim();
   } catch (_e) {
     return undefined;
   }
@@ -41,9 +41,9 @@ export function sendIpc(
   req:        CLIRequest,
   timeoutMs   = 10_000,
 ): Promise<CLIResponse> {
-  // P272 Task 1: Read and attach IPC authentication token if available.
-  const token = readIpcToken(socketPath);
-  const reqWithToken: CLIRequest = token !== undefined ? { ...req, token } : req;
+  // Read and attach IPC secret if available; used for peer authentication.
+  const ipcSecret = readIpcSecret(socketPath);
+  const reqWithToken: CLIRequest = ipcSecret !== undefined ? { ...req, token: ipcSecret } : req;
 
   return new Promise<CLIResponse>((resolve, reject) => {
     const socket   = connect({ path: socketPath });
@@ -84,7 +84,18 @@ export function sendIpc(
           ) {
             reject(new Error(`Invalid IPC response shape: ${line}`));
           } else {
-            resolve(parsed as CLIResponse);
+            // Give a clear message when IPC auth fails so the user knows
+            // to check whether the orchestrator is running.
+            const resp = parsed as CLIResponse;
+            if (resp.error === "IPC_AUTH_FAILED") {
+              reject(new Error(
+                ipcSecret === undefined
+                  ? "Orchestrator not running or IPC secret missing"
+                  : "IPC authentication failed — restart the orchestrator",
+              ));
+            } else {
+              resolve(resp);
+            }
           }
         } catch (err) {
           reject(new Error(`Invalid IPC response: ${line}`));

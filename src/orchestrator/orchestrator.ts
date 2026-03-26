@@ -23,7 +23,8 @@
 import { createServer, type Server as NetServer, type Socket } from "node:net";
 import { existsSync, mkdirSync, unlinkSync, chmodSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
+import { timingSafeCompare } from "../core/crypto-utils.js";
 import type { Database } from "../utils/db.js";
 import type { TaskEvent } from "../tasks/types.js";
 import { TaskStore } from "../tasks/store.js";
@@ -95,8 +96,8 @@ export class OrchestratorProcess {
   private _socketServer: NetServer | null = null;
   /** Phase 10: Path to socket file (set when socketPath passed to startSocketServer). */
   private _socketPath: string | null = null;
-  /** P272: IPC authentication token (64-char hex, 32 bytes). Null until startSocketServer(). */
-  private _ipcToken: string | null = null;
+  /** IPC secret (64-char hex, 32 bytes). Written to ipc.token; null until startSocketServer(). */
+  private _ipcSecret: string | null = null;
 
   // In-memory agent registry (source of truth at runtime)
   readonly agents = new Map<string, AgentInstance>();
@@ -924,21 +925,20 @@ export class OrchestratorProcess {
     mkdirSync(socketDir, { recursive: true, mode: 0o700 });
     try { chmodSync(socketDir, 0o700); } catch (e: unknown) { void e; /* cleanup-ignore: chmod socket dir best-effort */ }
 
-    // P272 Task 1: Generate a 32-byte IPC authentication token and write it to
-    // {socketDir}/ipc.token with 0o600 permissions. The CLI client reads this
-    // token and includes it in every request so unauthenticated local processes
-    // cannot control the orchestrator.
-    const tokenHex = randomBytes(32).toString("hex");
-    this._ipcToken  = tokenHex;
+    // Generate a 32-byte IPC secret and write it to {socketDir}/ipc.token
+    // (mode 0o600). The CLI client reads this secret and includes it in every
+    // request so unauthenticated local processes cannot control the orchestrator.
+    const secretHex = randomBytes(32).toString("hex");
+    this._ipcSecret  = secretHex;
     const tokenFilePath = join(socketDir, IPC_TOKEN_FILENAME);
     try {
-      writeFileSync(tokenFilePath, tokenHex, { encoding: "utf-8", mode: 0o600 });
+      writeFileSync(tokenFilePath, secretHex, { encoding: "utf-8", mode: 0o600 });
       try { chmodSync(tokenFilePath, 0o600); } catch (_e) { /* best-effort */ }
     } catch (e: unknown) {
-      logger.warn("ORCHESTRATOR", "Failed to write IPC token file — IPC auth disabled", {
+      logger.warn("ORCHESTRATOR", "Failed to write IPC secret file — IPC auth disabled", {
         metadata: { error: e instanceof Error ? e.message : String(e) },
       });
-      this._ipcToken = null; // disable auth if token write failed
+      this._ipcSecret = null; // disable auth if secret write failed
     }
 
     // Allowed IPC command types — reject unknown commands before processing.
@@ -981,13 +981,12 @@ export class OrchestratorProcess {
           return;
         }
 
-        // P272 Task 1: Verify IPC authentication token using constant-time comparison.
-        if (this._ipcToken !== null) {
-          const expectedBuf = Buffer.from(this._ipcToken, "utf8");
+        // Verify the IPC secret using the canonical constant-time comparison
+        // from crypto-utils (SHA-256 hash normalisation prevents length-based
+        // timing leaks when secrets differ — never log the provided value).
+        if (this._ipcSecret !== null) {
           const providedToken = typeof req.token === "string" ? req.token : "";
-          const providedBuf   = Buffer.from(providedToken, "utf8");
-          const tokenOk = expectedBuf.length === providedBuf.length &&
-                          timingSafeEqual(expectedBuf, providedBuf);
+          const tokenOk = timingSafeCompare(this._ipcSecret, providedToken);
           if (!tokenOk) {
             _coreLogger.warn("orchestrator", "IPC authentication failed — rejecting request", {
               metadata: { command: req.command, request_id: req.request_id ?? "unknown" },
