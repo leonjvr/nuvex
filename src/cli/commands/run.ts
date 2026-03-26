@@ -215,64 +215,86 @@ export async function runRunCommand(opts: RunCommandOptions): Promise<number> {
 
 
 /**
- * Poll task status every 2 seconds until a terminal state or timeout.
+ * Poll task status with exponential backoff until a terminal state or timeout.
  *
  * Terminal states: DONE, FAILED, CANCELLED, ESCALATED
- * Returns 0 on DONE, 1 on failure or timeout.
+ * Returns 0 on DONE, 1 on failure, timeout, or SIGINT.
+ *
+ * Backoff: starts at 1s, doubles each iteration, caps at 5s.
+ * Ctrl+C is intercepted for a clean exit message instead of a stack trace.
  */
 async function pollTaskCompletion(
   taskId:  string,
   opts:    RunCommandOptions,
   store:   TaskStore,
 ): Promise<number> {
-  const POLL_INTERVAL_MS = 2_000;
-  const deadline         = Date.now() + opts.timeout * 1_000;
+  const INITIAL_INTERVAL_MS = 1_000;
+  const MAX_INTERVAL_MS     = 5_000;
+  const deadline            = Date.now() + opts.timeout * 1_000;
 
   if (!opts.json) {
     process.stdout.write(`Waiting for task ${taskId} (timeout: ${opts.timeout}s)…\n`);
   }
 
-  while (Date.now() < deadline) {
-    const current = store.get(taskId);
-    if (current !== null) {
-      const { status } = current;
+  let interrupted = false;
+  const onSigint = (): void => { interrupted = true; };
+  process.once("SIGINT", onSigint);
 
-      if (status === "DONE") {
-        if (opts.json) {
-          process.stdout.write(formatJson({ task_id: taskId, status: "done", result: current.result_summary }) + "\n");
-        } else {
-          process.stdout.write(`✓ Task complete: ${taskId}\n`);
-          if (current.result_summary) {
-            process.stdout.write(`  Result: ${current.result_summary}\n`);
+  let intervalMs = INITIAL_INTERVAL_MS;
+
+  try {
+    while (Date.now() < deadline && !interrupted) {
+      const current = store.get(taskId);
+      if (current !== null) {
+        const { status } = current;
+
+        if (status === "DONE") {
+          if (opts.json) {
+            process.stdout.write(formatJson({ task_id: taskId, status: "done", result: current.result_summary }) + "\n");
+          } else {
+            process.stdout.write(`✓ Task complete: ${taskId}\n`);
+            if (current.result_summary) {
+              process.stdout.write(`  Result: ${current.result_summary}\n`);
+            }
           }
+          return 0;
         }
-        return 0;
-      }
 
-      if (status === "FAILED") {
-        if (opts.json) {
-          process.stdout.write(formatJson({ task_id: taskId, status: "failed", error: current.result_summary }) + "\n");
-        } else {
-          process.stderr.write(`✗ Task failed: ${taskId}\n`);
-          if (current.result_summary) {
-            process.stderr.write(`  Error: ${current.result_summary}\n`);
+        if (status === "FAILED") {
+          if (opts.json) {
+            process.stdout.write(formatJson({ task_id: taskId, status: "failed", error: current.result_summary }) + "\n");
+          } else {
+            process.stderr.write(`✗ Task failed: ${taskId}\n`);
+            if (current.result_summary) {
+              process.stderr.write(`  Error: ${current.result_summary}\n`);
+            }
           }
+          return 1;
         }
-        return 1;
+
+        if (status === "CANCELLED") {
+          process.stderr.write(`✗ Task cancelled: ${taskId}\n`);
+          return 1;
+        }
+
+        if (status === "ESCALATED") {
+          process.stderr.write(`✗ Task escalated (requires human review): ${taskId}\n`);
+          return 1;
+        }
       }
 
-      if (status === "CANCELLED") {
-        process.stderr.write(`✗ Task cancelled: ${taskId}\n`);
-        return 1;
-      }
-
-      if (status === "ESCALATED") {
-        process.stderr.write(`✗ Task escalated (requires human review): ${taskId}\n`);
-        return 1;
-      }
+      await sleep(Math.min(intervalMs, deadline - Date.now()));
+      // Exponential backoff: double interval each cycle, cap at MAX_INTERVAL_MS
+      intervalMs = Math.min(intervalMs * 2, MAX_INTERVAL_MS);
     }
+  } finally {
+    process.off("SIGINT", onSigint);
+  }
 
-    await sleep(POLL_INTERVAL_MS);
+  if (interrupted) {
+    process.stderr.write(`\n✗ Interrupted. Task ${taskId} is still running.\n`);
+    process.stderr.write(`  Use 'sidjua tasks ${taskId}' to check current status.\n`);
+    return 1;
   }
 
   process.stderr.write(
