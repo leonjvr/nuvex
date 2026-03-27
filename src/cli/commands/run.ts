@@ -115,6 +115,32 @@ export async function runRunCommand(opts: RunCommandOptions): Promise<number> {
       return 1;
     }
 
+    if (yaml === null || typeof yaml !== "object" || Array.isArray(yaml)) {
+      process.stderr.write("✗ Task file must be a YAML object (key-value map)\n");
+      return 1;
+    }
+
+    // Type-check known fields
+    if ("title" in yaml && typeof yaml.title !== "string") {
+      process.stderr.write(`✗ Invalid task YAML: 'title' must be a string, got ${typeof yaml.title}\n`);
+      return 1;
+    }
+    if ("description" in yaml && typeof yaml.description !== "string") {
+      process.stderr.write(`✗ Invalid task YAML: 'description' must be a string, got ${typeof yaml.description}\n`);
+      return 1;
+    }
+    if ("priority" in yaml && yaml.priority !== undefined && typeof yaml.priority !== "number" && typeof yaml.priority !== "string") {
+      process.stderr.write(`✗ Invalid task YAML: 'priority' must be a number or string, got ${typeof yaml.priority}\n`);
+      return 1;
+    }
+
+    // Warn on unknown fields (forward-compat: don't reject)
+    const KNOWN_FIELDS = new Set(["title", "description", "priority", "division", "budget", "tier", "metadata"]);
+    const unknown = Object.keys(yaml as object).filter((k) => !KNOWN_FIELDS.has(k));
+    if (unknown.length > 0) {
+      process.stderr.write(`⚠ Unknown field(s) in task YAML (ignored): ${unknown.join(", ")}\n`);
+    }
+
     title       = yaml.title        ?? "Untitled task";
     description = yaml.description  ?? "";
     if (yaml.priority !== undefined)    priority    = yaml.priority;

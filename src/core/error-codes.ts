@@ -34,6 +34,8 @@ export enum ErrorCategory {
   LIMIT           = "LIMIT",
   LOCK            = "LOCK",
   BACKUP          = "BACKUP",
+  SSRF            = "SSRF",
+  SERVER          = "SERVER",
 }
 
 
@@ -218,6 +220,13 @@ const ERROR_REGISTRY: Readonly<Record<string, ErrorCodeEntry>> = {
   // REST tool security
   "REST-SEC-001": { code: "REST-SEC-001", category: ErrorCategory.SECURITY, message: "Request to private or local address blocked", recoverable: false, suggestion: "Use a publicly routable URL or configure an explicit allowlist" },
   "REST-SEC-002": { code: "REST-SEC-002", category: ErrorCategory.SECURITY, message: "Request domain not in allowlist",             recoverable: false, suggestion: "Add the domain to SIDJUA_REST_ALLOWLIST or use an allowed endpoint" },
+
+  // SSRF protection
+  "SSRF-001": { code: "SSRF-001", category: ErrorCategory.SSRF, message: "Invalid or non-HTTP(S) outbound URL",  recoverable: false, suggestion: "Use an http:// or https:// URL for outbound requests" },
+  "SSRF-002": { code: "SSRF-002", category: ErrorCategory.SSRF, message: "Private or loopback address blocked", recoverable: false, suggestion: "Use a publicly routable hostname for outbound requests" },
+
+  // Server-side errors
+  "SERVER-500": { code: "SERVER-500", category: ErrorCategory.SERVER, message: "Internal server error", recoverable: true, suggestion: "Retry the request or check server logs" },
 } as const;
 
 

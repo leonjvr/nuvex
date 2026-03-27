@@ -10,7 +10,7 @@
  */
 
 import { connect } from "node:net";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { CLIRequest, CLIResponse } from "../orchestrator/orchestrator.js";
 import { IPC_TOKEN_FILENAME } from "../orchestrator/orchestrator.js";
@@ -23,6 +23,17 @@ function readIpcSecret(socketPath: string): string | undefined {
   const secretPath = join(dirname(socketPath), IPC_TOKEN_FILENAME);
   if (!existsSync(secretPath)) return undefined;
   try {
+    // On non-Windows: verify the token file has 0o600 permissions (owner-only).
+    // A world-readable token file would allow other processes to impersonate the CLI.
+    if (process.platform !== "win32") {
+      const mode = statSync(secretPath).mode & 0o777;
+      if (mode !== 0o600) {
+        process.stderr.write(
+          `⚠ IPC token file has insecure permissions (${mode.toString(8)}, expected 600) — refusing to use\n`,
+        );
+        return undefined;
+      }
+    }
     return readFileSync(secretPath, "utf-8").trim();
   } catch (_e) {
     return undefined;

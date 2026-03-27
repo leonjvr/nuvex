@@ -18,6 +18,7 @@
 import { join }        from "node:path";
 import type { Command } from "commander";
 import { openDatabase } from "../../utils/db.js";
+import { validateWorkDir } from "../../utils/path-utils.js";
 import { CronScheduler } from "../../scheduler/cron-scheduler.js";
 import { TaskStore }     from "../../tasks/store.js";
 import { loadSchedulingGovernance } from "../../scheduler/config-loader.js";
@@ -29,6 +30,7 @@ const logger = createLogger("schedule-cmd");
 
 
 function openScheduler(workDir: string): { scheduler: CronScheduler; close: () => void } {
+  validateWorkDir(workDir);
   const db      = openDatabase(join(workDir, ".system", "sidjua.db"));
   const gov     = loadSchedulingGovernance(workDir);
   const budgetTracker = new BudgetTracker(db);
@@ -52,6 +54,7 @@ function openScheduler(workDir: string): { scheduler: CronScheduler; close: () =
 }
 
 function openStore(workDir: string): { store: TaskStore; close: () => void } {
+  validateWorkDir(workDir);
   const db    = openDatabase(join(workDir, ".system", "sidjua.db"));
   const store = new TaskStore(db);
   store.initialize();
@@ -61,6 +64,7 @@ function openStore(workDir: string): { store: TaskStore; close: () => void } {
 /** Look up agent division from the agents table. Returns null if not found. */
 function lookupAgentDivision(workDir: string, agentId: string): string | null {
   try {
+    validateWorkDir(workDir);
     const db = openDatabase(join(workDir, ".system", "sidjua.db"));
     const row = db.prepare<[string], { division: string }>(
       "SELECT division FROM agents WHERE id = ?",

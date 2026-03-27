@@ -14,6 +14,7 @@
 
 import type { Command } from "commander";
 import { openDatabase }          from "../../utils/db.js";
+import { validateWorkDir }       from "../../utils/path-utils.js";
 import { TaskOutputStore }       from "../../tasks/output-store.js";
 import { TaskSummaryStore }      from "../../tasks/summary-store.js";
 import { TaskOutputEmbedder }    from "../../tasks/output-embedder.js";
@@ -24,6 +25,7 @@ import { join }                  from "node:path";
 
 
 function makeManager(workDir: string): CommunicationManager {
+  validateWorkDir(workDir);
   const db = openDatabase(join(workDir, ".system", "sidjua.db"));
   db.pragma("journal_mode = WAL");
   const outputStore  = new TaskOutputStore(db);
@@ -87,6 +89,7 @@ export function registerOutputCommands(program: Command): void {
     .option("--work-dir <path>", "Workspace directory", process.cwd())
     .action((outputId: string, opts: { workDir: string }) => {
       try {
+        validateWorkDir(opts.workDir);
         const db = openDatabase(join(opts.workDir, ".system", "sidjua.db"));
         db.pragma("journal_mode = WAL");
         const store = new TaskOutputStore(db);

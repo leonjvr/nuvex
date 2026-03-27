@@ -14,6 +14,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join }       from "node:path";
 import { openDatabase }    from "../../utils/db.js";
+import { validateWorkDir } from "../../utils/path-utils.js";
 import { openCliDatabase } from "../utils/db-init.js";
 import { formatAge } from "../utils/format.js";
 import { sendIpc } from "../ipc-client.js";
@@ -266,6 +267,7 @@ async function respondToDecision(
   // Open a dedicated write connection instead of toggling query_only on
   // the shared read connection — toggling a global PRAGMA is not thread-safe
   // and risks opening a write window on the shared read-only handle.
+  validateWorkDir(opts.workDir);
   const dbFile = join(opts.workDir, ".system", "sidjua.db");
   const writeDb = openDatabase(dbFile);
   writeDb.pragma("journal_mode = WAL");

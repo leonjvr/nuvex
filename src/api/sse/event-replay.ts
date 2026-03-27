@@ -109,9 +109,18 @@ export function getReplaySince(
     return [];
   }
 
-  return rows.map((row) => {
-    const parsedData = JSON.parse(row.data) as Record<string, unknown>;
-    return {
+  const events: SSEEvent[] = [];
+  for (const row of rows) {
+    let parsedData: Record<string, unknown>;
+    try {
+      parsedData = JSON.parse(row.data) as Record<string, unknown>;
+    } catch (parseErr) {
+      logger.warn("event-replay", `Skipping corrupt event row (rowid=${row.rowid}): JSON.parse failed`, {
+        metadata: { rowid: row.rowid, error: parseErr instanceof Error ? parseErr.message : String(parseErr) },
+      });
+      continue;
+    }
+    events.push({
       id:        row.rowid,
       type:      toSSEEventType(row.event_type),
       data:      {
@@ -121,6 +130,7 @@ export function getReplaySince(
         ...parsedData,
       },
       timestamp: row.created_at,
-    };
-  });
+    });
+  }
+  return events;
 }

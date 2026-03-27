@@ -11,6 +11,7 @@
 import { existsSync, statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { validateWorkDir } from "../../utils/path-utils.js";
 import { hasTable } from "../utils/db-init.js";
 import { TaskStore } from "../../tasks/store.js";
 import { formatAge } from "../utils/format.js";
@@ -47,6 +48,7 @@ interface OrchestratorStateRow {
  * Returns 0 if orchestrator is running, 1 otherwise.
  */
 export function runHealthCommand(opts: HealthCommandOptions): number {
+  validateWorkDir(opts.workDir);
   const systemDir = join(opts.workDir, ".system");
   const pidFile   = join(systemDir, "orchestrator.pid");
   const dbFile    = join(systemDir, "sidjua.db");
