@@ -349,14 +349,13 @@ bash scripts/install-docker.sh 1.0.1
 
 #### Error Logging & Privacy
 
-SIDJUA ships with error logging enabled by default. This helps us identify
-and fix issues quickly during the initial release period.
+Error telemetry is **disabled by default** (privacy-first). When enabled, only sanitized error types and stack hashes are transmitted — no user data, no API keys, no agent content.
 
 - API keys and secrets are **automatically redacted** and never stored in full
 - All logs are stored **locally only** at `/data/logs/sidjua-error.log`
-- No data is sent externally without your explicit consent
-- User-configurable logging (enable/disable) available in Settings UI
-- To disable immediately: `docker run -e SIDJUA_LOG_LEVEL=none ...`
+- No data is sent externally without your explicit opt-in
+- Enable with: `sidjua config set telemetry.mode basic`
+- User-configurable in Settings UI
 
 To share logs for support: `docker cp sidjua:/data/logs/sidjua-error.log .`
 
@@ -436,15 +435,15 @@ SIDJUA automatically protects your work — you don't have to think about it.
 |---|---|---|
 | You run `sidjua shutdown` | Drains running tasks, writes checkpoints, stops cleanly | **None** |
 | Normal Mac/PC/Linux shutdown | SIDJUA catches the OS shutdown signal and saves automatically | **None** |
-| Hard crash, power failure, or force-quit | Silent checkpoints have been saving your state every 60 seconds | **At most 1 minute** |
+| Hard crash, power failure, or force-quit | Chat history and rate limiter state are checkpointed every 60 seconds; SQLite WAL provides additional durability | **At most 1 minute for chat/rate-limiter; in-flight execution state is not checkpointed** |
 
 **How it works:**
 
-SIDJUA detects whether it's running on your laptop or a 24/7 server. On desktops, it silently saves all agent state, chat history, and budget data every 60 seconds — invisible, zero performance impact. On servers (Docker, systemd), every 5 minutes — because servers always receive proper shutdown signals.
+SIDJUA silently checkpoints chat history and rate limiter state every 60 seconds — invisible, zero performance impact. SQLite WAL mode provides additional durability for all database writes. Note: in-flight agent execution context and daemon state are not included in periodic checkpoints.
 
 When your Mac or PC shuts down normally (menu → Shut Down, or closing the lid with shutdown configured), the operating system sends a termination signal. SIDJUA catches this signal and performs a full graceful shutdown automatically — exactly as if you had run `sidjua shutdown` yourself.
 
-The only scenario where you lose any work is a hard crash: pulling the power cord, a kernel panic, or holding the power button. Even then, the silent checkpoint means you lose at most 60 seconds of in-flight agent work. On restart, SIDJUA automatically recovers — interrupted tasks are flagged, budgets are cleaned up, and your chat history is restored.
+The only scenario where you lose persisted state is a hard crash: pulling the power cord, a kernel panic, or holding the power button. Even then, chat history is at most 60 seconds behind the latest checkpoint. On restart, SIDJUA automatically recovers — interrupted tasks are flagged, budgets are cleaned up, and your chat history is restored.
 
 **Best practice:** Run `sidjua shutdown` when you're done for the day. But if you forget — SIDJUA has your back.
 
@@ -512,7 +511,12 @@ GET  /api/v1/events          # SSE event stream
 GET  /api/v1/audit/report    # Compliance report
 ```
 
-All endpoints except `/health` require Bearer authentication. Generate a key:
+All API endpoints require Bearer authentication, except:
+- `GET /api/v1/health` — health check
+- `GET /api/v1/locale/*` — locale strings
+- Static GUI assets and SPA routes
+
+Generate a key:
 
 ```bash
 sidjua api-key generate
