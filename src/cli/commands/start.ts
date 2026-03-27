@@ -441,7 +441,6 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
       workDir:      opts.workDir,
       orchestrator,
       secrets:      null as null,
-      getApiKey:    () => apiKey,
       integration:  null as null,
       // P269 / P316: scoped token store — enables token CRUD + token-based auth (mirrors cli-server.ts)
       tokenStore,

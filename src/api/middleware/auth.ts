@@ -37,7 +37,11 @@ const logger = createLogger("api-server");
 const PUBLIC_PATHS = new Set(["/api/v1/health"]);
 
 /** Path prefixes that bypass authentication (GUI static files, SPA routes) */
-const PUBLIC_PREFIXES = ["/assets/", "/favicon", "/api/v1/locale"];
+const PUBLIC_PREFIXES = [
+  "/assets/", "/favicon", "/api/v1/locale",
+  // Read-only static catalogs — no secrets, safe to serve without auth
+  "/api/v1/starter-agents", "/api/v1/starter-divisions",
+];
 
 /**
  * Return true if the path should be served without authentication.
