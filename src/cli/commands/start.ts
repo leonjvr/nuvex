@@ -273,10 +273,11 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
 
     // ── Messaging gateway (Telegram bidirectional) ────────────────────────
 
-    let messagingGateway: InboundMessageGateway | null = null;
-    let messagingRegistry: AdapterRegistry | null = null;
-    let messagingUserMapping: UserMappingStore | null = null;
-    let sharedEventBus: TaskEventBus | null = null;
+    let messagingGateway:     InboundMessageGateway | null = null;
+    let messagingRegistry:    AdapterRegistry | null       = null;
+    let messagingUserMapping: UserMappingStore | null      = null;
+    let sharedEventBus:       TaskEventBus | null          = null;
+    let responseRouter:       ResponseRouter | null        = null;
 
     if (db !== null) {
       const messagingConfig = loadMessagingConfig(opts.workDir);
@@ -322,7 +323,12 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
         }
 
         const governance = messagingConfig.governance;
-        const responseRouter = new ResponseRouter(messagingRegistry, governance);
+        responseRouter = new ResponseRouter(messagingRegistry, governance);
+        // Restore task origins persisted by the previous server run so that
+        // in-flight task responses are routed back to the correct channel.
+        if (db !== null) {
+          try { responseRouter.restoreOrigins(db); } catch (_e) { /* non-fatal */ }
+        }
 
         const taskBridgeCfg = {
           mode:            "direct_passthrough" as const,
@@ -526,10 +532,13 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
         try { await server.stop(); } catch (_e) { /* cleanup-ignore */ }
       }
       if (db !== null) {
-        try { persistChatState(db); }          catch (_e) { /* persist-ignore */ }
-        try { persistRateLimiterState(db); }   catch (_e) { /* persist-ignore */ }
-        try { db.pragma("wal_checkpoint(TRUNCATE)"); } catch (_e) { /* flush-ignore */ }
-        try { db.close(); } catch (_e) { /* cleanup-ignore */ }
+        try { persistChatState(db); }                    catch (_e) { /* persist-ignore */ }
+        try { persistRateLimiterState(db); }             catch (_e) { /* persist-ignore */ }
+        if (responseRouter !== null) {
+          try { responseRouter.persistOrigins(db); }     catch (_e) { /* persist-ignore */ }
+        }
+        try { db.pragma("wal_checkpoint(TRUNCATE)"); }   catch (_e) { /* flush-ignore */ }
+        try { db.close(); }                              catch (_e) { /* cleanup-ignore */ }
       }
       try { require("node:fs").unlinkSync(pidFile); } catch (_e) { /* cleanup-ignore */ }
       try { require("node:fs").unlinkSync(sockFile); } catch (_e) { /* cleanup-ignore */ }

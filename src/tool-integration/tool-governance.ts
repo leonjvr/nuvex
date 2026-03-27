@@ -236,23 +236,27 @@ export class ToolGovernance {
         return { rule_type: "approval_required", passed: true };
       }
 
+      case "path_deny":
+      // "path_restriction" stored in existing databases maps to the same logic.
+      // Semantics: the pattern specifies a PATH THAT IS DENIED (denylist, not allowlist).
+      // Any file path that equals or is nested inside the denied subtree is blocked.
+      // eslint-disable-next-line no-fallthrough
       case "path_restriction": {
         if (pattern !== undefined) {
           const filePath = extractPath(action.params);
           if (filePath !== undefined) {
             const resolvedPath = resolve(filePath);
-            const allowedBase = resolve(pattern);
-            // Block if the resolved path is within the blocked subtree (boundary-aware)
-            if (resolvedPath === allowedBase || resolvedPath.startsWith(allowedBase + sep)) {
+            const deniedBase   = resolve(pattern); // pattern = the ROOT OF THE DENIED SUBTREE
+            if (resolvedPath === deniedBase || resolvedPath.startsWith(deniedBase + sep)) {
               return {
-                rule_type: "path_restriction",
+                rule_type: rule.rule_type, // preserve stored name for audit trail continuity
                 passed: false,
-                reason: "Path blocked",
+                reason: "Path access denied",
               };
             }
           }
         }
-        return { rule_type: "path_restriction", passed: true };
+        return { rule_type: rule.rule_type, passed: true };
       }
 
       case "domain_restriction": {

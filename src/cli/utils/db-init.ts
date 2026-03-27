@@ -96,36 +96,48 @@ export function openCliDatabase(opts: CliDbOptions): InstanceType<typeof Databas
     return new Database(dbFile, { readonly: true });
   }
 
-  // Apply schema inside a BEGIN EXCLUSIVE transaction.
-  // Retry once immediately if the first attempt fails.
-  // If the retry also fails, close the DB and throw — fail-secure.
-  const applySchema = (): void => {
-    db.transaction(() => {
-      db.exec(PHASE9_SCHEMA_SQL);
-      db.exec(TOKEN_SCHEMA_SQL);
-    }).exclusive();
+  // Fast-path: if both schema families are already present, skip the exclusive
+  // init lock entirely.  This eliminates per-CLI-invocation lock contention on
+  // long-running deployments where schema is stable.
+  const schemaPresent = (): boolean => {
+    const check = db.prepare<[], { n: number }>(
+      "SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('task_events','api_tokens')",
+    ).get();
+    return (check?.n ?? 0) >= 2;
   };
 
-  try {
-    applySchema();
-  } catch (e: unknown) {
-    logger.warn("db-init", "Schema init failed — table may exist with different structure; retrying once", {
-      metadata: { error: e instanceof Error ? e.message : String(e) },
-    });
-    // Retry immediately. busy_timeout=5000 (set above) causes better-sqlite3
-    // to wait up to 5 s on SQLITE_BUSY before throwing, so a spin delay
-    // between retries adds no value and blocks the event loop. A second
-    // synchronous attempt covers the narrow window where the EXCLUSIVE
-    // transaction races with a concurrent schema init from another process.
+  if (!schemaPresent()) {
+    // Apply schema inside a BEGIN EXCLUSIVE transaction.
+    // Retry once immediately if the first attempt fails.
+    // If the retry also fails, close the DB and throw — fail-secure.
+    const applySchema = (): void => {
+      db.transaction(() => {
+        db.exec(PHASE9_SCHEMA_SQL);
+        db.exec(TOKEN_SCHEMA_SQL);
+      }).exclusive();
+    };
+
     try {
       applySchema();
-    } catch (e2: unknown) {
-      const msg = e2 instanceof Error ? e2.message : String(e2);
-      logger.error("db-init", "Schema init failed after retry — aborting", {
-        metadata: { error: msg },
+    } catch (e: unknown) {
+      logger.warn("db-init", "Schema init failed — table may exist with different structure; retrying once", {
+        metadata: { error: e instanceof Error ? e.message : String(e) },
       });
-      db.close();
-      throw new Error(`Database schema initialisation failed: ${msg}`);
+      // Retry immediately. busy_timeout=5000 (set above) causes better-sqlite3
+      // to wait up to 5 s on SQLITE_BUSY before throwing, so a spin delay
+      // between retries adds no value and blocks the event loop. A second
+      // synchronous attempt covers the narrow window where the EXCLUSIVE
+      // transaction races with a concurrent schema init from another process.
+      try {
+        applySchema();
+      } catch (e2: unknown) {
+        const msg = e2 instanceof Error ? e2.message : String(e2);
+        logger.error("db-init", "Schema init failed after retry — aborting", {
+          metadata: { error: msg },
+        });
+        db.close();
+        throw new Error(`Database schema initialisation failed: ${msg}`);
+      }
     }
   }
 
