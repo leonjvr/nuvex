@@ -20,7 +20,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { API_PATHS } from '../api/paths';
-import { getStoredApiKey } from '../lib/config';
+import { getRuntimeApiKey } from '../lib/config';
 import type { LocaleStringsResponse } from '../api/types';
 
 
@@ -149,7 +149,7 @@ export function useTranslation(): UseTranslationResult {
     // Non-server-supported locales (e.g. es, fil) return 400 — that is expected and non-fatal.
     let serverPersisted = false;
     try {
-      const key = getStoredApiKey();
+      const key = getRuntimeApiKey();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (key) headers['Authorization'] = `Bearer ${key}`;
       const res = await fetch(API_PATHS.localeSet(), {

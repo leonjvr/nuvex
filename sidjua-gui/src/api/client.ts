@@ -140,13 +140,13 @@ export class SidjuaApiClient {
     };
   }
 
-  async get<T>(path: string, timeoutMs: number = TIMEOUT_MS.default): Promise<T> {
+  async get<T>(path: string, timeoutMs: number = TIMEOUT_MS.default, signal?: AbortSignal): Promise<T> {
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
         method: 'GET',
         headers: this.headers(),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
       throw classifyFetchError(err);
@@ -158,14 +158,14 @@ export class SidjuaApiClient {
     return res.json() as Promise<T>;
   }
 
-  async post<T>(path: string, body?: unknown, timeoutMs: number = TIMEOUT_MS.default): Promise<T> {
+  async post<T>(path: string, body?: unknown, timeoutMs: number = TIMEOUT_MS.default, signal?: AbortSignal): Promise<T> {
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
         headers: this.headers(),
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
       throw classifyFetchError(err);
@@ -177,14 +177,14 @@ export class SidjuaApiClient {
     return res.json() as Promise<T>;
   }
 
-  async put<T>(path: string, body?: unknown, timeoutMs: number = TIMEOUT_MS.default): Promise<T> {
+  async put<T>(path: string, body?: unknown, timeoutMs: number = TIMEOUT_MS.default, signal?: AbortSignal): Promise<T> {
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
         method: 'PUT',
         headers: this.headers(),
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
       throw classifyFetchError(err);
@@ -196,14 +196,14 @@ export class SidjuaApiClient {
     return res.json() as Promise<T>;
   }
 
-  async patch<T>(path: string, body?: unknown, timeoutMs: number = TIMEOUT_MS.default): Promise<T> {
+  async patch<T>(path: string, body?: unknown, timeoutMs: number = TIMEOUT_MS.default, signal?: AbortSignal): Promise<T> {
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
         method: 'PATCH',
         headers: this.headers(),
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
       throw classifyFetchError(err);
@@ -215,13 +215,13 @@ export class SidjuaApiClient {
     return res.json() as Promise<T>;
   }
 
-  async delete<T>(path: string, timeoutMs: number = TIMEOUT_MS.default): Promise<T> {
+  async delete<T>(path: string, timeoutMs: number = TIMEOUT_MS.default, signal?: AbortSignal): Promise<T> {
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
         method: 'DELETE',
         headers: this.headers(),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
       throw classifyFetchError(err);

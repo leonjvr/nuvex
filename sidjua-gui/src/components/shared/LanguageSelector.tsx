@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useToast } from './Toast';
+import { useAppConfig } from '../../lib/config';
 
 
 function GlobeIcon() {
@@ -77,6 +78,7 @@ const REGION_ORDER = ['Americas', 'Europe', 'Middle East', 'Asia'];
 
 export function LanguageSelector() {
   const { locale, setLocale, t } = useTranslation();
+  const { config }                = useAppConfig();
   const toast                     = useToast();
   const [open, setOpen]           = useState(false);
   const [available, setAvailable] = useState<string[]>(['en', 'de']);
@@ -84,11 +86,12 @@ export function LanguageSelector() {
 
   // Fetch available locales from the API on mount
   useEffect(() => {
-    fetch('/api/v1/locale')
+    const serverUrl = config.serverUrl || window.location.origin;
+    fetch(`${serverUrl}/api/v1/locale`)
       .then((res) => res.ok ? res.json() as Promise<{ available: string[] }> : null)
       .then((data) => { if (data?.available) setAvailable(data.available); })
       .catch(() => { /* silent — fall back to default */ });
-  }, []);
+  }, [config.serverUrl]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
