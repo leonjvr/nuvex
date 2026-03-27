@@ -245,8 +245,10 @@ export function registerSecretRoutes(app: Hono, services: SecretRouteServices): 
   });
 
   // ---- GET /api/v1/secrets/value?ns=<namespace>&key=<key> -----------------
+  // Requires admin scope — reading plaintext secrets is a privileged operation.
+  // Readonly callers can list keys (GET /secrets/keys) but not reveal values.
 
-  app.get("/api/v1/secrets/value", requireScope("readonly"), async (c) => {
+  app.get("/api/v1/secrets/value", requireScope("admin"), async (c) => {
     const ns  = c.req.query("ns");
     const key = c.req.query("key");
     if (!ns || !key) {

@@ -22,6 +22,7 @@ import {
   existsSync,
   chmodSync,
   unlinkSync,
+  statSync,
 } from "node:fs";
 import { join }                                             from "node:path";
 import { createCipheriv, createDecipheriv, randomBytes }   from "node:crypto";
@@ -104,8 +105,32 @@ function getMasterKey(): Buffer {
     const keyPath  = join(configDir, ".provider-master-key");
 
     if (existsSync(keyPath)) {
-      const hex  = readFileSync(keyPath, "utf-8").trim();
-      _masterKey = Buffer.from(hex, "hex");
+      const hex = readFileSync(keyPath, "utf-8").trim();
+
+      // Validate: 64 hex chars = 32 bytes for AES-256-GCM.
+      // A truncated or corrupted key would silently produce wrong encryptions.
+      if (hex.length !== 64 || !/^[0-9a-f]+$/i.test(hex)) {
+        throw SidjuaError.from(
+          "PCFG-002",
+          `Invalid provider master key in ${keyPath}: ` +
+          `expected 64 hex chars (32 bytes for AES-256), got ${hex.length} chars. ` +
+          `Delete the file to auto-generate a new key (existing encrypted configs will be lost).`,
+        );
+      }
+
+      // Warn on insecure file permissions (non-Windows only).
+      if (process.platform !== "win32") {
+        try {
+          const mode = statSync(keyPath).mode & 0o777;
+          if (mode !== 0o600) {
+            logger.warn("provider_config", `Master key file has insecure permissions (${mode.toString(8)}, expected 600)`, {
+              metadata: { path: keyPath },
+            });
+          }
+        } catch (_statErr) { /* non-fatal */ }
+      }
+
+      _masterKey  = Buffer.from(hex, "hex");
       _memoryMode = "fs";
       return _masterKey;
     }
