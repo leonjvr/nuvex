@@ -8,7 +8,12 @@
  * requireScope(minimumScope) creates a Hono middleware that rejects requests
  * whose CallerContext scope is below the required level.
  *
- * Scope hierarchy: admin(4) > operator(3) > agent(2) > readonly(1)
+ * Scope hierarchy: admin(4) > operator(3) > agent(2) > readonly(1) > bootstrap(0)
+ *
+ * "bootstrap" is the legacy single-key role — it falls below all scopes and
+ * is rejected by every requireScope() call. The only exception is
+ * POST /api/v1/tokens which uses requireAdminOrBootstrap() to allow the
+ * initial scoped-token creation flow.
  */
 
 import type { MiddlewareHandler } from "hono";
@@ -32,10 +37,11 @@ const SCOPE_LEVELS: Record<TokenScope, number> = {
 /**
  * Returns true when the actual scope satisfies the required minimum.
  * Missing/undefined scope is treated as 0 (below all scopes — no access).
+ * "bootstrap" is explicitly treated as level 0 — it never satisfies any requireScope() call.
  */
-export function scopeAtLeast(actual: TokenScope | undefined, required: TokenScope): boolean {
-  if (actual === undefined) return false;
-  return (SCOPE_LEVELS[actual] ?? 0) >= SCOPE_LEVELS[required];
+export function scopeAtLeast(actual: CallerContext["role"], required: TokenScope): boolean {
+  if (actual === undefined || actual === "bootstrap") return false;
+  return (SCOPE_LEVELS[actual as TokenScope] ?? 0) >= SCOPE_LEVELS[required];
 }
 
 /**

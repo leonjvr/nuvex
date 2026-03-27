@@ -14,7 +14,6 @@
 import { Hono }              from "hono";
 import { SidjuaError }       from "../../core/error-codes.js";
 import { getStarterAgents, loadDefaultDivisions } from "../../defaults/index.js";
-import { isProviderConfigured } from "../../core/provider-config.js";
 
 export function registerStarterAgentRoutes(app: Hono): void {
 
@@ -46,13 +45,7 @@ export function registerStarterAgentRoutes(app: Hono): void {
     if (!agent) {
       throw SidjuaError.from("AGT-001", `Starter agent "${id}" not found`);
     }
-    const configured = isProviderConfigured();
-    return c.json({
-      agent: {
-        ...agent,
-        llm_status: configured ? "configured" : "not_configured",
-      },
-    });
+    return c.json({ agent });
   });
 
   // ── GET /api/v1/starter-divisions ──────────────────────────────────────
