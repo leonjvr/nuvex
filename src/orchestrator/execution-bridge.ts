@@ -37,6 +37,10 @@ export interface UserTaskInput {
   budget_tokens?: number;       // max tokens across all agents
   budget_usd?:    number;       // max USD across all agents
   ttl_seconds?:   number;       // task timeout
+  /** CallerContext division — enforces cross-division isolation in the admission gate. */
+  callerDivision?: string;
+  /** CallerContext role — "admin" bypasses cross-division check. */
+  callerRole?:     string;
 }
 
 export interface TaskHandle {
@@ -124,6 +128,8 @@ export class ExecutionBridge {
       division,
       budget_usd:  costBudget,
       caller:      "api",
+      ...(input.callerDivision !== undefined && { callerDivision: input.callerDivision }),
+      ...(input.callerRole     !== undefined && { callerRole:     input.callerRole }),
     });
     if (!admission.admitted) {
       throw SidjuaError.from("EXEC-003", `Task denied by governance: ${admission.reason}`);

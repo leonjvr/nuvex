@@ -20,7 +20,8 @@ import { TaskEventBus }    from "../../tasks/event-bus.js";
 import { ExecutionBridge } from "../../orchestrator/execution-bridge.js";
 import { Hono }            from "hono";
 import { DIVISION_REGEX }  from "./agents.js";
-import { requireScope }    from "../middleware/require-scope.js";
+import { requireScope, CALLER_CONTEXT_KEY } from "../middleware/require-scope.js";
+import type { CallerContext }                from "../caller-context.js";
 
 // ---------------------------------------------------------------------------
 // Task submission schema validation
@@ -145,6 +146,11 @@ function validateTaskRunBody(body: Record<string, unknown>): {
 
 const logger = createLogger("api-execution");
 
+/** Extract CallerContext set by auth middleware. Works around Hono's generic Variable typing. */
+function getCallerCtx(c: import("hono").Context): CallerContext | undefined {
+  return c.get(CALLER_CONTEXT_KEY) as CallerContext | undefined;
+}
+
 
 export interface ExecutionRouteServices {
   db:        InstanceType<typeof Database>;
@@ -174,6 +180,7 @@ export function registerExecutionRoutes(app: Hono, services: ExecutionRouteServi
       },
     });
 
+    const callerCtx = getCallerCtx(c);
     const handle = await bridge.submitTask({
       description:    validated.description,
       priority:       validated.priority ?? 5,
@@ -181,6 +188,8 @@ export function registerExecutionRoutes(app: Hono, services: ExecutionRouteServi
       ...(validated.budget_usd      !== undefined && { budget_usd:    validated.budget_usd }),
       ...(validated.budget_tokens   !== undefined && { budget_tokens: validated.budget_tokens }),
       ...(validated.timeout_seconds !== undefined && { ttl_seconds:   validated.timeout_seconds }),
+      ...(callerCtx?.division !== undefined && { callerDivision: callerCtx.division }),
+      ...(callerCtx?.role     !== undefined && { callerRole:     callerCtx.role }),
     });
 
     return c.json(handle, 201);

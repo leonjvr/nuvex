@@ -38,6 +38,14 @@ export interface AdmissionInput {
   budget_usd?: number;
   /** Optional caller identifier for audit purposes. */
   caller?: string;
+  /**
+   * Division the caller belongs to (from CallerContext).
+   * When set, cross-division submission is denied unless callerRole is "admin".
+   * Omit for CLI and internal paths that bypass division restrictions.
+   */
+  callerDivision?: string;
+  /** Role of the caller (from CallerContext). "admin" bypasses cross-division check. */
+  callerRole?: string;
 }
 
 export type AdmissionResult =
@@ -76,6 +84,17 @@ export class TaskAdmissionGate {
           metadata: { division: input.division, caller: input.caller },
         });
         return { admitted: false, reason: `Unknown division: ${input.division}` };
+      }
+
+      // 1.5. Cross-division isolation — caller may only submit to their own division unless admin
+      if (!this._callerAllowedForDivision(input.division, input.callerDivision, input.callerRole)) {
+        logger.warn("admission-gate", "Task denied — cross-division access", {
+          metadata: { division: input.division, callerDivision: input.callerDivision, caller: input.caller },
+        });
+        return {
+          admitted: false,
+          reason:   `Cross-division access denied: caller division "${input.callerDivision}" may not submit tasks to division "${input.division}"`,
+        };
       }
 
       // 2. Budget pre-check
@@ -171,6 +190,28 @@ export class TaskAdmissionGate {
       });
       return false;
     }
+  }
+
+  /**
+   * Enforce cross-division isolation.
+   *
+   * Returns false (deny) when ALL of these are true:
+   *   - A callerDivision is present (i.e., request came through an authenticated API path)
+   *   - callerDivision differs from the target division
+   *   - callerRole is not "admin"
+   *   - target division is not "general" (general is open to all callers)
+   *
+   * Absent callerDivision (CLI, internal paths) → allow (skip check).
+   */
+  private _callerAllowedForDivision(
+    targetDivision: string,
+    callerDivision?: string,
+    callerRole?:     string,
+  ): boolean {
+    if (callerDivision === undefined) return true;           // no caller context — CLI / internal
+    if (callerRole === "admin")        return true;           // admin bypass
+    if (targetDivision === "general")  return true;           // general is open
+    return callerDivision === targetDivision;
   }
 
   /** Remove all tokens whose TTL has elapsed. */

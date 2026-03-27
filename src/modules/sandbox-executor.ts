@@ -137,18 +137,13 @@ export class ModuleSandboxExecutor {
     // Shell-executing tool callers must pass this config to provider.wrapCommand().
     const moduleSandboxConfig = buildModuleSandboxConfig(request.agentId, policy);
     if (!isSandboxed && policy.allowedDomains.length > 0) {
-      // Sandbox provider is "none" — network isolation cannot be enforced for this module.
-      // Log a warning so operators know the policy is declared but not active.
-      logger.warn(
-        "module_sandbox_network_not_enforced",
-        `Module "${request.moduleName}" has a network allowlist but sandbox provider is "none" — network isolation inactive`,
-        {
-          metadata: {
-            moduleName:     request.moduleName,
-            allowedDomains: policy.allowedDomains,
-            agentId:        request.agentId,
-          },
-        },
+      // Sandbox provider is "none" but the module declares network capabilities.
+      // Execution is blocked — network isolation cannot be enforced without a sandbox.
+      throw SidjuaError.from(
+        "MOD-006",
+        `Module "${request.moduleName}" requires network sandbox (allowedDomains: ${policy.allowedDomains.join(", ")}) ` +
+        "but no sandbox provider is active. Configure a sandbox provider or remove network capabilities from the module manifest.",
+        { moduleName: request.moduleName, allowedDomains: policy.allowedDomains, agentId: request.agentId },
       );
     }
     if (isSandboxed) {
