@@ -22,7 +22,6 @@
 
 import { randomUUID }       from "node:crypto";
 import { Hono, type Context } from "hono";
-import { timingSafeCompare } from "../../core/crypto-utils.js";
 import { createLogger }      from "../../core/logger.js";
 import type { CallerContext } from "../caller-context.js";
 import { CALLER_CONTEXT_KEY, requireScope } from "../middleware/require-scope.js";
@@ -264,12 +263,8 @@ export function cleanupExpiredTicketsDb(db: import("../../utils/db.js").Database
 }
 
 
-export interface TicketRouteServices {
-  /** Returns the current API key. */
-  getApiKey: () => string;
-  /** Returns the pending (grace-period) key, or null/undefined if none is active. */
-  getPendingApiKey?: () => string | null;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TicketRouteServices {}
 
 /**
  * Register the SSE ticket endpoint.
@@ -290,22 +285,6 @@ export function registerSseTicketRoutes(app: Hono, services: TicketRouteServices
       return c.json(
         { error: { code: "AUTH-003", message: "SSE requires a scoped token. Create one with: sidjua token create --scope readonly", recoverable: false } },
         403,
-      );
-    }
-
-    // Secondary token check — requireScope() handles auth when the full middleware
-    // stack is present; services.getApiKey() provides a fallback for bare-Hono
-    // contexts (e.g. unit tests) where the auth middleware is not wired in.
-    const authHeader = c.req.header("authorization") ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    const currentKey = services.getApiKey();
-    const pendingKey = services.getPendingApiKey?.() ?? null;
-    const validCurrent = timingSafeCompare(token, currentKey);
-    const validPending  = pendingKey !== null && timingSafeCompare(token, pendingKey);
-    if (!validCurrent && !validPending) {
-      return c.json(
-        { error: { code: "AUTH-001", message: "Invalid or missing API key", recoverable: false } },
-        401,
       );
     }
 

@@ -97,8 +97,6 @@ export interface AllRouteServices {
   orchestrator?: OrchestratorLike | null;
   /** Pre-initialised secrets services — optional; secrets routes omitted if absent. */
   secrets?:      SecretRouteServices | null;
-  /** API key getter — required for SSE ticket endpoint. */
-  getApiKey?:    TicketRouteServices["getApiKey"];
   /** Integration gateway services — optional; /api/v1/integrations routes omitted if absent. */
   integration?:  IntegrationRouteServices | null;
   /** Directory containing PWA icon files (icon-192.png, icon-512.png, apple-touch-icon.png).
@@ -178,9 +176,7 @@ export function registerAllRoutes(app: Hono, services: AllRouteServices = {}): v
   registerGovernanceRoutes(app, { workDir, db });
 
   // SSE ticket route (short-lived tickets for EventSource connections)
-  if (services.getApiKey !== undefined) {
-    registerSseTicketRoutes(app, { getApiKey: services.getApiKey });
-  }
+  registerSseTicketRoutes(app, {});
 
   // Selftest routes (no DB required)
   registerSelftestApiRoutes(app, workDir);

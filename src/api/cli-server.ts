@@ -399,7 +399,6 @@ export function registerServerCommands(program: Command): void {
         registry,
         orchestrator,
         secrets:      null,
-        getApiKey:    () => apiKeyState.currentApiKey,
         integration:  null,
         tokenStore,
       });

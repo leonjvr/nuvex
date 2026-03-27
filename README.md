@@ -520,6 +520,8 @@ GET  /api/v1/audit/report    # Compliance report
 All API endpoints require Bearer authentication, except:
 - `GET /api/v1/health` — health check
 - `GET /api/v1/locale/*` — locale strings
+- `GET /api/v1/starter-agents` / `GET /api/v1/starter-agents/:id` — read-only starter agent catalog
+- `GET /api/v1/starter-divisions` / `GET /api/v1/starter-divisions/:id` — read-only starter division catalog
 - Static GUI assets and SPA routes
 
 Generate a key:

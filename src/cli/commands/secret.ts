@@ -136,20 +136,32 @@ export function registerSecretCommands(program: Command): void {
             err("--reveal requires an interactive terminal (stdout is not a TTY)");
             process.exit(1);
           }
-          // Write a real audit event to the DB before revealing the plaintext secret.
+          // Fail-closed: write a DB-level audit record before revealing the value.
+          // If the audit write fails, deny the reveal rather than leak without a trace.
           const auditDbPath = join(opts.workDir, ".system", "sidjua.db");
           const auditDb = openDatabase(auditDbPath);
           try {
-            auditDb.prepare(`
-              INSERT OR IGNORE INTO audit_events
-                (event_type, agent_id, division, data, created_at)
-              VALUES ('SECRET_REVEALED', 'cli-operator', 'system', ?, ?)
-            `).run(JSON.stringify({ namespace, key }), new Date().toISOString());
-          } catch (_err) {
-            // audit_events table may not exist pre-apply — non-fatal
-          } finally {
+            auditDb.exec(`
+              CREATE TABLE IF NOT EXISTS secret_reveal_audit (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                ns          TEXT NOT NULL,
+                key         TEXT NOT NULL,
+                agent_id    TEXT,
+                division    TEXT,
+                role        TEXT,
+                revealed_at TEXT NOT NULL
+              )
+            `);
+            auditDb.prepare(
+              `INSERT INTO secret_reveal_audit (ns, key, agent_id, division, role, revealed_at)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+            ).run(namespace, key, "cli-operator", "system", "operator", new Date().toISOString());
+          } catch (_auditErr) {
             auditDb.close();
+            err("Cannot reveal secret: audit logging unavailable");
+            process.exit(1);
           }
+          auditDb.close();
           out(msg("secret.get.reveal_audit", { namespace, key }));
           out(value + "\n");
         } else {
