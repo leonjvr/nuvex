@@ -92,10 +92,13 @@ function FirstStepHint({ label, text, command, settingsLabel, onGoToSettings }: 
 export interface FirstRunOverlayProps {
   onDismiss: () => void;
   onGoToSettings?: () => void;
+  /** True when the server check failed with a network error — shows retry UI. */
+  networkError?: boolean;
+  onRetry?: () => void;
 }
 
 
-export function FirstRunOverlay({ onDismiss, onGoToSettings }: FirstRunOverlayProps) {
+export function FirstRunOverlay({ onDismiss, onGoToSettings, networkError = false, onRetry }: FirstRunOverlayProps) {
   const totalSeconds = Math.round(FIRST_RUN_READ_DELAY_MS / 1000);
   const [countdown,  setCountdown]  = useState(totalSeconds);
   const [canProceed, setCanProceed] = useState(false);
@@ -245,6 +248,46 @@ export function FirstRunOverlay({ onDismiss, onGoToSettings }: FirstRunOverlayPr
           settingsLabel={settingsLabel}
           onGoToSettings={onGoToSettings}
         />
+
+        {/* Network error banner */}
+        {networkError && (
+          <div
+            role="alert"
+            style={{
+              background:   'var(--color-danger-subtle, rgba(239,68,68,0.08))',
+              border:       '1px solid var(--color-danger)',
+              borderRadius: 'var(--radius-md)',
+              padding:      '12px 16px',
+              marginBottom: '24px',
+              display:      'flex',
+              alignItems:   'center',
+              justifyContent: 'space-between',
+              gap:          '12px',
+            }}
+          >
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-danger)' }}>
+              Could not reach the server. Check your connection and try again.
+            </p>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                style={{
+                  background:   'var(--color-danger)',
+                  color:        '#fff',
+                  border:       'none',
+                  borderRadius: 'var(--radius-sm)',
+                  padding:      '6px 14px',
+                  fontSize:     '13px',
+                  fontWeight:   600,
+                  cursor:       'pointer',
+                  flexShrink:   0,
+                }}
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Dismiss area */}
         <div

@@ -24,12 +24,13 @@ export interface UseApiResult<T> {
 /**
  * Fetches data using the authenticated SidjuaApiClient.
  *
- * @param fetcher  Function that receives the client and returns a Promise<T>.
+ * @param fetcher  Function that receives the client and an AbortSignal, returns a Promise<T>.
  *                 Return `null` to skip the fetch (e.g. when filters are empty).
+ *                 Pass the signal to client methods to cancel on unmount.
  * @param deps     Re-fetch when these values change (in addition to client changes).
  */
 export function useApi<T>(
-  fetcher: (client: SidjuaApiClient) => Promise<T> | null,
+  fetcher: (client: SidjuaApiClient, signal: AbortSignal) => Promise<T> | null,
   deps: unknown[] = [],
 ): UseApiResult<T> {
   const { client } = useAppConfig();
@@ -39,7 +40,7 @@ export function useApi<T>(
   const [error,   setError]   = useState<string | null>(null);
 
   // AbortController ref — aborted on component unmount to cancel in-flight requests
-  // and prevent stale state updates on unmounted components (FIX M2).
+  // and prevent stale state updates on unmounted components.
   const controllerRef = useRef<AbortController | null>(null);
 
   const fetch = useCallback(() => {
@@ -48,13 +49,13 @@ export function useApi<T>(
       return;
     }
 
-    const promise = fetcher(client);
-    if (promise === null) return;
-
     // Abort any previously in-flight request before starting a new one
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
+
+    const promise = fetcher(client, controller.signal);
+    if (promise === null) return;
 
     setLoading(true);
     setError(null);

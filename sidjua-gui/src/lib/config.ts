@@ -5,8 +5,13 @@
 /**
  * SIDJUA GUI — App Configuration Context
  *
- * Stores server URL, API key, and connection state.
- * Persists to localStorage (falls back gracefully when unavailable).
+ * Stores server URL and connection state.
+ * The API key is held in React state ONLY — never persisted to localStorage.
+ * Server URL (non-secret) is persisted to localStorage for convenience.
+ *
+ * The API key is obtained via the server-injected window.__SIDJUA_BOOTSTRAP__
+ * object; the user must re-enter it after a hard page reload if bootstrap is
+ * unavailable (e.g. direct browser navigation to the UI URL).
  */
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, type ReactNode, createElement } from 'react';
@@ -30,7 +35,7 @@ export interface BuildInfo {
 export interface AppConfigContextValue {
   config: AppConfig;
   status: ConnectionStatus;
-  /** True while the GUI is fetching the API key from /api/v1/gui-bootstrap. */
+  /** @deprecated Always false — bootstrap fetch removed in favour of server-side injection. */
   bootstrapping: boolean;
   /** Build metadata from /api/v1/health — null until fetched. */
   buildInfo: BuildInfo | null;
@@ -57,37 +62,38 @@ const DEFAULT_CONFIG: AppConfig = {
 };
 
 // ---------------------------------------------------------------------------
-// Key obfuscation helpers
+// Runtime-only API key store
 //
-// NOTE: This is NOT cryptographic security — it prevents casual plaintext
-// extraction from localStorage by XSS or nosy browser extensions.
-// V2 will use the Tauri Secure Store plugin for proper OS keychain storage.
-// TODO(v2): Replace with @tauri-apps/plugin-secure-storage
+// The API key is kept in memory only — never written to localStorage.
+// getRuntimeApiKey() is used by non-React code (e.g. useTranslation) that
+// needs the key for authenticated requests but cannot access React context.
 // ---------------------------------------------------------------------------
 
-function obfuscateKey(key: string): string {
-  // Base64 + reverse: not crypto-secure, but prevents trivial plaintext read
-  return btoa(key.split('').reverse().join(''));
+let _runtimeApiKey = '';
+
+/** Update the in-memory API key. Called by AppConfigProvider on key change. */
+export function setRuntimeApiKey(key: string): void {
+  _runtimeApiKey = key;
 }
 
-function deobfuscateKey(encoded: string): string {
-  try {
-    return atob(encoded).split('').reverse().join('');
-  } catch {
-    // If decoding fails, return as-is (migration from old plaintext storage)
-    return encoded;
-  }
+/**
+ * Read the in-memory API key without React context.
+ * Used by useTranslation to attach an Authorization header to locale-persistence
+ * requests. Returns '' when no key has been set yet.
+ */
+export function getRuntimeApiKey(): string {
+  return _runtimeApiKey;
 }
 
+/** Load server URL from localStorage. API key is intentionally excluded. */
 function loadConfig(): AppConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AppConfig>;
-      const apiKey = parsed.apiKey ? deobfuscateKey(parsed.apiKey) : DEFAULT_CONFIG.apiKey;
       return {
         serverUrl: parsed.serverUrl ?? DEFAULT_CONFIG.serverUrl,
-        apiKey,
+        apiKey:    '',  // never loaded from storage
       };
     }
   } catch {
@@ -96,31 +102,12 @@ function loadConfig(): AppConfig {
   return DEFAULT_CONFIG;
 }
 
+/** Save server URL to localStorage. API key is intentionally excluded. */
 function saveConfig(cfg: AppConfig): void {
   try {
-    const toStore: AppConfig = { ...cfg };
-    if (toStore.apiKey) {
-      toStore.apiKey = obfuscateKey(toStore.apiKey);
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ serverUrl: cfg.serverUrl }));
   } catch {
     // ignore storage errors
-  }
-}
-
-/**
- * Read the stored API key directly from localStorage (no React state required).
- * Used by useTranslation to attach an Authorization header to locale-persistence
- * requests without creating a dependency on the config context.
- */
-export function getStoredApiKey(): string {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return '';
-    const parsed = JSON.parse(raw) as Partial<AppConfig>;
-    return parsed.apiKey ? deobfuscateKey(parsed.apiKey) : '';
-  } catch {
-    return '';
   }
 }
 
@@ -143,21 +130,17 @@ export function useAppConfig(): AppConfigContextValue {
 export function AppConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfigState] = useState<AppConfig>(loadConfig);
   const [status, setStatus]      = useState<ConnectionStatus>('unknown');
-  const [bootstrapping, setBootstrapping] = useState(false);
-  const [buildInfo, setBuildInfo]         = useState<BuildInfo | null>(null);
+  const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
 
-  // Guard: only attempt bootstrap once per mount
-  const bootstrapAttempted = useRef(false);
   // Guard: max 1 auth-failure recovery cycle to prevent infinite loops
-  const rebootstrapCount   = useRef(0);
+  const rebootstrapCount = useRef(0);
 
   // Stable ref so the useMemo dependency array stays clean
   const handleAuthFailureRef = useRef<() => void>(() => undefined);
   handleAuthFailureRef.current = () => {
     if (rebootstrapCount.current >= 1) return;
     rebootstrapCount.current += 1;
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-    bootstrapAttempted.current = false;
+    setRuntimeApiKey('');
     setConfigState((prev) => ({ ...prev, apiKey: '' }));
   };
 
@@ -173,6 +156,11 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
     saveConfig(next);
     setStatus('unknown');
   }, []);
+
+  // Keep runtime key in sync with React state
+  useEffect(() => {
+    setRuntimeApiKey(config.apiKey);
+  }, [config.apiKey]);
 
   const testConnection = useCallback(async (): Promise<boolean> => {
     if (!client) {
@@ -216,44 +204,24 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
       .catch(() => { /* server not reachable yet — buildInfo stays null */ });
   }, [config.serverUrl]);
 
-  // GUI bootstrap: if apiKey is absent, obtain it without manual config.
-  // P281: Check window.__SIDJUA_BOOTSTRAP__ (injected server-side) first —
-  // no extra HTTP round-trip required. Falls back to fetching /api/v1/gui-bootstrap
-  // for environments where server-side injection is unavailable.
+  // GUI bootstrap: read the API key from the server-injected window object.
+  // The key is injected into window.__SIDJUA_BOOTSTRAP__ by serveIndexHtmlWithBootstrap()
+  // on the server side before </head>.  No HTTP round-trip is required.
   useEffect(() => {
-    if (config.apiKey || bootstrapAttempted.current) return;
-    bootstrapAttempted.current = true;
+    if (config.apiKey) return;  // already have a key
 
-    // P281: Use server-injected bootstrap if available
     const injected = (window as WindowWithBootstrap).__SIDJUA_BOOTSTRAP__;
     if (typeof injected?.api_key === 'string' && injected.api_key) {
       const serverUrl = injected.server_url || config.serverUrl || window.location.origin;
       setConfig({ serverUrl, apiKey: injected.api_key });
-      return;
     }
-
-    // Fallback: fetch from /api/v1/gui-bootstrap (DEPRECATED: P281 — use server-side injection)
-    const serverUrl = config.serverUrl || window.location.origin;
-    setBootstrapping(true);
-
-    fetch(`${serverUrl}/api/v1/gui-bootstrap`, { method: 'GET' })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-      .then((data: unknown) => {
-        const apiKey = (data as Record<string, unknown>)['api_key'];
-        if (typeof apiKey === 'string' && apiKey) {
-          const next: AppConfig = { serverUrl, apiKey };
-          setConfig(next);
-        }
-      })
-      .catch(() => { /* bootstrap unavailable — user must configure manually */ })
-      .finally(() => { setBootstrapping(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value: AppConfigContextValue = {
     config,
     status,
-    bootstrapping,
+    bootstrapping:  false,  // no longer used — kept for interface stability
     buildInfo,
     setConfig,
     testConnection,

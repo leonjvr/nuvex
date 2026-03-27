@@ -24,40 +24,37 @@ import { Configuration } from './pages/Configuration';
 import { Settings }     from './pages/Settings';
 
 
+type FirstRunState = 'loading' | 'completed' | 'pending' | 'error';
+
 function AppWithFirstRunGate() {
   const { config } = useAppConfig();
 
-  // null = loading, true = completed, false = not yet completed
-  const [firstRunCompleted, setFirstRunCompleted] = useState<boolean | null>(null);
+  const [firstRunState, setFirstRunState] = useState<FirstRunState>('loading');
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function checkFirstRun() {
-      // If no server URL is configured yet, skip overlay (user must set up first)
-      if (!config.serverUrl || !config.apiKey) {
-        setFirstRunCompleted(true);
-        return;
-      }
-
-      try {
-        const client = new SidjuaApiClient(config.serverUrl, config.apiKey);
-        const res    = await client.getWorkspaceConfig();
-        if (!cancelled) {
-          setFirstRunCompleted(res.firstRunCompleted);
-        }
-      } catch {
-        // Network error or server not ready — skip overlay, don't block user
-        if (!cancelled) setFirstRunCompleted(true);
-      }
+  const checkFirstRun = useCallback(async () => {
+    // If no credentials yet, skip overlay — user must configure server first
+    if (!config.serverUrl || !config.apiKey) {
+      setFirstRunState('completed');
+      return;
     }
 
-    void checkFirstRun();
-    return () => { cancelled = true; };
+    setFirstRunState('loading');
+    try {
+      const client = new SidjuaApiClient(config.serverUrl, config.apiKey);
+      const res    = await client.getWorkspaceConfig();
+      setFirstRunState(res.firstRunCompleted ? 'completed' : 'pending');
+    } catch {
+      // Network error — show error state with retry button; do NOT auto-complete
+      setFirstRunState('error');
+    }
   }, [config.serverUrl, config.apiKey]);
 
+  useEffect(() => {
+    void checkFirstRun();
+  }, [checkFirstRun]);
+
   const handleDismiss = useCallback(async () => {
-    setFirstRunCompleted(true);  // optimistic update — hide overlay immediately
+    setFirstRunState('completed');  // optimistic update — hide overlay immediately
 
     if (!config.serverUrl || !config.apiKey) return;
     try {
@@ -70,18 +67,19 @@ function AppWithFirstRunGate() {
 
   return (
     <BrowserRouter>
-      <AppRoutes firstRunCompleted={firstRunCompleted} onDismiss={handleDismiss} />
+      <AppRoutes firstRunState={firstRunState} onDismiss={handleDismiss} onRetry={checkFirstRun} />
     </BrowserRouter>
   );
 }
 
 
 interface AppRoutesProps {
-  firstRunCompleted: boolean | null;
+  firstRunState: FirstRunState;
   onDismiss: () => void;
+  onRetry: () => void;
 }
 
-function AppRoutes({ firstRunCompleted, onDismiss }: AppRoutesProps) {
+function AppRoutes({ firstRunState, onDismiss, onRetry }: AppRoutesProps) {
   const navigate = useNavigate();
 
   const handleGoToSettings = useCallback(() => {
@@ -91,9 +89,14 @@ function AppRoutes({ firstRunCompleted, onDismiss }: AppRoutesProps) {
 
   return (
     <>
-      {/* Show overlay when first run is not yet completed */}
-      {firstRunCompleted === false && (
-        <FirstRunOverlay onDismiss={onDismiss} onGoToSettings={handleGoToSettings} />
+      {/* Show overlay when first run is pending or errored */}
+      {(firstRunState === 'pending' || firstRunState === 'error') && (
+        <FirstRunOverlay
+          onDismiss={onDismiss}
+          onGoToSettings={handleGoToSettings}
+          networkError={firstRunState === 'error'}
+          onRetry={onRetry}
+        />
       )}
 
       {/* Main app — always rendered but visually covered by overlay when shown */}

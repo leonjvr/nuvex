@@ -52,13 +52,6 @@ export function SseStatusIndicator({ status }: Props) {
         }}
       />
       {label}
-
-      <style>{`
-        @keyframes sidjua-pulse {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.35; }
-        }
-      `}</style>
     </span>
   );
 }
