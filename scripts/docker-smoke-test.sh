@@ -9,13 +9,13 @@
 #   ./scripts/docker-smoke-test.sh [IMAGE_TAG]
 #
 # Examples:
-#   ./scripts/docker-smoke-test.sh                       # default: ghcr.io/goetzkohlberg/sidjua:1.0.0
+#   ./scripts/docker-smoke-test.sh                       # default: ghcr.io/goetzkohlberg/sidjua:1.0.1
 #   ./scripts/docker-smoke-test.sh sidjua/sidjua:latest
 #   IMAGE=my-custom-tag ./scripts/docker-smoke-test.sh
 
 set -e
 
-IMAGE="${1:-${IMAGE:-ghcr.io/goetzkohlberg/sidjua:1.0.0}}"
+IMAGE="${1:-${IMAGE:-ghcr.io/goetzkohlberg/sidjua:1.0.1}}"
 CONTAINER="sidjua-smoke-test"
 PORT="${SIDJUA_PORT:-4200}"
 BASE_URL="http://localhost:${PORT}"
@@ -79,8 +79,8 @@ else
   fail "Health endpoint — got: ${HEALTH}"
 fi
 
-if echo "$HEALTH" | grep -q '"version":"1.0.0"'; then
-  pass "Health endpoint reports version 1.0.0"
+if echo "$HEALTH" | grep -q '"version":"1.0.1"'; then
+  pass "Health endpoint reports version 1.0.1"
 else
   fail "Health endpoint version — got: ${HEALTH}"
 fi
@@ -91,7 +91,7 @@ fi
 
 VERSION_OUT=$(docker exec "$CONTAINER" sidjua --version 2>/dev/null || echo "")
 if echo "$VERSION_OUT" | grep -q "1.0.0"; then
-  pass "sidjua --version outputs 1.0.0"
+  pass "sidjua --version outputs 1.0.1"
 else
   fail "sidjua --version — got: ${VERSION_OUT}"
 fi

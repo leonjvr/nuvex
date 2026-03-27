@@ -34,7 +34,7 @@ import type { TokenStore }        from "../token-store.js";
 const logger = createLogger("api-server");
 
 /** Routes that bypass authentication (exact match) */
-const PUBLIC_PATHS = new Set(["/api/v1/health", "/api/v1/gui-bootstrap"]);
+const PUBLIC_PATHS = new Set(["/api/v1/health"]);
 
 /** Path prefixes that bypass authentication (GUI static files, SPA routes) */
 const PUBLIC_PREFIXES = ["/assets/", "/favicon", "/api/v1/locale"];

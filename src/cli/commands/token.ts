@@ -83,21 +83,28 @@ export function registerTokenCommands(program: Command): void {
         });
 
         if (!process.stdout.isTTY) {
-          // Non-interactive: print just the raw token for scripting (TOKEN=$(sidjua token create ...))
+          // Non-interactive (piped): print ONLY the raw token so callers like
+          // TOKEN=$(sidjua token create ...) capture a clean value.
+          // Metadata goes to stderr — visible in the terminal but not captured.
           out(rawToken + "\n");
+          process.stderr.write(`  Scope:  ${opts.scope}\n`);
+          process.stderr.write(`  Label:  ${opts.label.trim()}\n`);
+          if (opts.division !== undefined) process.stderr.write(`  Division: ${opts.division}\n`);
+          if (opts.agentId  !== undefined) process.stderr.write(`  Agent ID: ${opts.agentId}\n`);
+          if (expiresAt     !== undefined) process.stderr.write(`  Expires:  ${expiresAt.toISOString()}\n`);
         } else {
           out(`Token created: ${id}\n`);
           out(`\n`);
           out(`  Token: ${rawToken}\n`);
           out(`\n`);
           out(`WARNING: This token will not be shown again. Store it securely.\n`);
+          out(`\n`);
+          out(`  Scope:  ${opts.scope}\n`);
+          out(`  Label:  ${opts.label.trim()}\n`);
+          if (opts.division !== undefined) out(`  Division: ${opts.division}\n`);
+          if (opts.agentId  !== undefined) out(`  Agent ID: ${opts.agentId}\n`);
+          if (expiresAt     !== undefined) out(`  Expires:  ${expiresAt.toISOString()}\n`);
         }
-        out(`\n`);
-        out(`  Scope:  ${opts.scope}\n`);
-        out(`  Label:  ${opts.label.trim()}\n`);
-        if (opts.division !== undefined) out(`  Division: ${opts.division}\n`);
-        if (opts.agentId  !== undefined) out(`  Agent ID: ${opts.agentId}\n`);
-        if (expiresAt     !== undefined) out(`  Expires:  ${expiresAt.toISOString()}\n`);
       } finally {
         db.close();
       }

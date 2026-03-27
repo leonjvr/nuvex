@@ -185,7 +185,8 @@ export function registerSecretRoutes(app: Hono, services: SecretRouteServices): 
   }
 
   // ---- GET /api/v1/secrets/namespaces -------------------------------------
-  // Namespace listing is not restricted — it reveals names only, no values.
+  // Namespace listing is scoped: operators/admins see all namespaces; division-scoped
+  // callers see only "global" and their own "divisions/<division>" namespace.
 
   app.get("/api/v1/secrets/namespaces", requireScope("readonly"), (c) => {
     if (!hasTable(secretsDb, "secrets")) {
@@ -197,7 +198,11 @@ export function registerSecretRoutes(app: Hono, services: SecretRouteServices): 
         "SELECT DISTINCT namespace FROM secrets ORDER BY namespace",
       )
       .all() as { namespace: string }[];
-    return c.json({ namespaces: rows.map((r) => r.namespace) });
+    const ctx        = getCtx(c);
+    const namespaces = rows
+      .map((r) => r.namespace)
+      .filter((ns) => authorizeSecretAccess(ns, ctx));
+    return c.json({ namespaces });
   });
 
   // ---- GET /api/v1/secrets/keys?ns=<namespace> ----------------------------
