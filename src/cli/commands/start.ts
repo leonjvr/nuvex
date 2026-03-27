@@ -11,7 +11,7 @@
  * - background: forks a detached child, writes PID file
  */
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, extname, resolve as resolvePath } from "node:path";
 import { assertWithinDirectory } from "../../utils/path-utils.js";
 import { spawn } from "node:child_process";
@@ -53,6 +53,7 @@ import type { OrchestratorProcess }   from "../../orchestrator/orchestrator.js";
 import { detectDeploymentMode, getCheckpointIntervalMs } from "../../core/deployment-mode.js";
 import { restoreChatState, persistChatState }            from "../../api/routes/chat.js";
 import { restoreRateLimiterState, persistRateLimiterState } from "../../api/middleware/rate-limiter.js";
+import { TokenStore }                                    from "../../api/token-store.js";
 
 const logger = createLogger("start-cmd");
 
@@ -200,6 +201,30 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
     runMigrations105(db);
     runAuditMigrations(db);
     const registry = db !== null ? new AgentRegistry(db) : undefined;
+
+    // DUAL PATH: cli-server.ts (Docker) does the same. Changes here MUST be mirrored there.
+    // P269 / P316: Scoped token store — enables token-based auth + auto-generates admin token.
+    const tokenStore = db !== null ? new TokenStore(db) : null;
+    if (tokenStore !== null && !tokenStore.hasAdminToken()) {
+      const adminTokenFile = join(systemDir, "admin.token");
+      try {
+        const { id, rawToken } = tokenStore.createToken({
+          scope: "admin",
+          label: "auto-generated admin token",
+        });
+        writeFileSync(adminTokenFile, rawToken, { encoding: "utf-8", mode: 0o600 });
+        try { chmodSync(adminTokenFile, 0o600); } catch (_e) { /* best effort */ }
+        logger.info("admin_token_generated", `Admin token created: ${id}`, {
+          metadata: { id, file: adminTokenFile },
+        });
+        process.stderr.write(`[sidjua] Admin token written to: ${adminTokenFile}\n`);
+        process.stderr.write(`[sidjua] WARNING: Protect this file — it grants full admin access.\n`);
+      } catch (e: unknown) {
+        logger.warn("admin_token_failed", "Could not write admin token file", {
+          metadata: { error: e instanceof Error ? e.message : String(e) },
+        });
+      }
+    }
 
     // ── Crash recovery — heal tasks interrupted by unclean shutdown ───────
 
@@ -389,8 +414,10 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
 
     const server = createApiServer({
       ...DEFAULT_SERVER_CONFIG,
-      port:    apiPort,
-      api_key: apiKey,
+      port:      apiPort,
+      api_key:   apiKey,
+      // P269 / P316: wire scoped token store into auth middleware (identical to cli-server.ts)
+      tokenStore,
     });
 
     // Register all API routes (tasks, agents, divisions, costs, governance, etc.)
@@ -410,6 +437,8 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
       secrets:      null as null,
       getApiKey:    () => apiKey,
       integration:  null as null,
+      // P269 / P316: scoped token store — enables token CRUD + token-based auth (mirrors cli-server.ts)
+      tokenStore,
       ...(sharedEventBus !== null ? { eventBus: sharedEventBus } : {}),
       ...messagingRouteServices,
       ...(registry !== undefined ? { registry } : {}),

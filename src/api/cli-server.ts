@@ -686,15 +686,23 @@ export function registerServerCommands(program: Command): void {
       // Use timestamp so grace period survives server restart
       const expiresAt = new Date(Date.now() + graceSec * 1_000).toISOString();
 
+      // Persist rotated state so a restart mid-grace-period still works.
+      // dbPath must be defined before the timer callback captures it.
+      const dbPath = join(opts.workDir, ".system", "sidjua.db");
+
       if (apiKeyState.pendingTimer !== null) clearTimeout(apiKeyState.pendingTimer);
       apiKeyState.pendingTimer = setTimeout(() => {
         apiKeyState.pendingKey   = null;
         apiKeyState.pendingTimer = null;
         logger.info("api_key_rotated", "Old API key grace period expired", {});
+        // Persist the cleared pending state so a subsequent restart does not
+        // re-honor an already-expired grace period (xAI H1 fix).
+        persistKeyState(dbPath, {
+          currentKey:       apiKeyState.currentApiKey,
+          pendingKey:       null,
+          pendingExpiresAt: null,
+        });
       }, graceSec * 1_000);
-
-      // Persist rotated state so a restart mid-grace-period still works
-      const dbPath = join(opts.workDir, ".system", "sidjua.db");
       persistKeyState(dbPath, {
         currentKey:       newKey,
         pendingKey:       oldKey !== "" ? oldKey : null,
