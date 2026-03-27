@@ -30,6 +30,7 @@ import { formatBytes } from "../utils/format.js";
 import { parse as parseYaml } from "yaml";
 import { runMigrations105 } from "../../agent-lifecycle/index.js";
 import { createLogger } from "../../core/logger.js";
+import { TaskAdmissionGate } from "../../orchestrator/task-admission-gate.js";
 
 const logger = createLogger("run-cmd");
 
@@ -164,6 +165,19 @@ export async function runRunCommand(opts: RunCommandOptions): Promise<number> {
     const store    = new TaskStore(db);
     store.initialize();
     const eventBus = new TaskEventBus(db);
+
+    // Governance admission gate — must pass before task creation
+    const gate = new TaskAdmissionGate(db);
+    const admission = gate.admitTask({
+      description,
+      division,
+      budget_usd: costBudget,
+      caller:     "cli",
+    });
+    if (!admission.admitted) {
+      process.stderr.write(`✗ Task denied by governance: ${admission.reason}\n`);
+      return 1;
+    }
 
     // Route task creation through TaskManager to enforce input sanitization
     const manager = new TaskManager(store, getSanitizer());

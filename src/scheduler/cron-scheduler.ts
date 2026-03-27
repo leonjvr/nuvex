@@ -292,7 +292,7 @@ export class CronScheduler {
     }
 
     // 2. Check budget
-    if (!this.budgetTracker.canAfford(schedule.governance.max_cost_per_run)) {
+    if (!this.budgetTracker.canAfford(schedule.governance.max_cost_per_run, schedule.division)) {
       return { executed: false, reason: "budget_exhausted" };
     }
 

@@ -22,6 +22,7 @@ import { TaskStore }       from "../tasks/store.js";
 import { TaskManager }     from "../tasks/task-manager.js";
 import { getSanitizer }    from "../core/input-sanitizer.js";
 import { TaskEventBus }    from "../tasks/event-bus.js";
+import { TaskAdmissionGate } from "./task-admission-gate.js";
 import type { Database }   from "../utils/db.js";
 import type { Task }       from "../tasks/types.js";
 import type { UserTaskInput as MessagingTaskInput, AcceptResult, SubmitResult } from "../messaging/types.js";
@@ -115,6 +116,18 @@ export class ExecutionBridge {
 
     const division = input.division ?? "general";
     const ttl      = input.ttl_seconds ?? 300;
+
+    // Governance admission gate — must pass before task creation
+    const gate = new TaskAdmissionGate(this.db);
+    const admission = gate.admitTask({
+      description: input.description,
+      division,
+      budget_usd:  costBudget,
+      caller:      "api",
+    });
+    if (!admission.admitted) {
+      throw SidjuaError.from("EXEC-003", `Task denied by governance: ${admission.reason}`);
+    }
 
     // Route through TaskManager for input sanitization
     const manager = new TaskManager(this.store, getSanitizer());
@@ -337,6 +350,18 @@ export class ExecutionBridge {
     const costBudget  = input.budget_usd ?? 10.0;
     const division    = input.division ?? "general";
     const ttl         = input.ttl_seconds ?? 300;
+
+    // Governance admission gate — must pass before task creation
+    const gate = new TaskAdmissionGate(this.db);
+    const admission = gate.admitTask({
+      description: input.description,
+      division,
+      budget_usd:  costBudget,
+      caller:      "messaging",
+    });
+    if (!admission.admitted) {
+      throw SidjuaError.from("EXEC-003", `Task denied by governance: ${admission.reason}`);
+    }
 
     const manager = new TaskManager(this.store, getSanitizer());
     const task = manager.createTask({
