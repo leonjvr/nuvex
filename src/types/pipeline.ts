@@ -5,14 +5,23 @@
 /**
  * SIDJUA — Pre-Action Governance Pipeline types
  *
- * Every agent action passes through the 5-stage pipeline BEFORE execution.
+ * Every agent action passes through the 6-stage pipeline BEFORE execution.
  * The pipeline is synchronous and blocking. An agent that bypasses it is a bug.
  *
- * Stages: Forbidden → Approval → Budget → Classification → Policy
+ * Stages: Forbidden → Security → Approval → Budget → Classification → Policy
  *
  * Source: PRE-ACTION-PIPELINE-SPEC-V1.md
  */
 
+/** Canonical pipeline stages in execution order. */
+export const PIPELINE_STAGES = [
+  "forbidden",
+  "security",
+  "approval",
+  "budget",
+  "classification",
+  "policy",
+] as const;
 
 export type ActionRisk = "low" | "medium" | "high" | "critical";
 

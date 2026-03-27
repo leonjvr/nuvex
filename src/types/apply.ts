@@ -5,11 +5,15 @@
 /**
  * SIDJUA — sidjua apply step types
  *
- * Types for each of the 10 provisioning steps executed by `sidjua apply`.
+ * Types for each of the 11 provisioning steps executed by `sidjua apply`.
  * Also includes shared error/result types, RBAC, routing, and cost center types.
  *
  * Source: SIDJUA-APPLY-TECH-SPEC-V1.md
  */
+
+/** Canonical number of apply steps (VALIDATE → FILESYSTEM → DATABASE → AGENTS →
+ *  SECRETS → RBAC → ROUTING → SKILLS → AUDIT → COST_CENTERS → FINALIZE). */
+export const APPLY_STEP_COUNT = 11;
 
 import type { Division, ParsedConfig } from "./config.js";
 

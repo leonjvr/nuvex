@@ -176,7 +176,7 @@ export function Sidebar({ drawerOpen = false, isMobile = false, onClose }: Sideb
             flexShrink: 0,
           }}
         >
-          v1.0.0
+          v{import.meta.env.VITE_APP_VERSION ?? '1.0.0'}
         </div>
       )}
     </nav>
