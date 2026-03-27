@@ -33,14 +33,14 @@ function openScheduler(workDir: string): { scheduler: CronScheduler; close: () =
   const gov     = loadSchedulingGovernance(workDir);
   const budgetTracker = new BudgetTracker(db);
   const budget = {
-    canAfford: (amount: number): boolean => {
+    canAfford: (amount: number, division?: string): boolean => {
       try {
-        const result = budgetTracker.costTracker.checkBudget("default", amount);
+        const result = budgetTracker.costTracker.checkBudget(division ?? "general", amount);
         return result.allowed;
       } catch (e: unknown) {
         // Fail closed: budget system unavailable → block scheduling
         logger.error("schedule-cmd", "Budget check failed — blocking schedule (budget system unavailable)", {
-          metadata: { amount, error: e instanceof Error ? e.message : String(e) },
+          metadata: { amount, division, error: e instanceof Error ? e.message : String(e) },
         });
         return false;
       }

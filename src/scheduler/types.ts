@@ -90,5 +90,5 @@ export interface AgentConfig {
 
 
 export interface BudgetTrackerLike {
-  canAfford(amountUsd: number): boolean;
+  canAfford(amountUsd: number, division?: string): boolean;
 }
