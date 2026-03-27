@@ -102,6 +102,14 @@ function toWebRequest(req: IncomingMessage, host: string): Request {
     }
   }
 
+  // Inject the real TCP peer address as a trusted server-side header.
+  // Written AFTER copying client headers so any client-supplied x-sidjua-peer-address
+  // is unconditionally overwritten — prevents host-spoofing via forged headers.
+  const peerAddr = req.socket?.remoteAddress ?? "";
+  if (peerAddr !== "") {
+    headers.set("x-sidjua-peer-address", peerAddr);
+  }
+
   const method = req.method ?? "GET";
   const hasBody = !["GET", "HEAD"].includes(method);
 

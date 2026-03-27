@@ -123,8 +123,11 @@ function serveIndexHtmlWithBootstrap(
     return c.text("Forbidden", 403);
   }
 
-  const host    = (c.req.header("host") ?? "").split(":")[0]!.toLowerCase();
-  const isLocal = host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1";
+  // Use the TCP peer address set server-side by toWebRequest() — not the Host header,
+  // which is client-controlled and trivially spoofable.  Fail-closed: if the peer
+  // address header is absent (e.g. test environment), do NOT inject the API key.
+  const peerAddr = c.req.header("x-sidjua-peer-address") ?? "";
+  const isLocal  = peerAddr === "127.0.0.1" || peerAddr === "::1" || peerAddr === "::ffff:127.0.0.1";
 
   let serverUrl = "";
   try { serverUrl = new URL(c.req.url).origin; } catch (_err) { /* non-fatal — GUI falls back to window.location.origin */ }
