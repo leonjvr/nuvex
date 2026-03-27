@@ -210,6 +210,7 @@ const ERROR_REGISTRY: Readonly<Record<string, ErrorCodeEntry>> = {
   "MOD-003": { code: "MOD-003", category: ErrorCategory.MODULE, message: "Module not recognized as first-party",    recoverable: false, suggestion: "Only built-in modules are supported in V1.0" },
   "MOD-004": { code: "MOD-004", category: ErrorCategory.MODULE, message: "Module sandbox initialization failed",    recoverable: false, suggestion: "Check sandbox provider configuration" },
   "MOD-005": { code: "MOD-005", category: ErrorCategory.MODULE, message: "Module tool execution timeout",           recoverable: true,  suggestion: "Retry or increase module_timeout_ms in division config" },
+  "MOD-006": { code: "MOD-006", category: ErrorCategory.MODULE, message: "Module requires network sandbox",          recoverable: false, suggestion: "Configure a real sandbox provider (bubblewrap) or remove network capabilities from the module manifest" },
 
   // Shell tool security
   "SHELL-SEC-001": { code: "SHELL-SEC-001", category: ErrorCategory.SECURITY, message: "Shell metacharacter detected in command argument", recoverable: false, suggestion: "Remove metacharacters (;, |, &, $, backticks, etc.) from the command" },

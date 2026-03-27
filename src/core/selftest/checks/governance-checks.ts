@@ -81,7 +81,7 @@ export const PolicyEnforcementFunctional: SelftestCheck = {
     const t = now();
 
     try {
-      // Attempt to load the pre-action pipeline config loader as a dry-run check
+      // Part 1: verify governance config is loadable from disk (when present)
       const { loadGovernanceConfig } = await import("../../../pipeline/config-loader.js");
       const configPath = join(ctx.workDir, ".system", "governance", "governance.yaml");
 
@@ -98,11 +98,88 @@ export const PolicyEnforcementFunctional: SelftestCheck = {
 
       loadGovernanceConfig(join(ctx.workDir, ".system", "governance"));
 
+      // Part 2: functional enforcement test — verify evaluateAction() actually BLOCKs
+      // forbidden actions, not just that the config loads.
+      const { evaluateAction } = await import("../../../pipeline/index.js");
+      type GovernanceConfig    = import("../../../types/pipeline.js").GovernanceConfig;
+      type ActionRequest       = import("../../../types/pipeline.js").ActionRequest;
+      type Database            = import("../../../utils/db.js").Database;
+
+      const BetterSQLite3 = await import("better-sqlite3");
+      const DatabaseCtor  = ((BetterSQLite3 as unknown as { default: new (p: string) => Database }).default
+        ?? BetterSQLite3) as new (p: string) => Database;
+
+      const testDb = new DatabaseCtor(":memory:");
+      testDb.exec(`
+        CREATE TABLE audit_trail (
+          id             INTEGER PRIMARY KEY AUTOINCREMENT,
+          created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+          agent_id       TEXT NOT NULL,
+          division_code  TEXT,
+          action_type    TEXT NOT NULL,
+          action_detail  TEXT NOT NULL,
+          governance_check TEXT,
+          input_summary  TEXT,
+          output_summary TEXT,
+          token_count    INTEGER,
+          cost_usd       REAL,
+          classification TEXT NOT NULL DEFAULT 'INTERNAL',
+          parent_task_id TEXT,
+          metadata       TEXT
+        )
+      `);
+
+      const minimalConfig: GovernanceConfig = {
+        forbidden: [
+          { action: "data.delete", reason: "selftest block", escalate_to: "SYSTEM_BLOCK" },
+        ],
+        approval:  [],
+        budgets:   {},
+        classification: {
+          levels: [{ code: "PUBLIC", rank: 0, description: "Public" }],
+          agent_clearance: {},
+        },
+        policies:  [],
+        loaded_at: new Date().toISOString(),
+        file_hashes: {},
+      };
+
+      const testRequest: ActionRequest = {
+        request_id:    "selftest-enforcement-check",
+        timestamp:     new Date().toISOString(),
+        agent_id:      "selftest-agent",
+        agent_tier:    1,
+        division_code: "general",
+        action: {
+          type:        "data.delete",
+          target:      "selftest-target",
+          description: "Selftest: verify forbidden action is blocked",
+        },
+        context: {
+          division_code: "general",
+          session_id:    "selftest-session",
+        },
+      };
+
+      const result = evaluateAction(testRequest, minimalConfig, testDb);
+      testDb.close();
+
+      if (result.verdict !== "BLOCK" || result.blocking_stage !== "forbidden") {
+        return {
+          name:     this.name,
+          category: CAT,
+          status:   "fail",
+          message:  `Policy enforcement test FAILED: expected BLOCK/forbidden, got ${result.verdict}/${result.blocking_stage ?? "none"}`,
+          duration: Date.now() - t,
+          fixable:  false,
+        };
+      }
+
       return {
         name:     this.name,
         category: CAT,
         status:   "pass",
-        message:  "Pre-action pipeline configuration is loadable",
+        message:  "Pre-action pipeline configuration loadable and enforcement functional",
         duration: Date.now() - t,
         fixable:  false,
       };
@@ -112,7 +189,7 @@ export const PolicyEnforcementFunctional: SelftestCheck = {
         name:     this.name,
         category: CAT,
         status:   "warn",
-        message:  `Policy config load failed (may be expected on fresh install): ${msg}`,
+        message:  `Policy enforcement check failed (may be expected on fresh install): ${msg}`,
         duration: Date.now() - t,
         fixable:  false,
       };

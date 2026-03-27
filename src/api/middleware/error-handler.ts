@@ -96,7 +96,7 @@ function httpStatusForSidjuaError(err: SidjuaError): number {
   if (code === "EXEC-007") return 500; // synthesis failed
 
   // Module sandbox errors
-  if (code === "MOD-002" || code === "MOD-003") return 403;
+  if (code === "MOD-002" || code === "MOD-003" || code === "MOD-006") return 403;
   if (code === "MOD-005") return 504;
   if (code.startsWith("MOD-")) return 500;
 
