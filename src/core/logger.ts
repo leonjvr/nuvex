@@ -87,18 +87,24 @@ const _componentLevels = new Map<string, LogLevel>();
 
 /** Default built-in redact patterns — always retained; user patterns appended after these. */
 const _defaultRedactPatterns: readonly RegExp[] = [
-  /Bearer [A-Za-z0-9+/=]+/g,
-  /\bsk-[a-zA-Z0-9]+/g,
-  /\bkey-[a-zA-Z0-9]+/g,
+  // Auth headers (Bearer / Basic)
+  /Bearer [A-Za-z0-9+/=_-]+/g,
+  /Basic [A-Za-z0-9+/=]{10,}/g,
+  // Provider API keys — sk-* family (OpenAI, Anthropic sk-ant-*, OpenAI sk-proj-*)
+  // Must allow dashes so sk-ant-api03-xxx and sk-proj-xxx are fully redacted
+  /\bsk-[a-zA-Z0-9_-]+/g,
+  // xAI / Grok API keys
+  /\bxai-[A-Za-z0-9_-]+/g,
+  // Generic key- prefix tokens
+  /\bkey-[a-zA-Z0-9_-]+/g,
+  // Password assignments in log strings
   /"?password"?\s*[:=]\s*"?[^"\s,}]*/gi,
-  // AWS access keys
+  // AWS access keys (AKIA*)
   /\bAKIA[0-9A-Z]{16}\b/g,
   // GitHub tokens
   /\b(ghp_|ghr_|gho_|ghs_|ghu_)[A-Za-z0-9_]{36,}\b/g,
   // Slack tokens
   /\b(xoxb-|xoxp-|xapp-)[A-Za-z0-9-]+/g,
-  // Basic auth header
-  /Basic [A-Za-z0-9+/=]{10,}/g,
   // JWT tokens (header.payload.sig)
   /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
 ];

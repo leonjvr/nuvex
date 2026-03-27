@@ -407,6 +407,12 @@ set/get/list/delete/rotate/namespaces`). No external vault required.
 headers, CSRF protection, rate limiting, and input sanitization on every API
 surface. SQL injection prevention with parameterized queries throughout.
 
+**Rate Limiting** — in-memory token-bucket rate limiting is enforced per IP address.
+Rate limit counters are not shared between processes: running multiple server instances
+against the same database results in independent, non-shared rate limit counters.
+SIDJUA Community Edition is designed for single-process operation. Do not run multiple
+instances simultaneously unless you handle rate limiting externally (e.g. via a reverse proxy).
+
 **Backup Integrity** — HMAC-signed backup archives with zip-slip protection,
 zip bomb prevention, and manifest checksum verification on restore.
 

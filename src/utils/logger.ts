@@ -3,7 +3,12 @@
 // Dual licensed: AGPL-3.0 + SIDJUA Commercial License. See LICENSE.
 
 /**
- * SIDJUA — Structured logger
+ * SIDJUA — Structured logger (legacy)
+ *
+ * @deprecated This module is the Phase 1-9 logger and will be removed in V1.0.2.
+ * New code must use `createLogger(component)` from `src/core/logger.ts`.
+ * Existing callers are preserved for backward compatibility and will be migrated
+ * to core/logger in V1.0.2.
  *
  * All library code MUST use this logger instead of console.log.
  * Log entries are structured JSON: { level, timestamp, step, message, data? }
@@ -139,3 +144,18 @@ export class Logger {
 
 /** Default module-level logger instance. Replace handler at entry point if needed. */
 export const logger = new Logger();
+
+// ---------------------------------------------------------------------------
+// Migration bridge — re-export core/logger so callers can migrate incrementally.
+// Usage: import { createLogger } from "../utils/logger.js" (then move to core/).
+// ---------------------------------------------------------------------------
+
+export {
+  createLogger,
+  setGlobalLevel,
+  setComponentLevel,
+  resetLogger,
+  type Logger as CoreLogger,
+  type LogEntry as CoreLogEntry,
+  type LogLevel as CoreLogLevel,
+} from "../core/logger.js";
