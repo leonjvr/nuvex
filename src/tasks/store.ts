@@ -16,7 +16,8 @@ import type {
   TaskStatus,
   TaskType,
 } from "./types.js";
-import { DEFAULT_TTL_SECONDS } from "./types.js";
+import { DEFAULT_TTL_SECONDS }   from "./types.js";
+import { runTaskMigrations }     from "./task-migrations.js";
 
 
 interface TaskDbRow {
@@ -149,7 +150,9 @@ export class TaskStore {
         embedding_id TEXT,
         metadata TEXT NOT NULL DEFAULT '{}',
         recurring_schedule_id TEXT,
-        is_recurring INTEGER NOT NULL DEFAULT 0,
+        is_recurring          INTEGER NOT NULL DEFAULT 0,
+        source_metadata       TEXT,
+        governance_override   TEXT,
         FOREIGN KEY (parent_id) REFERENCES tasks(id)
       );
     `);
@@ -164,18 +167,14 @@ export class TaskStore {
       "CREATE INDEX IF NOT EXISTS idx_tasks_type     ON tasks(type)",
       "CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority, status)",
     ]) {
-      try { this.db.exec(ddl); } catch (_err) { /* column may not exist on legacy schema */ }
+      try { this.db.exec(ddl); } catch (_err) { /* index may already exist */ }
     }
 
-    // V1.1: Add recurring schedule columns to existing tables (backward-compatible migration)
-    for (const ddl of [
-      "ALTER TABLE tasks ADD COLUMN recurring_schedule_id TEXT",
-      "ALTER TABLE tasks ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0",
-      "ALTER TABLE tasks ADD COLUMN source_metadata TEXT",
-      "ALTER TABLE tasks ADD COLUMN governance_override TEXT",
-    ]) {
-      try { this.db.exec(ddl); } catch (_err) { /* column already exists */ }
-    }
+    // Add columns introduced after initial schema creation.
+    // runTaskMigrations() guards each ALTER TABLE with PRAGMA table_info so it
+    // is safe on both fresh databases (columns already in CREATE TABLE above)
+    // and legacy databases (columns added on first run, skipped thereafter).
+    runTaskMigrations(this.db);
   }
 
   // ---------------------------------------------------------------------------
