@@ -20,7 +20,7 @@
  * system in src/apply/database.ts).
  */
 
-import { existsSync, readdirSync, readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync, renameSync, mkdirSync, statSync } from "node:fs";
 import { join, dirname }        from "node:path";
 import { createRequire }        from "node:module";
 import { fileURLToPath }        from "node:url";
@@ -314,12 +314,11 @@ function collectAgentDbs(dir: string, out: string[], depth: number): void {
       continue;
     }
 
-    // Otherwise recurse into subdirectories
-    try {
-      readdirSync(full);
+    // Otherwise recurse into subdirectories — use statSync instead of
+    // exception-driven readdirSync to distinguish files from directories.
+    const st = statSync(full, { throwIfNoEntry: false });
+    if (st?.isDirectory()) {
       collectAgentDbs(full, out, depth + 1);
-    } catch (e: unknown) {
-      void e; /* cleanup-ignore: readdirSync failure on entry means it is a file, not a directory — expected */
     }
   }
 }

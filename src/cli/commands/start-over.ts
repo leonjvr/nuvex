@@ -25,12 +25,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir, freemem, tmpdir } from "node:os";
-import { join, resolve, basename } from "node:path";
+import { join, resolve, basename, relative, sep } from "node:path";
 import { validateWorkDir } from "../../utils/path-utils.js";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import type { Command } from "commander";
 import { SIDJUA_VERSION } from "../../version.js";
+import { createLogger }   from "../../core/logger.js";
+
+const logger = createLogger("start-over");
 
 
 /** Summary of a workspace, produced by scanWorkspace(). */
@@ -386,19 +389,69 @@ export function writeBackupMetadata(
 }
 
 /**
- * Copy the entire workspace to `destDir`.
- * Uses `cpSync` with `recursive: true` — platform-native copy.
+ * Files and patterns that must NEVER be included in a workspace backup.
+ *
+ * The backup is user-accessible (stored in ~/.sidjua/backups or a
+ * user-specified path). Credentials and server secrets must not be copied
+ * there to avoid credential leakage via the backup archive.
+ *
+ * Matching logic (see shouldExcludeFromBackup):
+ *   - Exact relative-path matches are checked against EXCLUDED_EXACT_PATHS.
+ *   - Any file inside .system/ that has a .key or .token extension is blocked
+ *     via EXCLUDED_SYSTEM_PATTERN regardless of its specific name.
+ */
+const EXCLUDED_EXACT_PATHS = new Set([
+  ".env",
+  join(".system", "master.key"),
+  join(".system", "backup.key"),
+  join(".system", "server.key"),
+  join(".system", "ipc.token"),
+  join(".system", "admin.token"),
+]);
+
+const EXCLUDED_SYSTEM_PATTERN = /\.(key|token)$/i;
+
+function shouldExcludeFromBackup(workDir: string, srcPath: string): boolean {
+  const rel = relative(workDir, srcPath);
+  if (EXCLUDED_EXACT_PATHS.has(rel)) return true;
+  // Block any *.key / *.token file inside .system/ (catches future additions)
+  const inSystem = rel === ".system" || rel.startsWith(".system" + sep);
+  if (inSystem && EXCLUDED_SYSTEM_PATTERN.test(basename(srcPath))) return true;
+  return false;
+}
+
+/**
+ * Copy the entire workspace to `destDir`, excluding secrets and credentials.
+ *
+ * Sensitive files (API keys, IPC tokens, .env) are never copied to the
+ * backup destination — the backup is user-accessible and must not contain
+ * credentials. Excluded paths are logged at INFO level.
  *
  * @throws Error if the copy fails for any reason.
  */
 export function copyWorkspace(workDir: string, destDir: string): void {
   mkdirSync(destDir, { recursive: true });
-  // Copy each top-level entry to avoid copying the dest if it's inside workDir
+  // Copy each top-level entry separately to avoid copying dest if it's inside workDir
   const entries = readdirSync(workDir);
   for (const name of entries) {
-    const src  = join(workDir, name);
+    const src = join(workDir, name);
+    if (shouldExcludeFromBackup(workDir, src)) {
+      logger.info("start_over_backup", `Excluded from backup: ${name}`, { metadata: { path: name } });
+      continue;
+    }
     const dest = join(destDir, name);
-    cpSync(src, dest, { recursive: true, errorOnExist: false });
+    cpSync(src, dest, {
+      recursive:    true,
+      errorOnExist: false,
+      filter: (srcFile) => {
+        if (shouldExcludeFromBackup(workDir, srcFile)) {
+          const rel = relative(workDir, srcFile);
+          logger.info("start_over_backup", `Excluded from backup: ${rel}`, { metadata: { path: rel } });
+          return false;
+        }
+        return true;
+      },
+    });
   }
 }
 
