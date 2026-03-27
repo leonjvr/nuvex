@@ -12,8 +12,10 @@
 import { sha256hex } from "../crypto-utils.js";
 
 
-// API key patterns: sk-xxx, key-xxx and keyword-preceded long tokens
+// API key patterns — sk-* family covers OpenAI (sk-..., sk-proj-...) and Anthropic (sk-ant-...)
+// xai- covers xAI / Grok keys; key-xxx covers generic key- prefixed tokens
 const SK_KEY_PATTERN    = /\bsk-[A-Za-z0-9_-]+/g;
+const XAI_KEY_PATTERN   = /\bxai-[A-Za-z0-9_-]+/g;
 const BEARER_PATTERN    = /Bearer\s+[A-Za-z0-9_\-./+=]+/gi;
 const KEYWORD_KEY_PATTERN =
   /\b(?:key|token|secret|password|apikey|api_key|access_token|auth_token)\s*[=:]\s*["']?[A-Za-z0-9_\-./+=]{16,}["']?/gi;
@@ -57,6 +59,7 @@ export function redactPii(input: string): string {
 
   // API keys
   result = result.replace(SK_KEY_PATTERN,        '<api-key>');
+  result = result.replace(XAI_KEY_PATTERN,       '<api-key>');
   result = result.replace(BEARER_PATTERN,        'Bearer <redacted>');
   result = result.replace(KEYWORD_KEY_PATTERN,   (match) => {
     // Keep the keyword, redact the value

@@ -20,6 +20,27 @@ import { REQUEST_ID_KEY } from "./request-logger.js";
 const logger = createLogger("api-server");
 
 
+/** SQLite error codes that indicate the database is temporarily busy. */
+const SQLITE_BUSY_CODES = new Set([
+  "SQLITE_BUSY", "SQLITE_LOCKED", "SQLITE_BUSY_RECOVERY",
+  "SQLITE_BUSY_SNAPSHOT", "SQLITE_LOCKED_SHAREDCACHE",
+]);
+
+/**
+ * Return true when the thrown error originates from better-sqlite3 and indicates
+ * a transient contention condition (busy / locked). These errors should never
+ * surface internal paths or DB codes to the caller.
+ */
+function isSqliteBusyError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  // better-sqlite3 sets `code` on the Error object
+  const code = (err as Error & { code?: string }).code;
+  if (code !== undefined && SQLITE_BUSY_CODES.has(code)) return true;
+  // Fallback: match message text for drivers that don't set `.code`
+  return /SQLITE_(BUSY|LOCKED)/i.test(err.message);
+}
+
+
 function writeToErrorLog(entry: Record<string, unknown>): void {
   const errorLogPath = process.env["SIDJUA_ERROR_LOG"];
   if (!errorLogPath) return;
@@ -136,6 +157,23 @@ export function createErrorHandler(isDevelopment = false): ErrorHandler {
       if (isDevelopment && err.detail !== undefined) body["detail"] = err.detail;
 
       return c.json({ error: body }, status as Parameters<typeof c.json>[1]);
+    }
+
+    // SQLite contention — return 503 with a safe generic message (no paths/codes)
+    if (isSqliteBusyError(err)) {
+      logger.warn("api_db_busy", "Database temporarily busy", {
+        correlationId: requestId,
+        metadata: { path: c.req.path },
+      });
+      return c.json({
+        error: {
+          code:        "SYS-002",
+          message:     "Database temporarily busy, please retry",
+          recoverable: true,
+          suggestion:  "Retry after a short delay",
+          request_id:  requestId,
+        },
+      }, 503);
     }
 
     // Generic / unexpected error → SYS-001
