@@ -204,6 +204,14 @@ export async function runRunCommand(opts: RunCommandOptions): Promise<number> {
       process.stderr.write(`✗ Task denied by governance: ${admission.reason}\n`);
       return 1;
     }
+    // Consume the single-use admission token before proceeding.
+    // verifyAndConsumeToken() atomically removes the token from the in-process
+    // store and confirms it has not expired — preventing any replay of the same
+    // token if a second task creation is attempted after admission.
+    if (!gate.verifyAndConsumeToken(admission.token)) {
+      process.stderr.write("✗ Admission token expired or already consumed — please retry.\n");
+      return 1;
+    }
 
     // Route task creation through TaskManager to enforce input sanitization
     const manager = new TaskManager(store, getSanitizer());

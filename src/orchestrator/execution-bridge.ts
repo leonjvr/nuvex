@@ -134,6 +134,9 @@ export class ExecutionBridge {
     if (!admission.admitted) {
       throw SidjuaError.from("EXEC-003", `Task denied by governance: ${admission.reason}`);
     }
+    if (!gate.verifyAndConsumeToken(admission.token)) {
+      throw SidjuaError.from("EXEC-003", "Admission token expired — please retry");
+    }
 
     // Route through TaskManager for input sanitization
     const manager = new TaskManager(this.store, getSanitizer());
@@ -367,6 +370,9 @@ export class ExecutionBridge {
     });
     if (!admission.admitted) {
       throw SidjuaError.from("EXEC-003", `Task denied by governance: ${admission.reason}`);
+    }
+    if (!gate.verifyAndConsumeToken(admission.token)) {
+      throw SidjuaError.from("EXEC-003", "Admission token expired — please retry");
     }
 
     const manager = new TaskManager(this.store, getSanitizer());

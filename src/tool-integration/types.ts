@@ -157,6 +157,9 @@ export interface ToolAccess {
 export type GovernanceRuleType =
   | "forbidden"
   | "approval_required"
+  /** Blocks access to any file path that matches or is below the pattern path. */
+  | "path_deny"
+  /** @deprecated Use "path_deny". Kept for backward compatibility with stored rules. */
   | "path_restriction"
   | "domain_restriction"
   | "rate_limit";
