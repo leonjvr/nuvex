@@ -11,7 +11,8 @@
  */
 
 import { existsSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve }              from "node:path";
+import { assertWithinDirectory } from "../utils/path-utils.js";
 import { loadAndValidate, loadAndValidateDir } from "../apply/validate.js";
 import { planFilesystem } from "../apply/filesystem.js";
 import { apply } from "../apply/index.js";
@@ -69,6 +70,16 @@ function parseStep(raw: string): ApplyStep {
  */
 export async function runApplyCommand(opts: ApplyCommandOptions): Promise<number> {
   let configPath = resolve(opts.workDir, opts.config);
+
+  // Guard against path-traversal in --config: reject any path that resolves
+  // outside the workspace root.  The fallback paths (governance/, config/)
+  // are constructed by the code itself and are always within workDir.
+  try {
+    assertWithinDirectory(configPath, opts.workDir);
+  } catch (_e) {
+    process.stderr.write(`Error: --config path is outside the workspace root: ${opts.config}\n`);
+    return 1;
+  }
 
   // Resolution order:
   //  1. governance/divisions/ directory (modular per-file format)

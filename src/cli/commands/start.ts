@@ -454,8 +454,8 @@ export async function runStartCommand(opts: StartCommandOptions): Promise<number
     // ── GUI static file serving (no auth required) ────────────────────────
 
     if (hasGui) {
-      server.app.get("/", (c) => serveGuiFile(c, guiDist, "index.html"));
-      server.app.get("/index.html", (c) => serveGuiFile(c, guiDist, "index.html"));
+      server.app.get("/", (c) => serveIndexHtmlWithBootstrap(c, guiDist, () => apiKey));
+      server.app.get("/index.html", (c) => serveIndexHtmlWithBootstrap(c, guiDist, () => apiKey));
       server.app.get("/favicon.ico", (c) => serveGuiFile(c, guiDist, "favicon.ico"));
       server.app.get("/assets/*", (c) => {
         const assetPath = c.req.path.replace(/^\/assets\//, "");
@@ -606,6 +606,53 @@ async function isPortAvailable(port: number, host: string): Promise<boolean> {
     srv.once("error", () => resolve(false));
     srv.once("listening", () => { srv.close(); resolve(true); });
     srv.listen(port, host);
+  });
+}
+
+/**
+ * Serve index.html with the API key injected server-side.
+ *
+ * Mirrors the bootstrap logic in cli-server.ts so the CLI foreground path
+ * has identical security properties (peer-address validation, no-store headers,
+ * loopback-only key injection).
+ */
+function serveIndexHtmlWithBootstrap(
+  c: Context,
+  guiDist: string,
+  getApiKey: () => string,
+): Response {
+  const filePath = join(guiDist, "index.html");
+  let realPath: string;
+  try {
+    realPath = realpathSync(filePath);
+  } catch (_e) {
+    return c.text("Not found", 404);
+  }
+  try {
+    assertWithinDirectory(realPath, guiDist);
+  } catch (_e) {
+    return c.text("Forbidden", 403);
+  }
+
+  // Use the TCP peer address set by toWebRequest() — not the Host header.
+  // Fail-closed: absent peer header (test env) → do NOT inject the key.
+  const peerAddr = c.req.header("x-sidjua-peer-address") ?? "";
+  const isLocal  = peerAddr === "127.0.0.1" || peerAddr === "::1" || peerAddr === "::ffff:127.0.0.1";
+
+  let serverUrl = "";
+  try { serverUrl = new URL(c.req.url).origin; } catch (_err) { /* non-fatal */ }
+
+  const payload = isLocal
+    ? JSON.stringify({ api_key: getApiKey(), server_url: serverUrl })
+    : JSON.stringify({});
+
+  const script = `<script>window.__SIDJUA_BOOTSTRAP__ = ${payload};</script>`;
+  const html   = readFileSync(realPath, "utf-8").replace("</head>", `  ${script}\n  </head>`);
+
+  return c.newResponse(html, 200, {
+    "Content-Type":  "text/html; charset=utf-8",
+    "Cache-Control": "no-store, no-cache",
+    "Pragma":        "no-cache",
   });
 }
 
