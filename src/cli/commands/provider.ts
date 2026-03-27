@@ -20,7 +20,24 @@ import type { Command } from "commander";
 import { ProviderCatalog }         from "../../providers/catalog.js";
 import { CustomProviderManager }   from "../../providers/custom-provider.js";
 import { ProviderAutoDetect }      from "../../providers/auto-detect.js";
+import { askSecret }               from "../utils/interactive-prompt.js";
 
+
+/** Read all of stdin as a single trimmed string (for non-TTY API key piping). */
+function readStdinLine(): Promise<string> {
+  return new Promise<string>((resolve) => {
+    let data = "";
+    process.stdin.resume();
+    process.stdin.setEncoding("utf8");
+    const onData = (chunk: string) => { data += chunk; };
+    const onEnd  = () => {
+      process.stdin.removeListener("data", onData);
+      resolve(data.trim());
+    };
+    process.stdin.on("data", onData);
+    process.stdin.once("end", onEnd);
+  });
+}
 
 export function registerProviderCommands(program: Command): void {
   const providerCmd = program
@@ -95,7 +112,8 @@ export function registerProviderCommands(program: Command): void {
     .requiredOption("--name <name>",     "Display name")
     .requiredOption("--base-url <url>",  "Base URL of the OpenAI-compatible endpoint")
     .requiredOption("--model <model>",   "Default model ID")
-    .option("--api-key <key>",           "API key (or set via env var)")
+    // --api-key removed: key is read from interactive prompt (TTY) or stdin (pipe)
+    // to prevent the credential appearing in shell history or process listings.
     .option("--header <kv>",             "Custom header (key:value), repeatable", collect, [])
     .option("--no-probe",                "Skip capability auto-detection")
     .action(async (opts: {
@@ -103,10 +121,14 @@ export function registerProviderCommands(program: Command): void {
       name:     string;
       baseUrl:  string;
       model:    string;
-      apiKey?:  string;
       header:   string[];
       probe:    boolean;
     }) => {
+      // Read API key securely: prompt (TTY) or stdin (pipe). Never from CLI args.
+      const apiKey = process.stdin.isTTY
+        ? await askSecret("API key (leave empty to skip)")
+        : await readStdinLine();
+
       const customHeaders = parseHeaders(opts.header);
       const catalog       = new ProviderCatalog();
       const manager       = new CustomProviderManager(catalog);
@@ -118,7 +140,7 @@ export function registerProviderCommands(program: Command): void {
         const result = await detector.probe({
           base_url: opts.baseUrl,
           model:    opts.model,
-          ...(opts.apiKey !== undefined                       && { api_key:        opts.apiKey }),
+          ...(apiKey !== ""                                   && { api_key:        apiKey }),
           ...(Object.keys(customHeaders).length > 0          && { custom_headers: customHeaders }),
         });
 
@@ -139,7 +161,7 @@ export function registerProviderCommands(program: Command): void {
         id:                opts.id,
         name:              opts.name,
         base_url:          opts.baseUrl,
-        api_key_required:  opts.apiKey !== undefined,
+        api_key_required:  apiKey !== "",
         models:            [opts.model],
         supports_tool_use: "auto",
         ...(Object.keys(customHeaders).length > 0 && { custom_headers: customHeaders }),

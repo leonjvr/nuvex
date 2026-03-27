@@ -282,6 +282,17 @@ export interface TicketRouteServices {
  */
 export function registerSseTicketRoutes(app: Hono, services: TicketRouteServices): void {
   app.post("/api/v1/sse/ticket", requireScope("readonly"), (c: Context) => {
+    // Explicit bootstrap rejection — requireScope("readonly") already blocks this
+    // (bootstrap level 0 < readonly level 1) but we add an explicit check for a
+    // clear error message guiding the caller to create a scoped token first.
+    const callerCtx = c.get(CALLER_CONTEXT_KEY) as CallerContext | undefined;
+    if (callerCtx?.role === "bootstrap") {
+      return c.json(
+        { error: { code: "AUTH-003", message: "SSE requires a scoped token. Create one with: sidjua token create --scope readonly", recoverable: false } },
+        403,
+      );
+    }
+
     // Secondary token check — requireScope() handles auth when the full middleware
     // stack is present; services.getApiKey() provides a fallback for bare-Hono
     // contexts (e.g. unit tests) where the auth middleware is not wired in.

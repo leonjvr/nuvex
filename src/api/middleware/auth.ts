@@ -6,17 +6,17 @@
  * SIDJUA — P269: Authentication Middleware (Scoped Tokens)
  *
  * SECURITY NOTE: The legacy single API key path (getApiKey) is provided for
- * backward compatibility only.  A single compromised key grants full admin
- * access to all routes.  Operators should migrate to scoped tokens
- * (`sidjua token create`) which limit access to the minimum required
- * privilege level.  See docs/KNOWN-LIMITATIONS.md for migration guidance.
+ * backward compatibility only. It is now restricted to "bootstrap" scope —
+ * only health checks, locale, and first-time token creation are allowed.
+ * Operators must migrate to scoped tokens (`sidjua token create`) for full
+ * access.  See docs/KNOWN-LIMITATIONS.md for migration guidance.
  *
  * Authentication flow:
  *   1. Extract token from Authorization: Bearer <token>
  *   2. Try scoped token lookup via TokenStore.validateToken()
  *      → derive CallerContext from token (scope, division, agentId, tokenId)
  *   3. If no scoped token found: try legacy single API key (backward compat)
- *      → set CallerContext = { role: "admin" } + log deprecation warning
+ *      → set CallerContext = { role: "bootstrap" } + log deprecation warning
  *   4. If neither: 401 Unauthorized
  *
  * Sets c.set("callerContext", ctx) so route handlers and requireScope()
@@ -151,12 +151,12 @@ export const authenticate = (
     (pendingKey !== null && pendingKey !== "" && timingSafeCompare(providedKey, pendingKey));
 
   if (valid) {
-    // Legacy key → admin scope (backward compat)
-    logger.warn("auth_legacy_key", "Legacy API key used — migrate to scoped tokens (sidjua token create)", {
+    // Legacy key → bootstrap scope (restricted: health + locale + first token creation only)
+    logger.warn("auth_legacy_key", "Legacy API key used — restricted to bootstrap scope. Create a scoped token: sidjua token create --scope <scope>", {
       correlationId: requestId,
       metadata: { path },
     });
-    const ctx: CallerContext = { role: "admin" };
+    const ctx: CallerContext = { role: "bootstrap" };
     c.set(CALLER_CONTEXT_KEY, ctx);
     return next();
   }

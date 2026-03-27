@@ -14,13 +14,31 @@
  */
 
 import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
 import type { TokenStore, TokenScope } from "../token-store.js";
-import { requireScope } from "../middleware/require-scope.js";
+import { requireScope, scopeAtLeast, CALLER_CONTEXT_KEY } from "../middleware/require-scope.js";
+import type { CallerContext } from "../caller-context.js";
 import { createLogger } from "../../core/logger.js";
 
 const logger = createLogger("api-tokens");
 
 const VALID_SCOPES = new Set<TokenScope>(["admin", "operator", "agent", "readonly"]);
+
+/**
+ * Middleware for POST /api/v1/tokens: allows either admin scope OR the
+ * restricted "bootstrap" role (legacy key, first-run only).
+ * All other token management routes (list, get, delete) still require admin.
+ */
+const requireAdminOrBootstrap: MiddlewareHandler = async (c, next) => {
+  const ctx = c.get(CALLER_CONTEXT_KEY) as CallerContext | undefined;
+  if (ctx === undefined) {
+    return c.json({ error: { code: "AUTH-001", message: "Authentication required", recoverable: false } }, 401);
+  }
+  if (ctx.role === "bootstrap" || scopeAtLeast(ctx.role, "admin")) {
+    return next();
+  }
+  return c.json({ error: { code: "AUTH-003", message: "Insufficient scope", recoverable: false } }, 403);
+};
 
 export interface TokenRouteServices {
   tokenStore: TokenStore;
@@ -60,7 +78,9 @@ export function registerTokenRoutes(app: Hono, services: TokenRouteServices): vo
   });
 
   // ── POST /api/v1/tokens ──────────────────────────────────────────────────
-  app.post("/api/v1/tokens", requireScope("admin"), async (c) => {
+  // bootstrap role is allowed here for the initial-setup flow (first token creation).
+  // All other token routes (list/get/delete) still require admin scope.
+  app.post("/api/v1/tokens", requireAdminOrBootstrap, async (c) => {
     let body: {
       scope?:     unknown;
       division?:  unknown;

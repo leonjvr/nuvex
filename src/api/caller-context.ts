@@ -16,7 +16,12 @@ export interface CallerContext {
    * Authorization role of the caller.
    * Undefined means no authenticated context (deny sensitive operations).
    */
-  role?: "admin" | "operator" | "agent" | "readonly";
+  /**
+   * "bootstrap" is the restricted role assigned to the legacy single API key.
+   * It may only create the first scoped token (POST /api/v1/tokens) and access
+   * public endpoints. All privileged routes reject it.
+   */
+  role?: "admin" | "operator" | "agent" | "readonly" | "bootstrap";
   /** Set when an agent is making the call on its own behalf. */
   agentId?: string;
   /** Bound to token scope — restricts access to this division's resources. */
