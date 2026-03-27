@@ -160,6 +160,26 @@ const KEY_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 export function registerSecretRoutes(app: Hono, services: SecretRouteServices): void {
   const { provider, secretsDb } = services;
 
+  // Ensure the reveal audit table exists (created lazily on first registerSecretRoutes call).
+  // Writes to this table are fail-closed for secret reveal operations.
+  try {
+    secretsDb.exec(`
+      CREATE TABLE IF NOT EXISTS secret_reveal_audit (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        ns          TEXT NOT NULL,
+        key         TEXT NOT NULL,
+        agent_id    TEXT,
+        division    TEXT,
+        role        TEXT,
+        revealed_at TEXT NOT NULL
+      )
+    `);
+  } catch (tableErr) {
+    logger.warn("secrets_audit_init", "Could not create secret_reveal_audit table", {
+      metadata: { error: tableErr instanceof Error ? tableErr.message : String(tableErr) },
+    });
+  }
+
   // FAIL CLOSED: all secrets routes require a per-request CallerContext set by
   // auth middleware. If the context is absent the request is denied immediately —
   // we never default to operator access (Rule #12).
@@ -246,7 +266,24 @@ export function registerSecretRoutes(app: Hono, services: SecretRouteServices): 
         404,
       );
     }
-    auditSecretOperation("read", ns, key, getCtx(c), "allowed");
+    // Fail-closed: write a DB-level audit record before revealing the value.
+    // If the audit write fails, deny the reveal rather than leak without a trace.
+    const ctx = getCtx(c);
+    try {
+      secretsDb.prepare(
+        `INSERT INTO secret_reveal_audit (ns, key, agent_id, division, role, revealed_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(ns, key, ctx.agentId ?? null, ctx.division ?? null, ctx.role ?? null, new Date().toISOString());
+    } catch (auditErr) {
+      logger.error("secret_reveal_audit_failed", "Cannot write reveal audit — denying secret reveal (fail-closed)", {
+        metadata: { ns, key, error: auditErr instanceof Error ? auditErr.message : String(auditErr) },
+      });
+      return c.json(
+        { error: { code: "SEC-503", message: "Cannot reveal secret: audit logging unavailable" } },
+        503,
+      );
+    }
+    auditSecretOperation("read", ns, key, ctx, "allowed");
     return c.json({ namespace: ns, key, value });
   });
 

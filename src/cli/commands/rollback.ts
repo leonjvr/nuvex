@@ -25,7 +25,8 @@
  */
 
 import type { Command }          from "commander";
-import { getPaths }              from "../../core/paths.js";
+import { resolvePaths }          from "../../core/paths.js";
+import { validateWorkDir }       from "../../utils/path-utils.js";
 import { getCanonicalDbPath }   from "../../core/db/paths.js";
 import { SIDJUA_VERSION }        from "../../version.js";
 import { FileLockManager }       from "../../core/update/lock-manager.js";
@@ -43,17 +44,19 @@ export function registerRollbackCommands(program: Command): void {
   program
     .command("rollback")
     .description("Rollback SIDJUA to a previous version")
-    .option("--to <version>",  "Target version to rollback to")
-    .option("--yes",           "Auto-confirm without interactive prompt")
-    .option("--force-unlock",  "Release stale lock before starting")
-    .option("--list",          "List available versions for rollback")
+    .option("--to <version>",   "Target version to rollback to")
+    .option("--yes",            "Auto-confirm without interactive prompt")
+    .option("--force-unlock",   "Release stale lock before starting")
+    .option("--list",           "List available versions for rollback")
+    .option("--work-dir <path>", "Workspace directory", process.cwd())
     .action(async (opts: {
       to?:          string;
       yes:          boolean;
       forceUnlock:  boolean;
       list:         boolean;
+      workDir:      string;
     }) => {
-      await runRollback(opts.to, opts.yes, opts.forceUnlock, opts.list);
+      await runRollback(opts.to, opts.yes, opts.forceUnlock, opts.list, opts.workDir);
     });
 }
 
@@ -63,8 +66,10 @@ async function runRollback(
   autoYes:       boolean,
   forceUnlock:   boolean,
   listOnly:      boolean,
+  workDir:       string,
 ): Promise<void> {
-  const paths   = getPaths();
+  validateWorkDir(workDir);
+  const paths   = resolvePaths(workDir);
   const archive = new VersionArchiveManager(join(paths.system.root, ".."), paths.system.root);
   const lock    = new FileLockManager(paths.data.root);
 
@@ -162,9 +167,6 @@ async function runRollback(
 
       // Rollback in reverse order (only migrations not in the restored system)
       const { openDatabase } = await import("../../utils/db.js");
-      // Derive workDir from the already-resolved paths.system.root (= <workDir>/.system)
-      // so the correct DB is opened regardless of the process working directory.
-      const workDir = join(paths.system.root, "..");
       const db = openDatabase(getCanonicalDbPath(workDir));
       try {
         const toReverse = [...currentState.appliedMigrations].reverse();

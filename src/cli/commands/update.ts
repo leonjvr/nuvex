@@ -21,7 +21,8 @@
  */
 
 import type { Command }         from "commander";
-import { getPaths }             from "../../core/paths.js";
+import { resolvePaths }         from "../../core/paths.js";
+import { validateWorkDir }      from "../../utils/path-utils.js";
 import { getCanonicalDbPath }  from "../../core/db/paths.js";
 import { SIDJUA_VERSION }       from "../../version.js";
 import { loadVersionInfo }      from "../../core/governance/rule-loader.js";
@@ -92,11 +93,12 @@ export function registerChangelogCommands(program: Command): void {
 
 
 async function runFullUpdate(checkOnly: boolean, autoYes: boolean, forceUnlock: boolean, workDir: string): Promise<void> {
+  validateWorkDir(workDir);
   if (!existsSync(join(workDir, ".system", "sidjua.db"))) {
     process.stderr.write(`Error: No SIDJUA workspace found at ${workDir}\n`);
     process.exit(1);
   }
-  const paths    = getPaths();
+  const paths    = resolvePaths(workDir);
   const provider = new NpmUpdateProvider();
   const lock     = new FileLockManager(paths.data.root);
 
@@ -250,11 +252,12 @@ async function runFullUpdate(checkOnly: boolean, autoYes: boolean, forceUnlock: 
 
 
 async function runGovernanceUpdate(autoYes: boolean, forceUnlock: boolean, workDir: string): Promise<void> {
+  validateWorkDir(workDir);
   if (!existsSync(join(workDir, ".system", "sidjua.db"))) {
     process.stderr.write(`Error: No SIDJUA workspace found at ${workDir}\n`);
     process.exit(1);
   }
-  const paths    = getPaths();
+  const paths    = resolvePaths(workDir);
   const provider = new NpmUpdateProvider();
   const lock     = new FileLockManager(paths.data.root);
 
@@ -356,7 +359,7 @@ async function runGovernanceUpdate(autoYes: boolean, forceUnlock: boolean, workD
 }
 
 
-export function runSelftest(paths: ReturnType<typeof getPaths>): boolean {
+export function runSelftest(paths: ReturnType<typeof resolvePaths>): boolean {
   const checks: Array<{ name: string; pass: boolean; reason?: string }> = [];
 
   // system/VERSION exists

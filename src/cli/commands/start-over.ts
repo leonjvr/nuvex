@@ -16,6 +16,7 @@
 import {
   existsSync,
   statSync,
+  statfsSync,
   readdirSync,
   mkdirSync,
   cpSync,
@@ -25,6 +26,7 @@ import {
 } from "node:fs";
 import { homedir, freemem, tmpdir } from "node:os";
 import { join, resolve, basename } from "node:path";
+import { validateWorkDir } from "../../utils/path-utils.js";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import type { Command } from "commander";
@@ -348,13 +350,21 @@ export function resolveBackupDest(root: string, ts: string): string {
  * a conservative guard (backups are on disk, not RAM, but this prevents the
  * most obvious failures).
  */
+const MIN_FREE_BYTES = 100 * 1024 * 1024; // 100 MB minimum regardless of workspace size
+
 export function checkDiskSpace(
   workspaceSizeBytes: number,
+  checkPath = tmpdir(),
 ): { ok: true } | { ok: false; needed: number; available: number } {
-  // Try reading free bytes from /proc/mounts → /proc/statvfs (Linux only)
-  // Fall back to freemem() if unavailable
-  const available = freemem();
-  const needed    = Math.ceil(workspaceSizeBytes * 1.1);
+  let available: number;
+  try {
+    const stats = statfsSync(checkPath);
+    available = stats.bfree * stats.bsize;
+  } catch (_err) {
+    // Fall back to freemem() if statfsSync is unavailable (e.g. non-Linux)
+    available = freemem();
+  }
+  const needed = Math.max(Math.ceil(workspaceSizeBytes * 1.1), MIN_FREE_BYTES);
   if (available < needed) {
     return { ok: false, needed, available };
   }
@@ -632,6 +642,7 @@ export interface StartOverCommandOptions {
 
 export async function runStartOverCommand(opts: StartOverCommandOptions): Promise<number> {
   const { workDir, list, backupsRoot } = opts;
+  validateWorkDir(workDir);
 
   // --- --list mode ---
   if (list) {
@@ -670,7 +681,7 @@ export async function runStartOverCommand(opts: StartOverCommandOptions): Promis
   printSummary(summary);
 
   // --- Step 2: Disk space check ---
-  const spaceCheck = checkDiskSpace(summary.totalBytes);
+  const spaceCheck = checkDiskSpace(summary.totalBytes, workDir);
   if (!spaceCheck.ok) {
     process.stderr.write(
       `Not enough disk space for backup.\n` +

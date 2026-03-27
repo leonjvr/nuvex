@@ -32,13 +32,6 @@ The blue "configure an LLM provider" banner remains visible even when all agents
 **Workaround:** Ignore the banner — your agents are working correctly if the cards show a green status.
 **Fix:** V1.0.1 — Banner checks actual provider state.
 
-### Clear Button Deletes Chat Without Confirmation
-
-The Clear button in chat removes all history without a safety prompt.
-
-**Workaround:** Do not click the Clear button if you want to keep chat history.
-**Fix:** V1.0.1 — Clear button will be removed, replaced by Apply button.
-
 ### Advanced Provider Mode Not Persistent
 
 Per-agent provider changes in Advanced mode are not saved. No API key field appears for new providers.

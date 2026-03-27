@@ -15,6 +15,8 @@ import { resolve, join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import type { Command }  from "commander";
 import { openDatabase }  from "../../utils/db.js";
+import { runMigrations105 }        from "../../agent-lifecycle/migration.js";
+import { SqliteSecretsProvider }   from "../../apply/secrets.js";
 import { EmailAdapter }  from "../../integrations/adapters/email-adapter.js";
 import type { EmailAdapterConfig } from "../../integrations/adapters/types.js";
 import { msg }           from "../../i18n/index.js";
@@ -78,33 +80,39 @@ function maskEmail(email: string): string {
 interface EmailStatusOptions { workDir: string; reveal?: boolean }
 
 export async function runEmailStatus(opts: EmailStatusOptions): Promise<number> {
-  const envPath = join(opts.workDir, ".env");
-  if (!existsSync(envPath)) {
-    process.stdout.write("No email configuration found.\n");
-    process.stdout.write("Run `sidjua email setup` or add SIDJUA_SMTP_* variables to .env\n");
-    return 0;
-  }
+  const env   = loadEmailEnv(opts.workDir);
+  const creds = await loadEmailCredentials(opts.workDir);
 
-  const env = loadEmailEnv(opts.workDir);
-
-  if (!env.smtpHost) {
+  if (!env.smtpHost && creds.smtpUser === undefined) {
     process.stdout.write("Email channel: NOT configured\n");
-    process.stdout.write("  Add SIDJUA_SMTP_HOST, SIDJUA_SMTP_USER, SIDJUA_SMTP_PASS to .env\n");
+    process.stdout.write("  Set SIDJUA_SMTP_HOST in .env and run:\n");
+    process.stdout.write("    sidjua secret set email/smtp-user <value>\n");
+    process.stdout.write("    sidjua secret set email/smtp-pass <value>\n");
+    creds.close();
     return 0;
   }
 
   const reveal = opts.reveal === true;
   process.stdout.write("Email channel: configured\n");
-  process.stdout.write(`  SMTP host:     ${reveal ? `${env.smtpHost}:${env.smtpPort ?? 587}` : `${maskHost(env.smtpHost)}:${env.smtpPort ?? 587}`}\n`);
-  process.stdout.write(`  SMTP user:     ${env.smtpUser !== undefined ? (reveal ? env.smtpUser : maskEmail(env.smtpUser)) : "(not set)"}\n`);
-  process.stdout.write(`  From address:  ${env.emailFrom !== undefined ? (reveal ? env.emailFrom : maskEmail(env.emailFrom)) : "(not set)"}\n`);
-  process.stdout.write(`  Agent name:    ${env.agentName ?? "(not set)"}\n`);
-  process.stdout.write(`  IMAP host:     ${env.imapHost !== undefined ? (reveal ? `${env.imapHost}:${env.imapPort ?? 993}` : `${maskHost(env.imapHost)}:${env.imapPort ?? 993}`) : "(not set)"}\n`);
-  process.stdout.write(`  IMAP user:     ${env.imapUser !== undefined ? (reveal ? env.imapUser : maskEmail(env.imapUser)) : "(not set)"}\n`);
+  if (env.smtpHost) {
+    process.stdout.write(`  SMTP host:     ${reveal ? `${env.smtpHost}:${env.smtpPort ?? 587}` : `${maskHost(env.smtpHost)}:${env.smtpPort ?? 587}`}\n`);
+  }
+  process.stdout.write(`  SMTP user:     ${creds.smtpUser !== undefined ? (reveal ? creds.smtpUser : maskEmail(creds.smtpUser)) : "(not set — run: sidjua secret set email/smtp-user)"}\n`);
+  if (env.emailFrom !== undefined) {
+    process.stdout.write(`  From address:  ${reveal ? env.emailFrom : maskEmail(env.emailFrom)}\n`);
+  }
+  if (env.agentName !== undefined) {
+    process.stdout.write(`  Agent name:    ${env.agentName}\n`);
+  }
+  if (env.imapHost !== undefined) {
+    process.stdout.write(`  IMAP host:     ${reveal ? `${env.imapHost}:${env.imapPort ?? 993}` : `${maskHost(env.imapHost)}:${env.imapPort ?? 993}`}\n`);
+  }
+  process.stdout.write(`  IMAP user:     ${creds.imapUser !== undefined ? (reveal ? creds.imapUser : maskEmail(creds.imapUser)) : "(not set)"}\n`);
   if (!reveal) {
     process.stdout.write("  (Use --reveal to show full credential values)\n");
   }
 
+  creds.close();
   return 0;
 }
 
@@ -116,10 +124,21 @@ interface EmailTestOptions {
 }
 
 export async function runEmailTest(opts: EmailTestOptions): Promise<number> {
-  const env = loadEmailEnv(opts.workDir);
+  const env   = loadEmailEnv(opts.workDir);
+  const creds = await loadEmailCredentials(opts.workDir);
 
-  if (!env.smtpHost || !env.smtpUser || !env.smtpPass || !env.emailFrom) {
-    process.stderr.write("Email channel not fully configured — check SIDJUA_SMTP_* in .env\n");
+  if (!creds.smtpUser || !creds.smtpPass) {
+    creds.close();
+    process.stderr.write("Email credentials not configured in the secrets store.\n");
+    process.stderr.write("Run:\n");
+    process.stderr.write("  sidjua secret set email/smtp-user <value>\n");
+    process.stderr.write("  sidjua secret set email/smtp-pass <value>\n");
+    return 1;
+  }
+
+  if (!env.smtpHost || !env.emailFrom) {
+    creds.close();
+    process.stderr.write("Email channel not fully configured — set SIDJUA_SMTP_HOST and SIDJUA_EMAIL_FROM in .env\n");
     return 1;
   }
 
@@ -130,14 +149,14 @@ export async function runEmailTest(opts: EmailTestOptions): Promise<number> {
   const config: EmailAdapterConfig = {
     smtp_host:    env.smtpHost,
     smtp_port:    env.smtpPort ?? 587,
-    smtp_user:    env.smtpUser,
-    smtp_pass:    env.smtpPass,
+    smtp_user:    creds.smtpUser,
+    smtp_pass:    creds.smtpPass,
     from_address: env.emailFrom,
     from_name:    agentName,
     tls:          true,
   };
 
-  const recipient = opts.to ?? env.smtpUser;
+  const recipient = opts.to ?? creds.smtpUser;
 
   try {
     const adapter = new EmailAdapter(config, opts.agentId);
@@ -148,11 +167,13 @@ export async function runEmailTest(opts: EmailTestOptions): Promise<number> {
       `If you received this, your email channel is working correctly.`,
     );
     adapter.destroy();
+    creds.close();
 
     process.stdout.write(`✓ Test email sent to ${recipient}\n`);
     process.stdout.write(`  Message-ID: ${result.messageId}\n`);
     return 0;
   } catch (err: unknown) {
+    creds.close();
     process.stderr.write(`✗ Test email failed: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
   }
@@ -218,25 +239,23 @@ export async function runEmailThreads(opts: EmailThreadsOptions): Promise<number
 }
 
 
+/** Non-sensitive email configuration (host, port, from-address). */
 interface EmailEnv {
   smtpHost:  string | undefined;
   smtpPort:  number | undefined;
-  smtpUser:  string | undefined;
-  smtpPass:  string | undefined;
   emailFrom: string | undefined;
   agentName: string | undefined;
   imapHost:  string | undefined;
   imapPort:  number | undefined;
-  imapUser:  string | undefined;
-  imapPass:  string | undefined;
 }
 
 const EMPTY_ENV: EmailEnv = {
-  smtpHost: undefined, smtpPort: undefined, smtpUser: undefined, smtpPass: undefined,
+  smtpHost: undefined, smtpPort: undefined,
   emailFrom: undefined, agentName: undefined,
-  imapHost: undefined, imapPort: undefined, imapUser: undefined, imapPass: undefined,
+  imapHost: undefined, imapPort: undefined,
 };
 
+/** Read non-sensitive email config from .env (host, port, from-address). */
 function loadEmailEnv(workDir: string): EmailEnv {
   const envPath = join(workDir, ".env");
   if (!existsSync(envPath)) return EMPTY_ENV;
@@ -263,13 +282,61 @@ function loadEmailEnv(workDir: string): EmailEnv {
   return {
     smtpHost:  map["SIDJUA_SMTP_HOST"],
     smtpPort:  map["SIDJUA_SMTP_PORT"] !== undefined ? parseInt(map["SIDJUA_SMTP_PORT"]!, 10) : undefined,
-    smtpUser:  map["SIDJUA_SMTP_USER"],
-    smtpPass:  map["SIDJUA_SMTP_PASS"],
     emailFrom: map["SIDJUA_EMAIL_FROM"],
     agentName: map["SIDJUA_AGENT_NAME"],
     imapHost:  map["SIDJUA_IMAP_HOST"],
     imapPort:  map["SIDJUA_IMAP_PORT"] !== undefined ? parseInt(map["SIDJUA_IMAP_PORT"]!, 10) : undefined,
-    imapUser:  map["SIDJUA_IMAP_USER"],
-    imapPass:  map["SIDJUA_IMAP_PASS"],
   };
+}
+
+
+/** Sensitive email credentials loaded from the governed secrets store. */
+interface EmailCredentials {
+  smtpUser: string | undefined;
+  smtpPass: string | undefined;
+  imapUser: string | undefined;
+  imapPass: string | undefined;
+  close:    () => void;
+}
+
+const EMPTY_CREDS: EmailCredentials = {
+  smtpUser: undefined, smtpPass: undefined, imapUser: undefined, imapPass: undefined,
+  close: () => {},
+};
+
+/**
+ * Read SMTP/IMAP credentials from the governed secrets store.
+ * Credentials must be set via:
+ *   sidjua secret set email/smtp-user <value>
+ *   sidjua secret set email/smtp-pass <value>
+ *   sidjua secret set email/imap-user <value>
+ *   sidjua secret set email/imap-pass <value>
+ */
+async function loadEmailCredentials(workDir: string): Promise<EmailCredentials> {
+  const dbPath      = join(workDir, ".system", "sidjua.db");
+  const secretsPath = join(workDir, ".system", "secrets.db");
+
+  if (!existsSync(dbPath)) return EMPTY_CREDS;
+
+  try {
+    const mainDb  = openDatabase(dbPath);
+    runMigrations105(mainDb);
+    const provider = new SqliteSecretsProvider(mainDb);
+    await provider.init({ db_path: secretsPath });
+
+    const smtpUser = (await provider.get("email", "smtp-user")) ?? undefined;
+    const smtpPass = (await provider.get("email", "smtp-pass")) ?? undefined;
+    const imapUser = (await provider.get("email", "imap-user")) ?? undefined;
+    const imapPass = (await provider.get("email", "imap-pass")) ?? undefined;
+
+    return {
+      smtpUser: smtpUser !== "" ? smtpUser : undefined,
+      smtpPass: smtpPass !== "" ? smtpPass : undefined,
+      imapUser: imapUser !== "" ? imapUser : undefined,
+      imapPass: imapPass !== "" ? imapPass : undefined,
+      close: () => { provider.close(); mainDb.close(); },
+    };
+  } catch (_err) {
+    return EMPTY_CREDS;
+  }
 }

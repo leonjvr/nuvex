@@ -24,6 +24,7 @@ import {
   loadLocaleData,
 } from "../../i18n/index.js";
 import { openDatabase } from "../../utils/db.js";
+import { validateWorkDir } from "../../utils/path-utils.js";
 import { runWorkspaceConfigMigration } from "../../api/workspace-config-migration.js";
 
 
@@ -44,6 +45,7 @@ export function registerLocaleCommands(program: Command): void {
     .option("--work-dir <path>", "Working directory", process.cwd())
     .action(async (code: string, opts: { workDir: string }) => {
       const workDir   = resolve(opts.workDir);
+      validateWorkDir(workDir);
       const available = getAvailableLocales();
 
       if (!available.includes(code)) {
