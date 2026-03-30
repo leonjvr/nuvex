@@ -77,4 +77,7 @@ export const API_PATHS = {
 
   // Apply configuration
   apply:                 ()             => `${API_PREFIX}/apply`,
+
+  // Tokens (bootstrap → admin exchange)
+  tokens:                ()             => `${API_PREFIX}/tokens`,
 } as const;
