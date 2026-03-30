@@ -47,7 +47,18 @@ const cardTitleStyle: React.CSSProperties = {
 export function Dashboard() {
   const navigate  = useNavigate();
   const { t }     = useTranslation();
-  const { client } = useAppConfig();
+  const { config, client } = useAppConfig();
+
+  // Redirect to settings on first visit if no API key is configured.
+  // Guard prevents a redirect loop if the user navigates back to Dashboard
+  // after dismissing settings without entering a key.
+  const hasRedirectedRef = useRef(false);
+  useEffect(() => {
+    if (!config.apiKey && !hasRedirectedRef.current) {
+      hasRedirectedRef.current = true;
+      navigate('/settings', { replace: true });
+    }
+  }, [config.apiKey, navigate]);
   const { health }  = useHealth();
   const divRes      = useDivisions();
   const agentRes    = useAgents();
