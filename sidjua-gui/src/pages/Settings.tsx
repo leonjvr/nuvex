@@ -15,6 +15,7 @@ import { useToast } from '../components/shared/Toast';
 import type { ApprovedProvider, ProviderConfigResponse } from '../api/types';
 import { StartOverModal } from '../components/overlay/StartOverModal';
 import { LanguageSelector } from '../components/shared/LanguageSelector';
+import { GUI_ERRORS, formatGuiError } from '../i18n/gui-errors';
 
 
 interface ProviderCardProps {
@@ -194,15 +195,15 @@ function ApiKeySection({ provider, isCustom, onSaved }: ApiKeySectionProps) {
       const result = await client.testProvider(body);
       if (result.status === 'ok') {
         setTestStatus('ok');
-        setTestMessage(result.message ?? 'Connection successful');
+        setTestMessage(result.message ?? 'Connection successful — AI provider is ready.');
         setResponseMs(result.response_time_ms ?? null);
       } else {
         setTestStatus('error');
-        setTestMessage(result.error ?? 'Connection failed');
+        setTestMessage(result.error ?? `${GUI_ERRORS['GUI-PROVIDER-001'].message} ${GUI_ERRORS['GUI-PROVIDER-001'].suggestion}`);
       }
     } catch (err: unknown) {
       setTestStatus('error');
-      setTestMessage(err instanceof Error ? err.message : 'Test failed');
+      setTestMessage(formatGuiError(err));
     } finally {
       setTesting(false);
     }
@@ -229,10 +230,10 @@ function ApiKeySection({ provider, isCustom, onSaved }: ApiKeySectionProps) {
         },
         agent_overrides: {},
       });
-      toast.success('Provider configured! Your agents are now ready.');
+      toast.success('Provider configured — your agents are now ready.');
       onSaved();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Save failed');
+      toast.error(formatGuiError(err));
     } finally {
       setSaving(false);
     }
@@ -415,7 +416,7 @@ function AdvancedMode({ catalog, config, onSaved }: AdvancedModeProps) {
       toast.success('Agent overrides saved.');
       onSaved();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Save failed');
+      toast.error(formatGuiError(err));
     }
   }
 
@@ -496,7 +497,7 @@ function ProviderSettings({ onConfigChange }: ProviderSettingsProps) {
         setMode(cfg.mode);
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load provider data');
+      toast.error(formatGuiError(err));
     } finally {
       setLoadingCatalog(false);
     }
@@ -510,10 +511,10 @@ function ProviderSettings({ onConfigChange }: ProviderSettingsProps) {
       await client.deleteProviderConfig();
       setCurrentConfig(null);
       setSelectedId(null);
-      toast.success('Provider config cleared.');
+      toast.success('Provider configuration cleared.');
       onConfigChange();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Reset failed');
+      toast.error(formatGuiError(err));
     }
   }
 
@@ -824,7 +825,7 @@ export function Settings() {
       await client.setErrorLogging(next);
     } catch (err: unknown) {
       setErrorLogging(!next);       // revert on failure
-      setErrorLoggingError(err instanceof Error ? err.message : 'Update failed');
+      setErrorLoggingError(formatGuiError(err));
     } finally {
       setErrorLoggingBusy(false);
     }
@@ -851,9 +852,9 @@ export function Settings() {
     const ok = await testConnection();
     setTesting(false);
     if (ok) {
-      toast.success('Connection successful!');
+      toast.success('Connection successful — server is reachable.');
     } else {
-      toast.error('Connection failed. Check URL and API key.');
+      toast.error(`${GUI_ERRORS['GUI-SETTINGS-002'].message} ${GUI_ERRORS['GUI-SETTINGS-002'].suggestion}`);
     }
   }
 

@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppConfig } from '../lib/config';
 import type { SidjuaApiClient } from '../api/client';
-import { ApiError } from '../api/client';
+import { formatGuiError, GUI_ERRORS } from '../i18n/gui-errors';
 
 export interface UseApiResult<T> {
   data:    T | null;
@@ -45,7 +45,7 @@ export function useApi<T>(
 
   const fetch = useCallback(() => {
     if (!client) {
-      setError('Not connected — configure server URL and API key in Settings.');
+      setError(`${GUI_ERRORS['GUI-CONN-005'].message} ${GUI_ERRORS['GUI-CONN-005'].suggestion}`);
       return;
     }
 
@@ -68,13 +68,7 @@ export function useApi<T>(
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) {
-          if (err instanceof ApiError) {
-            setError(err.message);
-          } else if (err instanceof Error) {
-            setError(err.message);
-          } else {
-            setError('Unknown error');
-          }
+          setError(formatGuiError(err));
         }
       })
       .finally(() => {

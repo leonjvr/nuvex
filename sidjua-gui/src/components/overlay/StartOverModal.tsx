@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppConfig } from '../../lib/config';
+import { formatGuiError } from '../../i18n/gui-errors';
 
 
 interface WorkspaceSummaryData {
@@ -110,7 +111,7 @@ export function StartOverModal({ onComplete, onCancel }: StartOverModalProps) {
       setBackupPath(data.backup_path);
       setPhase('learn');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Backup failed');
+      setError(formatGuiError(err));
       setPhase('error');
     }
   }, [client]);
@@ -123,7 +124,7 @@ export function StartOverModal({ onComplete, onCancel }: StartOverModalProps) {
       await client.post<{ cleared: boolean }>('/api/v1/workspace/wipe', undefined, 60_000);
       setPhase('done');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Wipe failed');
+      setError(formatGuiError(err));
       setPhase('error');
     }
   }, [client]);
