@@ -528,6 +528,18 @@ function ChatInput({
           Send
         </button>
       </div>
+      <div style={{
+        textAlign:  'center',
+        fontSize:   '11px',
+        color:      'var(--color-text-muted)',
+        padding:    '4px 0 0 0',
+        lineHeight: 1.3,
+      }}>
+        SIDJUA agents use AI models that can make mistakes. Please verify important information.
+        <span style={{ display: 'block', fontSize: '10px', opacity: 0.7, marginTop: '2px' }}>
+          SIDJUA 1.0 — Development Preview
+        </span>
+      </div>
     </div>
   );
 }

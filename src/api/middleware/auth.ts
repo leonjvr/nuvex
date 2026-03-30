@@ -34,7 +34,11 @@ import type { TokenStore }        from "../token-store.js";
 const logger = createLogger("api-server");
 
 /** Routes that bypass authentication (exact match) */
-const PUBLIC_PATHS = new Set(["/api/v1/health"]);
+// /api/v1/events is deliberately public: EventSource cannot send custom headers.
+// The handler enforces its own ticket-based auth (consumeTicket), so no Bearer
+// token is needed at the middleware layer.  Unauthenticated requests without a
+// valid ticket are rejected by the handler with AUTH-001.
+const PUBLIC_PATHS = new Set(["/api/v1/health", "/api/v1/events"]);
 
 /** Path prefixes that bypass authentication (GUI static files, SPA routes) */
 const PUBLIC_PREFIXES = [
