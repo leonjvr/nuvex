@@ -345,6 +345,14 @@ export interface LocaleSetResponse {
   locale:  string;
 }
 
+// ---- Tokens ----------------------------------------------------------------
+
+export interface TokenCreateResponse {
+  id:       string;
+  rawToken: string;
+  warning:  string;
+}
+
 // ---- API Error -------------------------------------------------------------
 
 export interface ApiErrorBody {
