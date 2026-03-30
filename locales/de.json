@@ -539,9 +539,6 @@
   "gui.settings.help.where_apikey": "Wo ist mein API-Schlüssel?",
   "gui.settings.help.apikey_command": "docker exec sidjua cat /app/.system/api-key",
   "gui.settings.help.container_note": "Der Containername sidjua ist der Standard. Falls du ihn umbenannt hast, nutze docker ps um den richtigen Namen zu finden.",
-  "gui.welcome.first_step_label": "Erster Schritt:",
-  "gui.welcome.first_step_text": "Gehe zu Einstellungen und trage deinen API-Schlüssel ein. Rufe ihn ab mit:",
-  "gui.welcome.first_step_command": "docker exec sidjua cat /app/.system/api-key",
   "gui.settings.show_api_key": "API-Schlüssel anzeigen",
   "gui.settings.hide_api_key": "API-Schlüssel verbergen",
   "gui.locale.server_restricted": "Sprache wurde in der App eingestellt. Servermeldungen erscheinen auf Englisch oder Deutsch.",
@@ -610,5 +607,11 @@
   "gui.shutdown_reminder": "Vor dem Ausschalten immer 'sidjua shutdown' ausführen.",
   "cli.start.crash_recovery": "▸ Absturz-Wiederherstellung: {tasks} unterbrochene Aufgabe(n) wiederhergestellt.\n",
   "cli.start.runtime_mode": "  Laufzeitmodus: {mode} (Checkpoint alle {interval}s)\n",
-  "email.threads_table_missing": "E-Mail-Threads-Tabelle nicht gefunden. Führe `sidjua email setup` aus oder starte zuerst den Messaging-Adapter."
+  "email.threads_table_missing": "E-Mail-Threads-Tabelle nicht gefunden. Führe `sidjua email setup` aus oder starte zuerst den Messaging-Adapter.",
+  "agent.tier.1": "Abteilungsleiter",
+  "agent.tier.2": "Teamleiter",
+  "agent.tier.3": "Arbeiter",
+  "agent.tier.desc.1": "T1 — Strategisches Denken; erfordert das leistungsfähigste LLM.",
+  "agent.tier.desc.2": "T2 — Mittelstufe; Standard-LLMs empfohlen.",
+  "agent.tier.desc.3": "T3 — Einfache, wiederholende Aufgaben; kostenlose LLMs sind ausreichend."
 }

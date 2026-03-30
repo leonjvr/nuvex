@@ -14,80 +14,6 @@ import { FIRST_RUN_READ_DELAY_MS } from '../../constants/firstRun';
 import { useTranslation } from '../../hooks/useTranslation';
 
 
-interface FirstStepHintProps {
-  label:           string;
-  text:            string;
-  command:         string;
-  settingsLabel:   string;
-  onGoToSettings?: () => void;
-}
-
-function FirstStepHint({ label, text, command, settingsLabel, onGoToSettings }: FirstStepHintProps) {
-  // Split the text around the localised Settings word so it can be a link
-  const idx  = settingsLabel ? text.indexOf(settingsLabel) : -1;
-  const before = idx >= 0 ? text.slice(0, idx) : text;
-  const after  = idx >= 0 ? text.slice(idx + settingsLabel.length) : '';
-
-  return (
-    <div
-      style={{
-        background:   'var(--color-accent-subtle, rgba(99,102,241,0.08))',
-        border:       '1px solid var(--color-accent-border, rgba(99,102,241,0.2))',
-        borderLeft:   '4px solid var(--color-accent)',
-        borderRadius: 'var(--radius-md)',
-        padding:      '16px 20px',
-        marginBottom: '24px',
-      }}
-    >
-      <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: 'var(--color-text)', lineHeight: 1.6 }}>
-        <strong>{label}</strong>{' '}
-        {idx >= 0 ? (
-          <>
-            {before}
-            {onGoToSettings ? (
-              <button
-                onClick={onGoToSettings}
-                style={{
-                  background:     'none',
-                  border:         'none',
-                  padding:        0,
-                  color:          'var(--color-accent)',
-                  fontWeight:     600,
-                  cursor:         'pointer',
-                  fontSize:       '14px',
-                  textDecoration: 'underline',
-                }}
-              >
-                {settingsLabel}
-              </button>
-            ) : (
-              <strong>{settingsLabel}</strong>
-            )}
-            {after}
-          </>
-        ) : (
-          text
-        )}
-      </p>
-      <code
-        style={{
-          display:      'block',
-          fontFamily:   'monospace',
-          fontSize:     '13px',
-          background:   'var(--color-bg)',
-          color:        'var(--color-text)',
-          padding:      '8px 12px',
-          borderRadius: 'var(--radius-sm)',
-          border:       '1px solid var(--color-border)',
-          userSelect:   'all',
-        }}
-      >
-        {command}
-      </code>
-    </div>
-  );
-}
-
 
 export interface FirstRunOverlayProps {
   onDismiss: () => void;
@@ -110,11 +36,6 @@ export function FirstRunOverlay({ onDismiss, onGoToSettings, networkError = fals
   const closing           = t('gui.overlay.closing');
   const fullText          = t('gui.overlay.text');
   const dismissLabel      = t('gui.overlay.dismiss');
-  const firstStepLabel    = t('gui.welcome.first_step_label');
-  const firstStepText     = t('gui.welcome.first_step_text');
-  const firstStepCommand  = t('gui.welcome.first_step_command');
-  const settingsLabel     = t('gui.nav.settings');
-
   // Countdown tick: button is always visible; becomes active at 0
   useEffect(() => {
     if (totalSeconds <= 0) { setCanProceed(true); return; }
@@ -239,15 +160,6 @@ export function FirstRunOverlay({ onDismiss, onGoToSettings, networkError = fals
         >
           {closing}
         </p>
-
-        {/* API key setup hint */}
-        <FirstStepHint
-          label={firstStepLabel}
-          text={firstStepText}
-          command={firstStepCommand}
-          settingsLabel={settingsLabel}
-          onGoToSettings={onGoToSettings}
-        />
 
         {/* Network error banner */}
         {networkError && (

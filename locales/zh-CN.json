@@ -547,9 +547,6 @@
   "gui.settings.help.where_apikey": "Where is my API key?",
   "gui.settings.help.apikey_command": "docker exec sidjua sidjua api-key show",
   "gui.settings.help.container_note": "The container name sidjua is the default. If you renamed it, use docker ps to find the correct name.",
-  "gui.welcome.first_step_label": "First step:",
-  "gui.welcome.first_step_text": "Go to Settings and enter your API key. You can find it with:",
-  "gui.welcome.first_step_command": "docker exec sidjua sidjua api-key show",
   "gui.settings.show_api_key": "Show API key",
   "gui.settings.hide_api_key": "Hide API key",
   "gui.locale.server_restricted": "Language set in the app. Server messages will appear in English or German.",
@@ -618,5 +615,11 @@
   "gui.shutdown_reminder": "Always run 'sidjua shutdown' before turning off your computer.",
   "cli.start.crash_recovery": "▸ Crash recovery: {tasks} interrupted task(s) recovered.\n",
   "cli.start.runtime_mode": "  Runtime:  {mode} (checkpoint every {interval}s)\n",
-  "email.threads_table_missing": "未找到邮件线程表。请运行 `sidjua email setup` 或先启动消息适配器。"
+  "email.threads_table_missing": "未找到邮件线程表。请运行 `sidjua email setup` 或先启动消息适配器。",
+  "agent.tier.1": "部门负责人",
+  "agent.tier.2": "团队领导",
+  "agent.tier.3": "员工",
+  "agent.tier.desc.1": "T1 — Strategic reasoning; requires the most capable LLM.",
+  "agent.tier.desc.2": "T2 — Mid-level reasoning; standard LLMs recommended.",
+  "agent.tier.desc.3": "T3 — Simple, repetitive tasks; free-tier LLMs are fine."
 }
