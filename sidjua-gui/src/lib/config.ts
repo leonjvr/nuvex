@@ -47,6 +47,8 @@ export interface AppConfigContextValue {
   bootstrapping: boolean;
   /** Build metadata from /api/v1/health — null until fetched. */
   buildInfo: BuildInfo | null;
+  /** True when the active key came from auto-bootstrap, not a user-saved key. */
+  isBootstrapSession: boolean;
   setConfig: (config: AppConfig) => void;
   testConnection: () => Promise<boolean>;
   client: SidjuaApiClient | null;
@@ -92,6 +94,23 @@ export function setRuntimeApiKey(key: string): void {
  */
 export function getRuntimeApiKey(): string {
   return _runtimeApiKey;
+}
+
+// ---------------------------------------------------------------------------
+// Bootstrap session flag
+//
+// True when the current API key came from the automatic bootstrap exchange
+// (server-injected key or stored session token on page reload) rather than
+// from a user-initiated save in Settings.  Consumers use this to:
+//   - Hide the exchanged admin token from the Settings key field
+//   - Suppress the FirstRun overlay until the user has explicitly saved a key
+// ---------------------------------------------------------------------------
+
+let _isBootstrapSession = false;
+
+/** True when the active key was set by auto-bootstrap, not by the user. */
+export function getIsBootstrapSession(): boolean {
+  return _isBootstrapSession;
 }
 
 /** Load server URL from localStorage. API key is intentionally excluded. */
@@ -177,13 +196,14 @@ async function exchangeForAdminToken(serverUrl: string, bootstrapKey: string): P
 
 
 export const AppConfigContext = createContext<AppConfigContextValue>({
-  config:          DEFAULT_CONFIG,
-  status:          'unknown',
-  bootstrapping:   false,
-  buildInfo:       null,
-  setConfig:       () => undefined,
-  testConnection:  async () => false,
-  client:          null,
+  config:              DEFAULT_CONFIG,
+  status:              'unknown',
+  bootstrapping:       false,
+  buildInfo:           null,
+  isBootstrapSession:  false,
+  setConfig:           () => undefined,
+  testConnection:      async () => false,
+  client:              null,
 });
 
 export function useAppConfig(): AppConfigContextValue {
@@ -192,9 +212,10 @@ export function useAppConfig(): AppConfigContextValue {
 
 
 export function AppConfigProvider({ children }: { children: ReactNode }) {
-  const [config, setConfigState] = useState<AppConfig>(loadConfig);
-  const [status, setStatus]      = useState<ConnectionStatus>('unknown');
-  const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
+  const [config, setConfigState]               = useState<AppConfig>(loadConfig);
+  const [status, setStatus]                    = useState<ConnectionStatus>('unknown');
+  const [buildInfo, setBuildInfo]              = useState<BuildInfo | null>(null);
+  const [isBootstrapSession, setIsBootstrap]   = useState(false);
 
   // Guard: max 1 auth-failure recovery cycle to prevent infinite loops
   const rebootstrapCount = useRef(0);
@@ -217,10 +238,14 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const setConfig = useCallback((next: AppConfig) => {
-    // When the user manually sets a new key, attempt to exchange it for an
-    // admin session token.  If exchange succeeds, store the admin token and
-    // use it; otherwise fall back to the provided key as-is (e.g. the user
-    // may have entered an admin token directly).
+    // User-initiated save: clear the bootstrap session flag so the FirstRun
+    // overlay and Settings key field reflect the actual user-chosen key.
+    _isBootstrapSession = false;
+    setIsBootstrap(false);
+
+    // Attempt to exchange for an admin session token.  If exchange succeeds,
+    // store the admin token and use it; otherwise use the provided key as-is
+    // (e.g. the user may have entered an admin token directly).
     void (async () => {
       if (next.apiKey) {
         const adminToken = await exchangeForAdminToken(next.serverUrl, next.apiKey);
@@ -302,8 +327,10 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
 
     const storedToken = loadStoredSessionToken();
     if (storedToken) {
-      // Reuse persisted admin token across page reloads
+      // Reuse persisted admin token across page reloads — mark as bootstrap session
       const serverUrl = config.serverUrl || window.location.origin;
+      _isBootstrapSession = true;
+      setIsBootstrap(true);
       setConfigState((prev) => ({ ...prev, serverUrl, apiKey: storedToken }));
       return;
     }
@@ -313,6 +340,9 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
       const serverUrl = injected.server_url || config.serverUrl || window.location.origin;
       void (async () => {
         const adminToken = await exchangeForAdminToken(serverUrl, injected.api_key);
+        // Either path (exchanged token or fallback key) is a bootstrap session
+        _isBootstrapSession = true;
+        setIsBootstrap(true);
         if (adminToken) {
           saveSessionToken(adminToken);
           setConfigState({ serverUrl, apiKey: adminToken });
@@ -329,8 +359,9 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
   const value: AppConfigContextValue = {
     config,
     status,
-    bootstrapping:  false,  // no longer used — kept for interface stability
+    bootstrapping:      false,  // no longer used — kept for interface stability
     buildInfo,
+    isBootstrapSession,
     setConfig,
     testConnection,
     client,

@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { useAppConfig } from '../lib/config';
+import { useAppConfig, getIsBootstrapSession } from '../lib/config';
 import type { AppConfig, BuildInfo } from '../lib/config';
 import type { LoggingStatus } from '../api/types';
 import { useApi } from '../hooks/useApi';
@@ -795,7 +795,12 @@ export function Settings() {
   const { t } = useTranslation();
   const toast = useToast();
 
-  const [form,          setForm]          = useState<AppConfig>({ ...config });
+  const [form,          setForm]          = useState<AppConfig>({
+    ...config,
+    // Don't pre-fill the key field with the auto-exchanged bootstrap token —
+    // the user must explicitly enter their own key.
+    apiKey: getIsBootstrapSession() ? '' : config.apiKey,
+  });
   const [testing,       setTesting]       = useState(false);
   const [providerKey,   setProviderKey]   = useState(0); // force re-render on provider save
   const [showStartOver, setShowStartOver] = useState(false);

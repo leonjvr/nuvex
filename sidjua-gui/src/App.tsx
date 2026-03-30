@@ -27,13 +27,14 @@ import { Settings }     from './pages/Settings';
 type FirstRunState = 'loading' | 'completed' | 'pending' | 'error';
 
 function AppWithFirstRunGate() {
-  const { config } = useAppConfig();
+  const { config, isBootstrapSession } = useAppConfig();
 
   const [firstRunState, setFirstRunState] = useState<FirstRunState>('loading');
 
   const checkFirstRun = useCallback(async () => {
-    // If no credentials yet, skip overlay — user must configure server first
-    if (!config.serverUrl || !config.apiKey) {
+    // If no credentials yet, or key came from auto-bootstrap (not user-saved),
+    // skip overlay — show it only after the user has explicitly configured their key.
+    if (!config.serverUrl || !config.apiKey || isBootstrapSession) {
       setFirstRunState('completed');
       return;
     }
@@ -47,7 +48,7 @@ function AppWithFirstRunGate() {
       // Network error — show error state with retry button; do NOT auto-complete
       setFirstRunState('error');
     }
-  }, [config.serverUrl, config.apiKey]);
+  }, [config.serverUrl, config.apiKey, isBootstrapSession]);
 
   useEffect(() => {
     void checkFirstRun();
