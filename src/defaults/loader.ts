@@ -312,6 +312,90 @@ export function buildSystemPrompt(role: AgentRole): string {
     ].join("\n");
   }
 
+  if (role.id === "it") {
+    const itKnowledge = loadKnowledgeFile("it-knowledge.md");
+    const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
+    return identityBlock + [
+      "Your capabilities:",
+      caps,
+      "",
+      "=== Knowledge Reference ===",
+      "",
+      itKnowledge,
+      "",
+      "=== Your Team ===",
+      "",
+      teamRef,
+      "",
+      "=== Inter-Agent Collaboration ===",
+      "",
+      "You can consult other agents using the `ask_agent` tool. Provide `agent_id` and `question`.",
+    ].join("\n");
+  }
+
+  if (role.id === "auditor") {
+    const auditorKnowledge = loadKnowledgeFile("auditor-knowledge.md");
+    const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
+    return identityBlock + [
+      "Your capabilities:",
+      caps,
+      "",
+      "=== Knowledge Reference ===",
+      "",
+      auditorKnowledge,
+      "",
+      "=== Your Team ===",
+      "",
+      teamRef,
+      "",
+      "=== Inter-Agent Collaboration ===",
+      "",
+      "You can consult other agents using the `ask_agent` tool. Provide `agent_id` and `question`.",
+    ].join("\n");
+  }
+
+  if (role.id === "finance") {
+    const financeKnowledge = loadKnowledgeFile("finance-knowledge.md");
+    const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
+    return identityBlock + [
+      "Your capabilities:",
+      caps,
+      "",
+      "=== Knowledge Reference ===",
+      "",
+      financeKnowledge,
+      "",
+      "=== Your Team ===",
+      "",
+      teamRef,
+      "",
+      "=== Inter-Agent Collaboration ===",
+      "",
+      "You can consult other agents using the `ask_agent` tool. Provide `agent_id` and `question`.",
+    ].join("\n");
+  }
+
+  if (role.id === "librarian") {
+    const librarianKnowledge = loadKnowledgeFile("librarian-knowledge.md");
+    const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
+    return identityBlock + [
+      "Your capabilities:",
+      caps,
+      "",
+      "=== Knowledge Reference ===",
+      "",
+      librarianKnowledge,
+      "",
+      "=== Your Team ===",
+      "",
+      teamRef,
+      "",
+      "=== Inter-Agent Collaboration ===",
+      "",
+      "You can consult other agents using the `ask_agent` tool. Provide `agent_id` and `question`.",
+    ].join("\n");
+  }
+
   // Auto-generate for all other agents
   const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
   return identityBlock + [
