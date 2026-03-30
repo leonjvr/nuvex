@@ -29,6 +29,8 @@ import { registerExecutionRoutes }   from "./execution.js";
 import { registerOutputRoutes }      from "./outputs.js";
 import { registerSecretRoutes }      from "./secrets.js";
 import { registerSseTicketRoutes }   from "./sse-ticket.js";
+import { registerEventRoutes }       from "./events.js";
+import { EventStreamManager }        from "../sse/event-stream.js";
 import { registerSelftestApiRoutes }  from "./selftest.js";
 import { registerIntegrationRoutes }  from "./integration.js";
 import type { IntegrationRouteServices } from "./integration.js";
@@ -83,6 +85,7 @@ export {
   registerMessagingRoutes,
   registerScheduleRoutes,
   registerTokenRoutes,
+  registerEventRoutes,
 };
 
 
@@ -112,6 +115,8 @@ export interface AllRouteServices {
   eventBus?:      TaskEventBus | null;
   /** P269: Scoped API token store — enables token-based auth + token CRUD endpoints. */
   tokenStore?:    TokenStore | null;
+  /** Returns the current API key — used by the SSE events handler for ticket validation. */
+  getApiKey?:     () => string;
 }
 
 
@@ -177,6 +182,14 @@ export function registerAllRoutes(app: Hono, services: AllRouteServices = {}): v
 
   // SSE ticket route (short-lived tickets for EventSource connections)
   registerSseTicketRoutes(app, {});
+
+  // SSE events stream (consumes tickets, sends real-time events to EventSource clients)
+  const sseManager = new EventStreamManager();
+  registerEventRoutes(app, {
+    getApiKey: services.getApiKey ?? (() => ""),
+    manager:   sseManager,
+    db:        db ?? null,
+  });
 
   // Selftest routes (no DB required)
   registerSelftestApiRoutes(app, workDir);

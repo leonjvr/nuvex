@@ -401,6 +401,7 @@ export function registerServerCommands(program: Command): void {
         secrets:      null,
         integration:  null,
         tokenStore,
+        getApiKey:    getActiveApiKey,
       });
 
       // ── GUI static file serving ───────────────────────────────────────────────
