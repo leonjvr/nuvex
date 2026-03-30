@@ -266,7 +266,7 @@ export function FirstRunOverlay({ onDismiss, onGoToSettings, networkError = fals
             }}
           >
             <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-danger)' }}>
-              Could not reach the server. Check your connection and try again.
+              Cannot connect to the SIDJUA server. Make sure the container is running: <code>docker start sidjua</code>
             </p>
             {onRetry && (
               <button

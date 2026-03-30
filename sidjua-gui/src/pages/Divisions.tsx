@@ -8,6 +8,7 @@ import { useAppConfig } from '../lib/config';
 import { AgentIcon }    from '../components/shared/AgentIcon';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import type { StarterDivisionsResponse } from '../api/types';
+import { GUI_ERRORS } from '../i18n/gui-errors';
 
 const cardStyle: React.CSSProperties = {
   background:   'var(--color-surface)',
@@ -50,7 +51,7 @@ export function Divisions() {
         color:        'var(--color-warning)',
         fontSize:     '13px',
       }}>
-        <strong>Not connected</strong> — configure your server URL and API key in Settings.
+        <strong>{GUI_ERRORS['GUI-CONN-005'].message}</strong> {GUI_ERRORS['GUI-CONN-005'].suggestion}
       </div>
     );
   }

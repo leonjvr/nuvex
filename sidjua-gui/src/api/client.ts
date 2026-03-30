@@ -3,6 +3,7 @@
 // Dual licensed: AGPL-3.0 + SIDJUA Commercial License. See LICENSE.
 
 import { API_PATHS } from './paths';
+import { GUI_ERRORS } from '../i18n/gui-errors';
 import type {
   HealthStatus,
   SystemInfo,
@@ -70,6 +71,8 @@ export class ApiError extends Error {
     public readonly type: ApiErrorType,
     public readonly status: number = 0,
     public readonly retryable: boolean = false,
+    /** GUI error catalog code — used by formatGuiError() for i18n-ready display. */
+    public readonly guiCode?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -82,18 +85,25 @@ export class ApiError extends Error {
 
 /**
  * Classify an HTTP error response into a typed ApiError.
- * Truncates long body text to 200 characters.
+ * Returns a user-friendly message (see gui-errors.ts) instead of raw status codes.
  */
-function classifyHttpError(status: number, body: string): ApiError {
-  const detail = body.length > 200 ? `${body.slice(0, 200)}…` : body;
-  const suffix = detail ? `: ${detail}` : '';
+function classifyHttpError(status: number, _body: string): ApiError {
   if (status === 401 || status === 403) {
-    return new ApiError(`Authentication error (${status})`, ApiErrorType.AUTH, status, false);
+    return new ApiError(
+      `${GUI_ERRORS['GUI-AUTH-002'].message} ${GUI_ERRORS['GUI-AUTH-002'].suggestion}`,
+      ApiErrorType.AUTH, status, false, 'GUI-AUTH-002',
+    );
   }
   if (status >= 500) {
-    return new ApiError(`Server error (${status})${suffix}`, ApiErrorType.SERVER, status, true);
+    return new ApiError(
+      `${GUI_ERRORS['GUI-CONN-002'].message} ${GUI_ERRORS['GUI-CONN-002'].suggestion}`,
+      ApiErrorType.SERVER, status, true, 'GUI-CONN-002',
+    );
   }
-  return new ApiError(`Request failed (${status})${suffix}`, ApiErrorType.CLIENT, status, false);
+  return new ApiError(
+    `${GUI_ERRORS['GUI-CONN-003'].message} ${GUI_ERRORS['GUI-CONN-003'].suggestion}`,
+    ApiErrorType.CLIENT, status, false, 'GUI-CONN-003',
+  );
 }
 
 /**
@@ -103,17 +113,21 @@ function classifyHttpError(status: number, body: string): ApiError {
 function classifyFetchError(err: unknown): ApiError {
   if (err instanceof ApiError) return err;
   if (err instanceof DOMException && err.name === 'AbortError') {
-    return new ApiError('Request aborted', ApiErrorType.ABORTED, 0, false);
+    return new ApiError(
+      `${GUI_ERRORS['GUI-CONN-004'].message} ${GUI_ERRORS['GUI-CONN-004'].suggestion}`,
+      ApiErrorType.ABORTED, 0, false, 'GUI-CONN-004',
+    );
   }
   if (err instanceof TypeError) {
     // fetch() throws TypeError on network-level failures (DNS, refused connection)
-    return new ApiError(`Network error: ${err.message}`, ApiErrorType.NETWORK, 0, true);
+    return new ApiError(
+      `${GUI_ERRORS['GUI-CONN-001'].message} ${GUI_ERRORS['GUI-CONN-001'].suggestion}`,
+      ApiErrorType.NETWORK, 0, true, 'GUI-CONN-001',
+    );
   }
   return new ApiError(
-    err instanceof Error ? err.message : String(err),
-    ApiErrorType.NETWORK,
-    0,
-    true,
+    `${GUI_ERRORS['GUI-CONN-001'].message} ${GUI_ERRORS['GUI-CONN-001'].suggestion}`,
+    ApiErrorType.NETWORK, 0, true, 'GUI-CONN-001',
   );
 }
 

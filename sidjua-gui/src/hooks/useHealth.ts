@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppConfig } from '../lib/config';
 import type { HealthStatus } from '../api/types';
+import { GUI_ERRORS } from '../i18n/gui-errors';
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -25,7 +26,7 @@ export function useHealth() {
 
   useEffect(() => {
     if (!client) {
-      setError('Not connected');
+      setError(`${GUI_ERRORS['GUI-CONN-005'].message} ${GUI_ERRORS['GUI-CONN-005'].suggestion}`);
       return;
     }
 
@@ -42,7 +43,7 @@ export function useHealth() {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Health check failed');
+          setError(err instanceof Error ? err.message : `${GUI_ERRORS['GUI-HEALTH-001'].message} ${GUI_ERRORS['GUI-HEALTH-001'].suggestion}`);
         }
       } finally {
         if (!cancelled) setLoading(false);

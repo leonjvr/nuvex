@@ -22,6 +22,7 @@ import { AgentCard }      from '../components/shared/AgentCard';
 import { AgentIcon }      from '../components/shared/AgentIcon';
 import type { ActivityEvent } from '../components/shared/ActivityFeed';
 import type { Agent, AgentLifecycleStatus, TasksResponse, AuditResponse, StarterAgentsResponse, StarterAgent, ProviderConfigResponse, ProviderCatalogResponse } from '../api/types';
+import { formatGuiError } from '../i18n/gui-errors';
 
 
 const FLASH_DURATION_MS = 1_500;
@@ -98,7 +99,7 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
       await client.patchAgent(agentId, { provider, model });
       agentRes.refetch();
     } catch (err: unknown) {
-      setPatchError(err instanceof Error ? err.message : 'Update failed');
+      setPatchError(formatGuiError(err));
     }
   }
 
@@ -111,7 +112,7 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
       else                    await client.stopAgent(agentId);
       agentRes.refetch();
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Action failed');
+      setActionError(formatGuiError(err));
     } finally {
       setActioning(null);
     }

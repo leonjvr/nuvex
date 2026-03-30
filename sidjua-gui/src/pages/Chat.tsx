@@ -11,6 +11,7 @@ import { useApi }        from '../hooks/useApi';
 import { AgentIcon }     from '../components/shared/AgentIcon';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import type { StarterAgentsResponse, ProviderConfigResponse } from '../api/types';
+import { GUI_ERRORS } from '../i18n/gui-errors';
 
 
 interface Message {
@@ -625,12 +626,15 @@ export function Chat() {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ message: 'Request failed' })) as { message?: string; error?: string };
-        const errorText = body.message ?? body.error ?? `HTTP ${res.status}`;
+        const body = await res.json().catch(() => ({})) as { message?: string; error?: string };
+        const backendMsg = body.message ?? body.error;
+        const errorText = backendMsg
+          ? backendMsg
+          : `${GUI_ERRORS['GUI-CHAT-001'].message} ${GUI_ERRORS['GUI-CHAT-001'].suggestion}`;
         setMessages((prev) => [...prev, {
           id:        assistantId,
           role:      'assistant',
-          content:   `Error: ${errorText}`,
+          content:   errorText,
           timestamp: new Date().toISOString(),
         }]);
         return;
@@ -640,7 +644,7 @@ export function Chat() {
         setMessages((prev) => [...prev, {
           id:        assistantId,
           role:      'assistant',
-          content:   'Error: No response from server.',
+          content:   `${GUI_ERRORS['GUI-CHAT-002'].message} ${GUI_ERRORS['GUI-CHAT-002'].suggestion}`,
           timestamp: new Date().toISOString(),
         }]);
         return;
@@ -792,13 +796,14 @@ export function Chat() {
         color:        'var(--color-warning)',
         fontSize:     '13px',
       }}>
-        <strong>Not connected.</strong> Configure your server URL and API key in{' '}
+        <strong>{GUI_ERRORS['GUI-CONN-005'].message}</strong>{' '}
         <button
           onClick={() => navigate('/settings')}
           style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit' }}
         >
-          Settings
-        </button>.
+          Open Settings
+        </button>{' '}
+        to enter your server URL and API key.
       </div>
     );
   }

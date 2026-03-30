@@ -3,6 +3,7 @@
 // Dual licensed: AGPL-3.0 + SIDJUA Commercial License. See LICENSE.
 
 import React, { Component, type ReactNode, type ErrorInfo } from 'react';
+import { GUI_ERRORS } from '../../i18n/gui-errors';
 
 interface Props {
   children: ReactNode;
@@ -46,9 +47,9 @@ export class ErrorBoundary extends Component<Props, State> {
             color:           'var(--color-danger)',
           }}
         >
-          <p style={{ fontWeight: 600, marginBottom: '8px' }}>Something went wrong</p>
+          <p style={{ fontWeight: 600, marginBottom: '8px' }}>{GUI_ERRORS['GUI-GENERIC-001'].message}</p>
           <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
-            {this.state.error?.message ?? 'Unknown error'}
+            {this.state.error?.message ?? GUI_ERRORS['GUI-GENERIC-001'].suggestion}
           </p>
           <button
             onClick={this.handleReset}

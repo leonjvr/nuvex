@@ -12,7 +12,7 @@ import { formatTime, formatRelative, todayIso } from '../lib/format';
 import { downloadJson, downloadCsv } from '../lib/download';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import type { AuditEntry, AuditResponse } from '../api/types';
-import { ApiError } from '../api/client';
+import { formatGuiError, GUI_ERRORS } from '../i18n/gui-errors';
 
 
 const PAGE_SIZE = 50;
@@ -239,7 +239,7 @@ export function AuditLog() {
   }, [selected]);
 
   const fetch = useCallback(async (fetchOffset = 0) => {
-    if (!client) { setError('Not connected'); return; }
+    if (!client) { setError(`${GUI_ERRORS['GUI-CONN-005'].message} ${GUI_ERRORS['GUI-CONN-005'].suggestion}`); return; }
     setLoading(true);
     setError(null);
     try {
@@ -258,7 +258,7 @@ export function AuditLog() {
       setTotal(res.total);
       setOffset(fetchOffset);
     } catch (err: unknown) {
-      setError(err instanceof ApiError ? `API ${err.status}: ${err.message}` : String(err));
+      setError(formatGuiError(err));
     } finally {
       setLoading(false);
     }
