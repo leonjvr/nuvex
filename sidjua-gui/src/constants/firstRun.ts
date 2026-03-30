@@ -12,7 +12,7 @@
 
 
 /** Milliseconds the user must wait before the dismiss button appears. */
-export const FIRST_RUN_READ_DELAY_MS = 10_000;
+export const FIRST_RUN_READ_DELAY_MS = 5_000;
 
 
 export const EXPECTATIONS_HEADING = "Your Office, Your Decisions";

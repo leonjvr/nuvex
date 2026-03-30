@@ -181,7 +181,8 @@ export class SidjuaSSEClient {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.opts.apiKey}`,
-        'Accept': 'application/json',
+        'Content-Type':  'application/json',
+        'Accept':        'application/json',
       },
       signal: AbortSignal.timeout(10_000),
     });

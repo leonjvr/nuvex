@@ -176,7 +176,7 @@ const ERROR_REGISTRY: Readonly<Record<string, ErrorCodeEntry>> = {
   "CHAT-001": { code: "CHAT-001", category: ErrorCategory.CHAT, message: "Message must not be empty",           recoverable: false, suggestion: "Provide a non-empty message" },
   "CHAT-002": { code: "CHAT-002", category: ErrorCategory.CHAT, message: "Agent not found",                    recoverable: false, suggestion: "Check agent ID" },
   "CHAT-003": { code: "CHAT-003", category: ErrorCategory.CHAT, message: "No LLM provider configured",         recoverable: true,  suggestion: "Configure a provider in Settings" },
-  "CHAT-004": { code: "CHAT-004", category: ErrorCategory.CHAT, message: "LLM request failed",                 recoverable: true,  suggestion: "Check API key and provider status" },
+  "CHAT-004": { code: "CHAT-004", category: ErrorCategory.CHAT, message: "LLM request failed",                 recoverable: true,  suggestion: "Check your API key and provider status. Free providers may have rate limits or temporary outages." },
 
   // Provider config
   "PCFG-001": { code: "PCFG-001", category: ErrorCategory.PROVIDER_CONFIG, message: "Provider not found in catalog",          recoverable: false, suggestion: "Use a provider id from GET /api/v1/provider/catalog" },

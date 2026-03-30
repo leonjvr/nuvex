@@ -443,9 +443,10 @@ export function registerChatRoutes(app: Hono, services: ChatRouteServices = {}):
 
           if (!firstRes.ok) {
             let errMsg = "LLM request failed";
-            if (firstRes.status === 401 || firstRes.status === 403) errMsg = "Invalid API key";
-            else if (firstRes.status === 429) errMsg = "Rate limit reached. Please wait a moment and try again.";
-            else if (firstRes.status >= 500)  errMsg = "Provider server error";
+            if (firstRes.status === 401 || firstRes.status === 403) errMsg = "Invalid API key — check your provider settings.";
+            else if (firstRes.status === 429) errMsg = "Rate limit reached. Free providers have strict limits — please wait a moment or consider switching to a paid provider.";
+            else if (firstRes.status >= 500)  errMsg = "The AI provider is temporarily unavailable. Free providers can be less reliable — if this persists, consider a paid provider or a local model.";
+            else errMsg = `The AI provider returned an error (${firstRes.status}). If you are using a free provider, connection issues may occur. Consider a paid provider or a local model for better reliability.`;
 
             logger.warn("chat_llm_error", "LLM returned error status", {
               metadata: { agent_id: agentId, http_status: firstRes.status },
@@ -723,9 +724,10 @@ export function registerChatRoutes(app: Hono, services: ChatRouteServices = {}):
 
           if (!res.ok) {
             let errMsg = "LLM request failed";
-            if (res.status === 401 || res.status === 403) errMsg = "Invalid API key";
-            else if (res.status === 429) errMsg = "Rate limit reached. Please wait a moment and try again.";
-            else if (res.status >= 500)  errMsg = "Provider server error";
+            if (res.status === 401 || res.status === 403) errMsg = "Invalid API key — check your provider settings.";
+            else if (res.status === 429) errMsg = "Rate limit reached. Free providers have strict limits — please wait a moment or consider switching to a paid provider.";
+            else if (res.status >= 500)  errMsg = "The AI provider is temporarily unavailable. Free providers can be less reliable — if this persists, consider a paid provider or a local model.";
+            else errMsg = `The AI provider returned an error (${res.status}). If you are using a free provider, connection issues may occur. Consider a paid provider or a local model for better reliability.`;
 
             logger.warn("chat_llm_error", "LLM returned error status", {
               metadata: { agent_id: agentId, http_status: res.status },
