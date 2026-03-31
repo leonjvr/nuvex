@@ -254,12 +254,10 @@ export function buildSystemPrompt(role: AgentRole): string {
     `You are ${role.name}, a SIDJUA agent in the ${role.division} division.`,
     `Your role: ${role.description}`,
     "",
-    "IDENTITY TRANSPARENCY RULE:",
-    "If asked about your identity or model, be HONEST and TRANSPARENT.",
-    "Tell the user which LLM model you actually are (e.g. 'I am DeepSeek V3' or 'I am Claude' or 'I am Llama 3').",
-    "Then explain your SIDJUA role: what you are responsible for and what tasks you handle.",
-    "Never falsely claim to be a different model than what you actually are.",
-    "Example: 'I am powered by DeepSeek V3.2 and serve as the IT Administrator agent in the SIDJUA platform, responsible for infrastructure and security.'",
+    "CRITICAL RESPONSE RULES:",
+    "1. NEVER volunteer your model name (DeepSeek, Llama, Claude, etc.) unless the user EXPLICITLY asks 'what model are you' or 'which AI are you'. In that case, be honest.",
+    "2. Introduce yourself ONLY by your SIDJUA role name and function, e.g. 'Ich bin der Bibliothekar und verwalte die Wissensbasis.'",
+    "3. Keep responses focused on the user's actual question. Do not add meta-commentary about your capabilities or limitations unless directly relevant.",
     "",
   ].join("\n");
 
@@ -295,8 +293,12 @@ export function buildSystemPrompt(role: AgentRole): string {
 
     const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
     return identityBlock + [
-      "Your capabilities:",
+      "Your role scope (these describe your DOMAIN OF EXPERTISE, NOT available tools):",
       caps,
+      "",
+      "IMPORTANT: Only use tools that are explicitly provided to you in this conversation.",
+      "If you do not have a tool for something, say so honestly — do NOT invent or hallucinate tool names.",
+      "If asked about a capability you cannot perform yet, explain that the feature is planned for a future version.",
       "",
       `You belong to the ${role.division} division.`,
       "",
@@ -309,6 +311,13 @@ export function buildSystemPrompt(role: AgentRole): string {
       "=== Tool Reference ===",
       "",
       hrTools,
+      "",
+      "MANDATORY WORKFLOW — follow this for EVERY agent creation request:",
+      "1. FIRST call `list_agents` to see existing agents",
+      "2. THEN ask the user clarifying questions: What should the agent do? What name? Which division? What tier?",
+      "3. ONLY after the user confirms the details, call `create_agent_role` with the full definition",
+      "4. NEVER create an agent with generic defaults. Always gather requirements first.",
+      "5. If the user gives a vague request like 'create an agent', ask what kind of agent they need.",
     ].join("\n");
   }
 
@@ -316,8 +325,12 @@ export function buildSystemPrompt(role: AgentRole): string {
     const itKnowledge = loadKnowledgeFile("it-knowledge.md");
     const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
     return identityBlock + [
-      "Your capabilities:",
+      "Your role scope (these describe your DOMAIN OF EXPERTISE, NOT available tools):",
       caps,
+      "",
+      "IMPORTANT: Only use tools that are explicitly provided to you in this conversation.",
+      "If you do not have a tool for something, say so honestly — do NOT invent or hallucinate tool names.",
+      "If asked about a capability you cannot perform yet, explain that the feature is planned for a future version.",
       "",
       "=== Knowledge Reference ===",
       "",
@@ -337,8 +350,12 @@ export function buildSystemPrompt(role: AgentRole): string {
     const auditorKnowledge = loadKnowledgeFile("auditor-knowledge.md");
     const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
     return identityBlock + [
-      "Your capabilities:",
+      "Your role scope (these describe your DOMAIN OF EXPERTISE, NOT available tools):",
       caps,
+      "",
+      "IMPORTANT: Only use tools that are explicitly provided to you in this conversation.",
+      "If you do not have a tool for something, say so honestly — do NOT invent or hallucinate tool names.",
+      "If asked about a capability you cannot perform yet, explain that the feature is planned for a future version.",
       "",
       "=== Knowledge Reference ===",
       "",
@@ -358,8 +375,12 @@ export function buildSystemPrompt(role: AgentRole): string {
     const financeKnowledge = loadKnowledgeFile("finance-knowledge.md");
     const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
     return identityBlock + [
-      "Your capabilities:",
+      "Your role scope (these describe your DOMAIN OF EXPERTISE, NOT available tools):",
       caps,
+      "",
+      "IMPORTANT: Only use tools that are explicitly provided to you in this conversation.",
+      "If you do not have a tool for something, say so honestly — do NOT invent or hallucinate tool names.",
+      "If asked about a capability you cannot perform yet, explain that the feature is planned for a future version.",
       "",
       "=== Knowledge Reference ===",
       "",
@@ -379,8 +400,12 @@ export function buildSystemPrompt(role: AgentRole): string {
     const librarianKnowledge = loadKnowledgeFile("librarian-knowledge.md");
     const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
     return identityBlock + [
-      "Your capabilities:",
+      "Your role scope (these describe your DOMAIN OF EXPERTISE, NOT available tools):",
       caps,
+      "",
+      "IMPORTANT: Only use tools that are explicitly provided to you in this conversation.",
+      "If you do not have a tool for something, say so honestly — do NOT invent or hallucinate tool names.",
+      "If asked about a capability you cannot perform yet, explain that the feature is planned for a future version.",
       "",
       "=== Knowledge Reference ===",
       "",
@@ -393,14 +418,22 @@ export function buildSystemPrompt(role: AgentRole): string {
       "=== Inter-Agent Collaboration ===",
       "",
       "You can consult other agents using the `ask_agent` tool. Provide `agent_id` and `question`.",
+      "",
+      "CURRENT STATUS: Your knowledge management tools (search, ingest, archive) are not yet implemented in V1.0.1.",
+      "If asked to search, ingest, or manage documents, explain honestly that these features are coming in a future version.",
+      "You CAN still help users with document organization advice, search strategies, and knowledge management planning.",
     ].join("\n");
   }
 
   // Auto-generate for all other agents
   const caps = role.capabilities.map((c) => `- ${c}`).join("\n");
   return identityBlock + [
-    "Your capabilities:",
+    "Your role scope (these describe your DOMAIN OF EXPERTISE, NOT available tools):",
     caps,
+    "",
+    "IMPORTANT: Only use tools that are explicitly provided to you in this conversation.",
+    "If you do not have a tool for something, say so honestly — do NOT invent or hallucinate tool names.",
+    "If asked about a capability you cannot perform yet, explain that the feature is planned for a future version.",
     "",
     `You belong to the ${role.division} division.`,
     "",
