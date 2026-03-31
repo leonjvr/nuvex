@@ -272,6 +272,9 @@ const MAX_TOOL_ITERATIONS = 5;
 /** XML fallback pattern: <tool_call>{"tool":"name","parameters":{...}}</tool_call> */
 const XML_TOOL_CALL_RE = /<tool_call>([\s\S]*?)<\/tool_call>/g;
 
+/** Llama-style: <function=tool_name>{"param":"value"}</function> */
+const LLAMA_TOOL_CALL_RE = /<function=([a-z_]+)>([\s\S]*?)<\/function>/g;
+
 interface ParsedToolCall {
   tool:       string;
   parameters: Record<string, unknown>;
@@ -293,6 +296,22 @@ function parseXmlToolCalls(content: string): ParsedToolCall[] {
         });
       }
     } catch (_jsonErr: unknown) { /* skip malformed */ }
+  }
+  return results;
+}
+
+function parseLlamaToolCalls(content: string): ParsedToolCall[] {
+  const results: ParsedToolCall[] = [];
+  for (const match of content.matchAll(LLAMA_TOOL_CALL_RE)) {
+    const toolName = match[1]?.trim();
+    const raw      = match[2]?.trim();
+    if (!toolName) continue;
+    let params: Record<string, unknown> = {};
+    if (raw) {
+      try { params = JSON.parse(raw) as Record<string, unknown>; }
+      catch (_e: unknown) { /* skip malformed */ }
+    }
+    results.push({ tool: toolName, parameters: params });
   }
   return results;
 }
@@ -515,14 +534,22 @@ export function registerChatRoutes(app: Hono, services: ChatRouteServices = {}):
           const assistantMsg   = firstChoice?.["message"] as Record<string, unknown> | undefined;
           const nativeCalls    = assistantMsg?.["tool_calls"] as Array<Record<string, unknown>> | undefined;
 
-          // Check for tool calls: native function calling OR XML fallback in content
+          // Check for tool calls: native function calling, XML fallback, or Llama format
           const textContent    = (assistantMsg?.["content"] as string | undefined) ?? "";
           const xmlCalls       = parseXmlToolCalls(textContent);
+          const llamaCalls     = parseLlamaToolCalls(textContent);
 
           const hasNativeCalls = finishReason === "tool_calls" && Array.isArray(nativeCalls) && nativeCalls.length > 0;
           const hasXmlCalls    = xmlCalls.length > 0;
+          const hasLlamaCalls  = llamaCalls.length > 0;
 
-          if (hasNativeCalls || hasXmlCalls) {
+          // Strip tool call tags so they don't leak into context or assistant content
+          const cleanedTextContent = textContent
+            .replace(LLAMA_TOOL_CALL_RE, "")
+            .replace(XML_TOOL_CALL_RE, "")
+            .trim();
+
+          if (hasNativeCalls || hasXmlCalls || hasLlamaCalls) {
             const rawCalls = hasNativeCalls
               ? nativeCalls.map((tc) => {
                   const fn   = tc["function"] as Record<string, unknown> | undefined;
@@ -532,7 +559,9 @@ export function registerChatRoutes(app: Hono, services: ChatRouteServices = {}):
                   catch (_e: unknown) { /* ignore */ }
                   return { id: tc["id"] as string | undefined, name, params };
                 })
-              : xmlCalls.map((xc) => ({ id: undefined, name: xc.tool, params: xc.parameters }));
+              : hasXmlCalls
+                ? xmlCalls.map((xc) => ({ id: undefined, name: xc.tool, params: xc.parameters }))
+                : llamaCalls.map((lc) => ({ id: undefined, name: lc.tool, params: lc.parameters }));
 
             // Validate tool names and enforce iteration cap
             const toolCallsToExecute = rawCalls
@@ -545,7 +574,7 @@ export function registerChatRoutes(app: Hono, services: ChatRouteServices = {}):
               // Append the assistant message (with or without tool_calls field)
               hasNativeCalls
                 ? { role: "assistant", content: textContent || null, tool_calls: nativeCalls }
-                : { role: "assistant", content: textContent },
+                : { role: "assistant", content: cleanedTextContent || null },
             ];
 
             for (const tc of toolCallsToExecute) {
@@ -613,6 +642,11 @@ export function registerChatRoutes(app: Hono, services: ChatRouteServices = {}):
                   content: `[Tool result for ${tc.name}]: ${resultContent}`,
                 });
               }
+            }
+
+            // Emit any pre-tool non-tag text as assistant prefix
+            if (cleanedTextContent.length > 0) {
+              assistantContent = cleanedTextContent;
             }
 
             // Phase 2: stream the follow-up response with tool results

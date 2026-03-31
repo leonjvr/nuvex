@@ -121,6 +121,21 @@ export function Header({ showMenuButton = false, onMenuToggle }: HeaderProps) {
         </button>
       )}
 
+      {/* Home link */}
+      <Link
+        to="/"
+        style={{
+          textDecoration: 'none',
+          color:          'var(--color-accent)',
+          fontWeight:     700,
+          fontSize:       '15px',
+          flexShrink:     0,
+          letterSpacing:  '-0.02em',
+        }}
+      >
+        SIDJUA
+      </Link>
+
       {/* Breadcrumbs */}
       <nav aria-label={t('gui.breadcrumb.aria')} style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
         {crumbs.map((crumb, i) => {

@@ -680,6 +680,25 @@ export class AuditService {
       ].join(","));
     }
 
+    lines.push("");
+    lines.push("=== Recent Events ===");
+    lines.push("id,timestamp,agentId,division,eventType,action,severity,details");
+
+    const recentEvents = this.db
+      .prepare<unknown[], {
+        id: string; timestamp: string; agent_id: string; division: string;
+        event_type: string; action: string; severity: string; details: string;
+      }>(`SELECT id, timestamp, agent_id, division, event_type, action, severity, details
+          FROM audit_events ORDER BY timestamp DESC LIMIT 500`)
+      .all();
+
+    for (const e of recentEvents) {
+      lines.push([
+        e.id, e.timestamp, e.agent_id, e.division, e.event_type,
+        e.action, e.severity, `"${(e.details ?? "").replace(/"/g, '""')}"`,
+      ].join(","));
+    }
+
     return lines.join("\n");
   }
 
