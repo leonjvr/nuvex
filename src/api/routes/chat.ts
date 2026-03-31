@@ -266,6 +266,9 @@ export interface ChatRouteServices {
   db?:      Database | null;
 }
 
+/** Maximum tool iterations per chat turn — prevents runaway tool loops. */
+const MAX_TOOL_ITERATIONS = 5;
+
 /** XML fallback pattern: <tool_call>{"tool":"name","parameters":{...}}</tool_call> */
 const XML_TOOL_CALL_RE = /<tool_call>([\s\S]*?)<\/tool_call>/g;
 
@@ -520,7 +523,7 @@ export function registerChatRoutes(app: Hono, services: ChatRouteServices = {}):
           const hasXmlCalls    = xmlCalls.length > 0;
 
           if (hasNativeCalls || hasXmlCalls) {
-            const toolCallsToExecute = hasNativeCalls
+            const rawCalls = hasNativeCalls
               ? nativeCalls.map((tc) => {
                   const fn   = tc["function"] as Record<string, unknown> | undefined;
                   const name = fn?.["name"] as string | undefined ?? "";
@@ -530,6 +533,11 @@ export function registerChatRoutes(app: Hono, services: ChatRouteServices = {}):
                   return { id: tc["id"] as string | undefined, name, params };
                 })
               : xmlCalls.map((xc) => ({ id: undefined, name: xc.tool, params: xc.parameters }));
+
+            // Validate tool names and enforce iteration cap
+            const toolCallsToExecute = rawCalls
+              .filter((tc) => tc.name.trim().length > 0)
+              .slice(0, MAX_TOOL_ITERATIONS);
 
             // Track messages for follow-up call (with tool results)
             const followUpMessages: Array<Record<string, unknown>> = [

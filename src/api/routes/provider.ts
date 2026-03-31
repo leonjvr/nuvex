@@ -95,8 +95,17 @@ function providerToPublic(p: ConfiguredProvider, catalogProviders: ApprovedProvi
   api_base?:        string;
   model?:           string;
   custom_name?:     string;
+  models?:          Array<{ model: string; display_name: string; recommended: boolean }>;
 } {
   const entry = catalogProviders.find((c) => c.id === p.provider_id);
+  // All models from catalog providers that share the same provider name
+  const providerName = entry?.name;
+  const models = providerName
+    ? catalogProviders
+        .filter((c) => c.name === providerName)
+        .map((c) => ({ model: c.model, display_name: c.display_name, recommended: c.recommended }))
+    : undefined;
+
   return {
     provider_id:     p.provider_id,
     display_name:    p.custom_name ?? entry?.display_name ?? p.provider_id,
@@ -105,6 +114,7 @@ function providerToPublic(p: ConfiguredProvider, catalogProviders: ApprovedProvi
     ...(p.api_base    !== undefined ? { api_base:    p.api_base }    : {}),
     ...(p.model       !== undefined ? { model:       p.model }       : {}),
     ...(p.custom_name !== undefined ? { custom_name: p.custom_name } : {}),
+    ...(models !== undefined && models.length > 0 ? { models } : {}),
   };
 }
 
