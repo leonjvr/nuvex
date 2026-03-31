@@ -46,14 +46,14 @@ export const GUI_ERRORS = {
   /** Server unreachable — Docker not running, wrong URL, firewall, etc. */
   'GUI-CONN-001': {
     message:         'Cannot connect to the SIDJUA server.',
-    suggestion:      'Make sure the SIDJUA container is running: docker start sidjua (or docker compose up)',
+    suggestion:      'Make sure the SIDJUA container is running: docker start $(docker ps -aq -f name=sidjua) (or docker compose up)',
     technicalDetail: 'Network error — connection refused or DNS failure',
   },
 
   /** Server returned a 5xx internal error. */
   'GUI-CONN-002': {
     message:         'The server encountered an internal error.',
-    suggestion:      'Try again in a moment, or restart SIDJUA: docker restart sidjua',
+    suggestion:      'Try again in a moment, or restart SIDJUA: docker restart $(docker ps -aq -f name=sidjua)',
     technicalDetail: 'HTTP 5xx — server-side error',
   },
 
@@ -184,14 +184,14 @@ export const GUI_ERRORS = {
   /** Workspace backup failed. */
   'GUI-WORKSPACE-001': {
     message:         'Failed to create a workspace backup.',
-    suggestion:      'Check disk space and try again. Run: docker exec sidjua sidjua backup create',
+    suggestion:      'Check disk space and try again. Run: docker exec $(docker ps -q -f name=sidjua) sidjua backup create',
     technicalDetail: 'POST /workspace/backup failed',
   },
 
   /** Workspace wipe failed. */
   'GUI-WORKSPACE-002': {
     message:         'Failed to wipe the workspace.',
-    suggestion:      'Try again or manually run: docker restart sidjua',
+    suggestion:      'Try again or manually run: docker restart $(docker ps -aq -f name=sidjua)',
     technicalDetail: 'POST /workspace/wipe failed',
   },
 
@@ -209,7 +209,7 @@ export const GUI_ERRORS = {
   /** Catch-all for unexpected errors. */
   'GUI-GENERIC-001': {
     message:         'Something went wrong.',
-    suggestion:      'Try reloading the page. If the problem persists, restart SIDJUA: docker restart sidjua',
+    suggestion:      'Try reloading the page. If the problem persists, restart SIDJUA: docker restart $(docker ps -aq -f name=sidjua)',
     technicalDetail: 'Unknown error',
   },
 

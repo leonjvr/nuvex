@@ -332,7 +332,7 @@ docker run -d \
   ghcr.io/goetzkohlberg/sidjua:latest
 ```
 
-API key is auto-generated on first start — retrieve it with `docker exec sidjua cat /app/.system/api-key`.
+API key is auto-generated on first start — retrieve it with `docker exec $(docker ps -q -f name=sidjua) cat /app/.system/api-key`.
 No environment variables required. No configuration required. No database
 server required — SIDJUA uses SQLite, one database file per agent.
 
@@ -357,7 +357,7 @@ Error telemetry is **disabled by default** (privacy-first). When enabled, only s
 - Enable with: `sidjua config set telemetry.mode basic`
 - User-configurable in Settings UI
 
-To share logs for support: `docker cp sidjua:/data/logs/sidjua-error.log .`
+To share logs for support: `docker cp $(docker ps -aq -f name=sidjua):/data/logs/sidjua-error.log .`
 
 **CLI Management** — complete lifecycle from a single binary:
 
