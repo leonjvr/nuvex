@@ -569,6 +569,7 @@ export function Agents() {
   const [search,         setSearch]         = useState(searchQuery);
   const [selectedId,     setSelectedId]     = useState<string | null>(null);
   const [flashingIds,    setFlashingIds]    = useState<Set<string>>(new Set());
+  const [refreshKey,     setRefreshKey]     = useState(0);
 
   // Escape closes detail panel
   useEffect(() => {
@@ -580,7 +581,7 @@ export function Agents() {
   }, [selectedId]);
 
   const divRes   = useDivisions();
-  const agentRes = useAgents();
+  const agentRes = useAgents({}, refreshKey);
   const { lastEvent } = useSse();
 
   // Live agent map for real-time status updates
@@ -735,7 +736,7 @@ export function Agents() {
         />
 
         <button
-          onClick={() => agentRes.refetch()}
+          onClick={() => setRefreshKey((k) => k + 1)}
           aria-label="Refresh agents"
           style={{
             display:      'inline-flex',

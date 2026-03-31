@@ -394,6 +394,19 @@ function AdvancedMode({ catalog, config, onSaved }: AdvancedModeProps) {
 
   async function handleSave() {
     if (!client) return;
+
+    // Warn if any agent is assigned to a provider different from the default
+    const defaultPid = config?.default_provider?.provider_id;
+    const hasMismatch = Object.values(overrides).some((provId) => provId !== defaultPid);
+    if (hasMismatch) {
+      const confirmed = window.confirm(
+        'Warning: Some agents are assigned to providers different from your default. ' +
+        'These agents will use the default provider\'s API key, which may not work if the providers require separate keys. ' +
+        'Ensure the selected providers accept the same API key, or configure each agent separately.\n\nSave anyway?'
+      );
+      if (!confirmed) return;
+    }
+
     const agentOverrides: Record<string, { provider_id: string; api_key: string; api_base?: string }> = {};
     for (const [agentId, provId] of Object.entries(overrides)) {
       const entry = catalog.find((p) => p.id === provId);

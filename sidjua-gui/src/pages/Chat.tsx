@@ -212,9 +212,9 @@ function ToolCallCard({ message }: { message: Message }) {
             Calling tool: {message.toolName ?? message.content}
           </strong>
         </div>
-        {message.content && message.toolName && (
+        {message.toolName && (
           <div style={{ opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '400px' }}>
-            {message.content}
+            {message.content || '(no parameters)'}
           </div>
         )}
       </div>
@@ -244,18 +244,13 @@ function ToolResultCard({ message }: { message: Message }) {
         {!success && message.toolError && (
           <div style={{ marginTop: '4px', opacity: 0.85 }}>{message.toolError}</div>
         )}
-        {success && message.toolData !== undefined && message.toolData !== null && (
-          <div style={{
-            marginTop:  '4px',
-            opacity:    0.8,
-            overflow:   'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth:   '400px',
-          }}>
-            {typeof message.toolData === 'object'
-              ? JSON.stringify(message.toolData).slice(0, 120)
-              : String(message.toolData).slice(0, 120)}
+        {success && (
+          <div style={{ marginTop: '4px', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '400px' }}>
+            {message.toolData !== undefined && message.toolData !== null
+              ? (typeof message.toolData === 'object'
+                  ? JSON.stringify(message.toolData).slice(0, 120)
+                  : String(message.toolData).slice(0, 120))
+              : '(completed)'}
           </div>
         )}
       </div>
@@ -292,7 +287,7 @@ function MessageBubble({ message }: { message: Message }) {
           border:       isUser ? 'none' : '1px solid var(--color-border)',
         }}
       >
-        {message.content}
+        {isUser ? message.content : stripFunctionTags(message.content)}
         {message.isStreaming && (
           <span style={{ display: 'inline-block', marginLeft: '4px', animation: 'pulse 1s infinite' }}>
             ▋
@@ -333,6 +328,14 @@ function TypingIndicator() {
   );
 }
 
+
+/** Strip Llama/XML tool call tags from assistant message text. */
+function stripFunctionTags(text: string): string {
+  return text
+    .replace(/<function=[a-z_]+>[\s\S]*?<\/function>/g, '')
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
+    .trim();
+}
 
 const VISIBLE_LIMIT = 50;
 
