@@ -13,8 +13,7 @@ import { useDivisions } from '../hooks/useDivisions';
 import { useApi }       from '../hooks/useApi';
 import { useSse }       from '../hooks/useSse';
 import { useAppConfig } from '../lib/config';
-import { formatCurrency, formatRelative, formatTime, todayIso } from '../lib/format';
-import { StatusBadge }   from '../components/shared/StatusBadge';
+import { formatRelative, todayIso } from '../lib/format';
 import { ProgressBar }   from '../components/shared/ProgressBar';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import { ActivityFeed }   from '../components/shared/ActivityFeed';
@@ -58,9 +57,6 @@ function AgentRow({ agent, isSelected, isFlashing, onClick }: AgentRowProps) {
         if (!isSelected) (e.currentTarget as HTMLTableRowElement).style.background = isFlashing ? 'var(--color-warning-bg)' : '';
       }}
     >
-      <td style={{ padding: '12px 16px', width: '120px' }}>
-        <StatusBadge status={agent.status} size="sm" />
-      </td>
       <td style={{ padding: '12px 8px', fontWeight: 600, fontSize: '13px', color: 'var(--color-text)' }}>
         {agent.name}
       </td>
@@ -78,15 +74,12 @@ function AgentRow({ agent, isSelected, isFlashing, onClick }: AgentRowProps) {
 }
 
 
-function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClose: () => void; liveStatus?: AgentLifecycleStatus }) {
+function AgentDetail({ agentId, onClose }: { agentId: string; onClose: () => void }) {
   const agentRes = useAgent(agentId);
   const agent    = agentRes.data?.agent;
   const { client } = useAppConfig();
 
   const { t } = useTranslation();
-
-  const [actioning,   setActioning]   = useState<'start' | 'stop' | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   // Provider/model selection state
   const catalogRes  = useApi<ProviderCatalogResponse>((c) => c.getProviderCatalog());
@@ -100,21 +93,6 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
       agentRes.refetch();
     } catch (err: unknown) {
       setPatchError(formatGuiError(err));
-    }
-  }
-
-  async function handleAction(action: 'start' | 'stop'): Promise<void> {
-    if (!client || actioning) return;
-    setActioning(action);
-    setActionError(null);
-    try {
-      if (action === 'start') await client.startAgent(agentId);
-      else                    await client.stopAgent(agentId);
-      agentRes.refetch();
-    } catch (err: unknown) {
-      setActionError(formatGuiError(err));
-    } finally {
-      setActioning(null);
     }
   }
 
@@ -166,11 +144,6 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
     );
   }
 
-  // Use live SSE-updated status (from agentMap) when available; fall back to API fetch.
-  const displayStatus = liveStatus ?? agent.status;
-  const canStart = displayStatus === 'stopped' || displayStatus === 'error';
-  const canStop  = displayStatus === 'active'  || displayStatus === 'idle';
-
   return (
     <PanelShell onClose={onClose}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -182,61 +155,7 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
             {agent.division} · {t(`agent.tier.${agent.tier}`)}
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <StatusBadge status={displayStatus} />
-          {canStart && (
-            <button
-              onClick={() => { void handleAction('start'); }}
-              disabled={!!actioning}
-              aria-label="Start agent"
-              style={{
-                display:      'inline-flex',
-                alignItems:   'center',
-                gap:          '5px',
-                padding:      '5px 12px',
-                borderRadius: 'var(--radius-md)',
-                border:       '1px solid var(--color-success)',
-                background:   'transparent',
-                color:        'var(--color-success)',
-                cursor:       actioning ? 'default' : 'pointer',
-                fontSize:     '12px',
-                fontWeight:   600,
-                opacity:      actioning ? 0.6 : 1,
-              }}
-            >
-              {actioning === 'start' ? <LoadingSpinner size="sm" label="Starting…" /> : 'Start'}
-            </button>
-          )}
-          {canStop && (
-            <button
-              onClick={() => { void handleAction('stop'); }}
-              disabled={!!actioning}
-              aria-label="Stop agent"
-              style={{
-                display:      'inline-flex',
-                alignItems:   'center',
-                gap:          '5px',
-                padding:      '5px 12px',
-                borderRadius: 'var(--radius-md)',
-                border:       '1px solid var(--color-warning)',
-                background:   'transparent',
-                color:        'var(--color-warning)',
-                cursor:       actioning ? 'default' : 'pointer',
-                fontSize:     '12px',
-                fontWeight:   600,
-                opacity:      actioning ? 0.6 : 1,
-              }}
-            >
-              {actioning === 'stop' ? <LoadingSpinner size="sm" label="Stopping…" /> : 'Stop'}
-            </button>
-          )}
-        </div>
       </div>
-      {actionError && (
-        <p style={{ color: 'var(--color-danger)', fontSize: '12px', marginBottom: '12px' }}>
-          {actionError}
-        </p>
-      )}
 
       {patchError && (
         <p style={{ color: 'var(--color-danger)', fontSize: '12px', marginBottom: '10px' }}>{patchError}</p>
@@ -265,25 +184,35 @@ function AgentDetail({ agentId, onClose, liveStatus }: { agentId: string; onClos
           </select>
         </div>
 
-        {/* Model dropdown — options from selected provider */}
+        {/* Model dropdown — all models from the same provider family */}
         <div>
           <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>Model</p>
           {(() => {
-            const selectedProv = catalogRes.data?.providers.find((p) => p.id === agent.provider);
-            // Catalog entry has a single model; show it plus the current value as options
-            const modelOptions: string[] = selectedProv
-              ? Array.from(new Set([selectedProv.model, agent.model, agent.resolved_model ?? agent.model].filter(Boolean)))
-              : [agent.resolved_model ?? agent.model];
+            const selectedProv   = catalogRes.data?.providers.find((p) => p.id === agent.provider);
+            const providerFamily = selectedProv?.name;
+            const familyEntries  = providerFamily
+              ? (catalogRes.data?.providers ?? []).filter((p) => p.name === providerFamily)
+              : selectedProv ? [selectedProv] : [];
+            const currentModel   = agent.resolved_model ?? agent.model;
+            const inFamily       = familyEntries.some((p) => p.model === currentModel);
             return (
               <select
-                value={agent.resolved_model ?? agent.model}
-                onChange={(e) => { void handleProviderChange(agent.provider, e.target.value); }}
+                value={currentModel}
+                onChange={(e) => {
+                  const match = familyEntries.find((p) => p.model === e.target.value);
+                  void handleProviderChange(match?.id ?? agent.provider, e.target.value);
+                }}
                 style={{ ...detailSelectStyle, width: '100%' }}
                 aria-label="Agent model"
               >
-                {modelOptions.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                {familyEntries.map((p) => (
+                  <option key={p.id} value={p.model}>
+                    {p.recommended ? '★ ' : ''}{p.model} ({p.quality})
+                  </option>
                 ))}
+                {!inFamily && currentModel && (
+                  <option value={currentModel}>{currentModel}</option>
+                )}
               </select>
             );
           })()}
@@ -864,7 +793,7 @@ export function Agents() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
-                  {['Status', 'Name', 'Division', 'Model', 'Last updated'].map((h) => (
+                  {['Name', 'Division', 'Model', 'Last updated'].map((h) => (
                     <th key={h} style={{
                       textAlign:     'left',
                       padding:       '10px 16px 10px 8px',
@@ -915,7 +844,6 @@ export function Agents() {
         <AgentDetail
           agentId={selectedId}
           onClose={() => setSelectedId(null)}
-          liveStatus={agentMap.get(selectedId)?.status}
         />
       )}
     </div>

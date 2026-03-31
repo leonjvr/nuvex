@@ -102,11 +102,13 @@ function ChatHeader({
   onApply,
   applyState,
   onBack,
+  showApply,
 }: {
   agent:      StarterAgentShape;
   onApply:    () => void;
   applyState: 'idle' | 'running' | 'success' | 'error';
   onBack:     () => void;
+  showApply?: boolean;
 }) {
   return (
     <div style={{
@@ -151,7 +153,7 @@ function ChatHeader({
         </div>
       </div>
 
-      <button
+      {showApply && <button
         onClick={onApply}
         disabled={applyState === 'running'}
         aria-label="Apply configuration"
@@ -185,7 +187,7 @@ function ChatHeader({
          applyState === 'success' ? 'Applied ✓' :
          applyState === 'error'   ? 'Failed ✗' :
          'Apply'}
-      </button>
+      </button>}
     </div>
   );
 }
@@ -719,7 +721,7 @@ export function Chat() {
                   role:      'tool_call' as const,
                   content:   paramsStr,
                   timestamp: new Date().toISOString(),
-                  toolName:  evt.tool ?? 'unknown',
+                  toolName:  evt.tool || 'unknown',
                 },
               ]);
             } else if (evt.type === 'tool_result') {
@@ -730,7 +732,7 @@ export function Chat() {
                   role:        'tool_result' as const,
                   content:     '',
                   timestamp:   new Date().toISOString(),
-                  toolName:    evt.tool ?? 'unknown',
+                  toolName:    evt.tool || 'unknown',
                   toolSuccess: evt.success !== false,
                   toolData:    evt.data ?? null,
                   toolError:   typeof evt.error === 'string' ? evt.error : null,
@@ -906,6 +908,7 @@ export function Chat() {
         onApply={() => { void handleApply(); }}
         applyState={applyState}
         onBack={() => navigate('/agents')}
+        showApply={agentId === 'hr'}
       />
 
       {/* Messages */}
