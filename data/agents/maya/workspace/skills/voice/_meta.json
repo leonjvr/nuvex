@@ -1,0 +1,17 @@
+{
+  "slug": "voice",
+  "name": "Voice — Speech-to-Text & Text-to-Speech",
+  "version": "1.0.0",
+  "description": "Transcribe incoming voice messages to text (STT) and synthesise spoken voice note replies (TTS). Integrates with WhatsApp and Telegram voice notes.",
+  "scripts": {
+    "stt": "scripts/stt.py",
+    "tts": "scripts/tts.py"
+  },
+  "credentials": {
+    "ELEVENLABS_API_KEY": {
+      "description": "ElevenLabs API key (from elevenlabs.io dashboard → API Keys)",
+      "env_file": "~/.config/elevenlabs/.env",
+      "key": "ELEVENLABS_API_KEY"
+    }
+  }
+}

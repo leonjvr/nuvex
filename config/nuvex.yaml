@@ -1,0 +1,144 @@
+# System-wide administrator. Skills and agents use this instead of hardcoding a name.
+# contact_channel: a WhatsApp contact name, Telegram handle, or "leon" / any channel ID
+# recognized by the messaging layer.
+system:
+  admin:
+    name: "Leon"
+    contact_channel: "leon"
+
+agents:
+- name: maya
+  tier: T1
+  division: personal
+  workspace: /data/agents/maya/workspace
+  model:
+    primary: anthropic/claude-sonnet-4-20250514
+    fast: groq/llama-3.3-70b-versatile
+    code: openai/gpt-4o
+    failover:
+      - openai/gpt-4o
+      - groq/llama-3.3-70b-versatile
+  routing:
+    simple_reply: fast
+    conversation: primary
+    code_generation: code
+    voice_response: fast
+  budget:
+    per_task_usd: 0.5
+    daily_usd: 5
+    monthly_usd: 50
+  compaction:
+    threshold: 50
+    preserve_recent: 10
+    summary_max_tokens: 2000
+    mode: safeguard
+  recovery:
+    llm_retries: 2
+    llm_retry_delay_seconds: 5
+    escalation_target: telegram
+  channels:
+    whatsapp:
+      enabled: true
+      sync_full_history: true
+      humanise_enabled: true
+      humanise_read_receipt_delay_ms: 1500
+      humanise_thinking_delay_ms: 2500
+      humanise_typing_speed_wpm: 45
+      humanise_chunk_messages: true
+    telegram:
+      enabled: false
+      bot_token: ''
+      allowed_users: ''
+    email:
+      enabled: false
+      imap_host: ''
+      imap_port: 993
+      smtp_host: ''
+      smtp_port: 587
+      email_user: ''
+      email_pass: ''
+    slack:
+      enabled: false
+      bot_token: ''
+      signing_secret: ''
+      default_channel: ''
+    discord:
+      enabled: false
+      bot_token: ''
+      guild_id: ''
+      webhook_url: ''
+  forbidden_tools:
+  - rm -rf /
+  - format
+  skills:
+  - voice
+  - dev-server
+  mcp_servers:
+    context7:
+      transport: stdio
+      command: npx
+      args:
+      - -y
+      - '@upstash/context7-mcp@latest'
+    filesystem:
+      transport: stdio
+      command: npx
+      args:
+      - -y
+      - '@modelcontextprotocol/server-filesystem'
+      - /data/agents/maya/workspace
+- name: research
+  tier: T2
+  division: operations
+  model:
+    primary: openai/gpt-4o
+    fast: groq/llama-3.3-70b-versatile
+    code: openai/gpt-4o
+  routing:
+    simple_reply: fast
+    conversation: primary
+    code_generation: code
+    voice_response: fast
+  budget:
+    per_task_usd: 0.5
+    daily_usd: 5
+    monthly_usd: 50
+  channels:
+    whatsapp:
+      enabled: false
+      sync_full_history: true
+    telegram:
+      enabled: false
+      bot_token: ''
+      allowed_users: ''
+    email:
+      enabled: false
+      imap_host: ''
+      imap_port: 993
+      smtp_host: ''
+      smtp_port: 587
+      email_user: ''
+      email_pass: ''
+    slack:
+      enabled: false
+      bot_token: ''
+    discord:
+      enabled: false
+      bot_token: ''
+  forbidden_tools: []
+  skills: []
+  description: Test agent
+whatsapp:
+  enabled: true
+  agent_id: maya
+  dm_policy: pairing
+  group_policy: allowlist
+  humanise_enabled: true
+  humanise_read_receipt_delay_ms: 1500
+  humanise_thinking_delay_ms: 2500
+  humanise_typing_speed_wpm: 45
+  humanise_chunk_messages: true
+database:
+  url: null
+health:
+  gateway_check_interval_seconds: 30

@@ -1,4 +1,5 @@
 node_modules
+!src/gateway/whatsapp/node_modules
 sidjua-gui/node_modules
 sidjua-gui/src-tauri
 dist

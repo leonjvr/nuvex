@@ -1,0 +1,151 @@
+# NUVEX production stack — all 6 containers
+# Binds to NETBIRD_IP (or 127.0.0.1 fallback) — no public 0.0.0.0 exposure
+# Deploy: docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+
+services:
+
+  # ─── Database ────────────────────────────────────────────────────────────
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: nuvex-db
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${DB_USER:-nuvex}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-nuvex}
+    volumes:
+      - nuvex_pg:/var/lib/postgresql/data
+    networks:
+      - nuvex-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-nuvex}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  # ─── Brain (LangGraph agent service) ─────────────────────────────────────
+  brain:
+    build:
+      context: .
+      dockerfile: Dockerfile.brain
+    container_name: nuvex-brain
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql://${DB_USER:-nuvex}:${DB_PASSWORD}@db:5432/${DB_NAME:-nuvex}"
+      NUVEX_CONFIG: "config/nuvex.yaml"
+      BRAIN_PORT: "8100"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+    volumes:
+      - nuvex_workspace:/root/.nuvex/workspace
+    networks:
+      - nuvex-net
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "${NETBIRD_IP:-127.0.0.1}:9100:8100"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8100/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ─── WhatsApp Gateway (Node.js / Baileys) ────────────────────────────────
+  gateway-wa:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway-wa
+    container_name: nuvex-gateway-wa
+    env_file: .env
+    environment:
+      BRAIN_URL: "http://brain:8100"
+      GATEWAY_WA_PORT: "8101"
+      WA_CREDS_PATH: "/creds"
+    volumes:
+      - nuvex_wa_creds:/creds
+    networks:
+      - nuvex-net
+    depends_on:
+      brain:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "${NETBIRD_IP:-127.0.0.1}:9101:8101"
+
+  # ─── Telegram Gateway ────────────────────────────────────────────────────
+  gateway-tg:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway-tg
+    container_name: nuvex-gateway-tg
+    env_file: .env
+    environment:
+      BRAIN_URL: "http://brain:8100"
+      GATEWAY_TG_PORT: "8102"
+    networks:
+      - nuvex-net
+    depends_on:
+      brain:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "${NETBIRD_IP:-127.0.0.1}:9102:8102"
+
+  # ─── Email Gateway ───────────────────────────────────────────────────────
+  gateway-mail:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway-mail
+    container_name: nuvex-gateway-mail
+    env_file: .env
+    environment:
+      BRAIN_URL: "http://brain:8100"
+      GATEWAY_MAIL_PORT: "8103"
+    networks:
+      - nuvex-net
+    depends_on:
+      brain:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "${NETBIRD_IP:-127.0.0.1}:9103:8103"
+
+  # ─── Dashboard (FastAPI + React) ─────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: nuvex-dashboard
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql://${DB_USER:-nuvex}:${DB_PASSWORD}@db:5432/${DB_NAME:-nuvex}"
+      NUVEX_CONFIG: "config/nuvex.yaml"
+      DASHBOARD_PORT: "8200"
+    volumes:
+      - nuvex_workspace:/root/.nuvex/workspace:ro
+    networks:
+      - nuvex-net
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "${NETBIRD_IP:-127.0.0.1}:9200:8200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8200/api/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  nuvex-net:
+    driver: bridge
+
+volumes:
+  nuvex_pg:
+  nuvex_workspace:
+  nuvex_wa_creds:

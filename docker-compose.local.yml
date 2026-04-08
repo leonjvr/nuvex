@@ -1,0 +1,160 @@
+# NUVEX local development stack — ports 9100-9432
+# All ports bind to 127.0.0.1 only (no public exposure)
+# Start with: docker compose -f docker-compose.local.yml up --build
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: nuvex-db-local
+    environment:
+      POSTGRES_USER: nuvex
+      POSTGRES_PASSWORD: nuvex
+      POSTGRES_DB: nuvex
+    ports:
+      - "127.0.0.1:9432:5432"
+    volumes:
+      - nuvex_pg_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nuvex"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  brain:
+    build:
+      context: .
+      dockerfile: Dockerfile.brain
+    container_name: nuvex-brain-local
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://nuvex:nuvex@db:5432/nuvex"
+      NUVEX_CONFIG: "config/nuvex.yaml"
+      BRAIN_PORT: "8100"
+      LOG_LEVEL: "debug"
+      DEV_RELOAD: "0"
+      # API keys from host .env (override empty strings in CI)
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      MINIMAX_API_KEY: "${MINIMAX_API_KEY:-}"
+      # Dev-server skill credentials
+      HETZNER_DEV_PROJECT_API: "${HETZNER_DEV_PROJECT_API:-}"
+    volumes:
+      # Agent workspace data (skills, screenshots, config)
+      - ./data:/data
+      # GitHub Copilot auth (one-time setup: copy hosts.yml from your gh config)
+      # Source: ~/.config/gh/hosts.yml on the host machine
+      - ./config/gh-config:/root/.openclaw/gh-config:rw
+    ports:
+      - "127.0.0.1:9100:8100"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8100/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: nuvex-dashboard-local
+    depends_on:
+      brain:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://nuvex:nuvex@db:5432/nuvex"
+      NUVEX_CONFIG: "config/nuvex.yaml"
+      DASHBOARD_PORT: "8200"
+      BRAIN_URL: "http://brain:8100"
+      WA_CONTAINER: "nuvex-gateway-wa-local"
+      GATEWAY_WA_URL: "http://gateway-wa:8101"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      MINIMAX_API_KEY: "${MINIMAX_API_KEY:-}"
+    volumes:
+      - ./data:/data
+      - ./config:/app/config:rw
+      - ./config/gh-config:/root/.openclaw/gh-config:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:9200:8200"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8200/api/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  gateway-tg:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway-tg
+    container_name: nuvex-gateway-tg-local
+    env_file:
+      - path: ./config/channels.env
+        required: false
+    environment:
+      BRAIN_URL: "http://brain:8100"
+      NUVEX_CONFIG: "config/nuvex.yaml"
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      brain:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9102:8102"
+    restart: unless-stopped
+    profiles:
+      - gateways
+
+  gateway-wa:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway-wa
+    container_name: nuvex-gateway-wa-local
+    env_file:
+      - path: ./config/channels.env
+        required: false
+    environment:
+      BRAIN_URL: "http://brain:8100"
+      WA_CREDS_PATH: /data/wa-creds
+    volumes:
+      - ./data:/data
+    depends_on:
+      brain:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9101:8101"
+    restart: unless-stopped
+    profiles:
+      - gateways
+
+  gateway-email:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway-mail
+    container_name: nuvex-gateway-email-local
+    env_file:
+      - path: ./config/channels.env
+        required: false
+    environment:
+      BRAIN_URL: "http://brain:8100"
+    depends_on:
+      brain:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9103:8103"
+    restart: unless-stopped
+    profiles:
+      - gateways
+
+volumes:
+  nuvex_pg_local:

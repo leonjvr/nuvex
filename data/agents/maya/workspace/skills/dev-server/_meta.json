@@ -1,0 +1,35 @@
+{
+  "slug": "dev-server",
+  "name": "Dev Server — Autonomous Development Environment",
+  "version": "1.0.0",
+  "description": "Provisions and manages isolated Hetzner dev servers with GitHub Copilot CLI for autonomous coding tasks. Maya can spin up a server, clone a repo, instruct Copilot to fix bugs or build features, fetch Playwright screenshots as proof of work, and deploy to staging after approval.",
+  "scripts": {
+    "provision":   "scripts/provision.sh",
+    "disprovision": "scripts/disprovision.sh",
+    "list":        "scripts/list.sh",
+    "copilot":     "scripts/copilot.sh",
+    "clone":       "scripts/clone.sh",
+    "screenshots": "scripts/screenshots.sh",
+    "gh-login":    "scripts/gh-login.sh"
+  },
+  "credentials": {
+    "HETZNER_DEV_PROJECT_API": {
+      "description": "Hetzner Cloud API key for the dev project",
+      "env_file":    "/data/agents/maya/workspace/skills/dev-server/.env"
+    },
+    "GH_TOKEN": {
+      "description": "GitHub OAuth token (with copilot scope). Use the Login with GitHub button to obtain this via the CLI.",
+      "env_file":    "/data/agents/maya/workspace/skills/dev-server/.env",
+      "key":         "GH_TOKEN",
+      "readonly":    true
+    }
+  },
+  "settings": {
+    "project_bindings": {
+      "type": "project_bindings",
+      "description": "Bind each project to the channel group it receives requests from. Maya will automatically know which project context to apply.",
+      "file": "/data/agents/maya/workspace/config/projects.json",
+      "channels": ["whatsapp", "telegram"]
+    }
+  }
+}

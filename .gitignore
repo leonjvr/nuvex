@@ -4,6 +4,11 @@ backups/
 .env
 .env.*
 !.env.example
+
+# Dev-server skill credentials (never commit)
+config/gh-config/hosts.yml
+data/agents/*/workspace/screenshots/
+data/agents/*/workspace/config/projects.json
 modules/**/.env
 *.db
 *.db-wal
@@ -43,3 +48,17 @@ SONNET-STATE.md
 ._*
 Makefile
 dev-pipeline.md
+
+# Temporary scripts and logs (never commit)
+_tmp_*.sh
+_tmp_*.sql
+_tmp_*.ts
+_brain_logs.txt
+.playwright-mcp/
+
+# Agent SSH keys — NEVER commit
+data/agents/*/workspace/ssh/
+
+# WhatsApp credentials / session keys — NEVER commit
+data/wa-creds/
+data/wa-qr.json

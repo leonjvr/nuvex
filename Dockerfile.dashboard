@@ -1,0 +1,27 @@
+FROM python:3.12-slim AS base
+
+WORKDIR /app
+
+# Install Node for frontend build
+RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Python deps
+COPY pyproject.toml ./
+RUN uv pip install --system --no-cache "."
+
+# Build frontend
+COPY src/dashboard/frontend ./src/dashboard/frontend
+RUN cd src/dashboard/frontend && npm install && npm run build
+
+# Copy source
+COPY src ./src
+COPY config ./config
+
+ENV DASHBOARD_PORT=8200
+
+EXPOSE 8200
+
+CMD ["python", "-m", "src.dashboard"]

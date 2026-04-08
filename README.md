@@ -1,23 +1,137 @@
-[English](README.md) | [Deutsch](docs/translations/README.de.md) | [Español](docs/translations/README.es.md) | [Français](docs/translations/README.fr.md) | [日本語](docs/translations/README.ja.md) | [한국어](docs/translations/README.ko.md) | [中文 (简体)](docs/translations/README.zh-CN.md) | [中文 (繁體)](docs/translations/README.zh-TW.md) | [العربية](docs/translations/README.ar.md) | [বাংলা](docs/translations/README.bn.md) | [Čeština](docs/translations/README.cs.md) | [Filipino](docs/translations/README.fil.md) | [हिन्दी](docs/translations/README.hi.md) | [Bahasa Indonesia](docs/translations/README.id.md) | [Italiano](docs/translations/README.it.md) | [Bahasa Melayu](docs/translations/README.ms.md) | [Nederlands](docs/translations/README.nl.md) | [Polski](docs/translations/README.pl.md) | [Português (BR)](docs/translations/README.pt-BR.md) | [Română](docs/translations/README.ro.md) | [Русский](docs/translations/README.ru.md) | [Svenska](docs/translations/README.sv.md) | [ภาษาไทย](docs/translations/README.th.md) | [Türkçe](docs/translations/README.tr.md) | [Українська](docs/translations/README.uk.md) | [Tiếng Việt](docs/translations/README.vi.md)
+# NUVEX — Networked Unified Verified Execution
 
----
-
-# SIDJUA Free — AI Agent Orchestration Platform
-
-> The only agent platform where governance is enforced by architecture, not by hoping the model behaves.
+> A Python-first, LangGraph-powered autonomous agent platform with structural governance, multi-channel messaging, and a production-ready ops dashboard.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fgoetzkohlberg%2Fsidjua-blue)](https://ghcr.io/goetzkohlberg/sidjua)
-[![Version](https://img.shields.io/badge/version-1.0.1-green)](https://github.com/GoetzKohlberg/sidjua/releases)
+[![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.6-green)](https://github.com/langchain-ai/langgraph)
 
 ---
 
-## Installation
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    NUVEX Production Stack                │
+│                                                         │
+│  ┌──────────────┐   ┌──────────────┐   ┌────────────┐  │
+│  │ gateway-wa   │   │ gateway-tg   │   │gateway-mail│  │
+│  │ (Baileys/WA) │   │ (Telegram)   │   │(IMAP/SMTP) │  │
+│  └──────┬───────┘   └──────┬───────┘   └─────┬──────┘  │
+│         └──────────────────┼──────────────────┘         │
+│                            ▼                            │
+│                  ┌──────────────────┐                   │
+│                  │      brain       │  LangGraph + FastAPI│
+│                  │  (port 9100)     │                   │
+│                  └────────┬─────────┘                   │
+│                           │                             │
+│              ┌────────────┴────────────┐                │
+│              ▼                         ▼                │
+│       ┌─────────────┐       ┌──────────────────┐       │
+│       │  PostgreSQL  │       │    dashboard     │       │
+│       │  + pgvector  │       │  React + FastAPI │       │
+│       └─────────────┘       └──────────────────┘       │
+└─────────────────────────────────────────────────────────┘
+```
+
+All services bind to the **Netbird VPN IP** in production. Local dev uses `127.0.0.1` ports `9100–9200`.
+
+---
+
+## Quick Start (local)
+
+```bash
+git clone https://github.com/GoetzKohlberg/nuvex.git
+cd nuvex
+
+# Start the full local stack (brain + database + gateways)
+docker compose -f docker-compose.local.yml up --build
+
+# Health check
+curl http://localhost:9100/health
+# → {"status":"ok","db":"connected","version":"0.1.0"}
+
+# Send a message to an agent
+curl -X POST http://localhost:9100/api/v1/invoke \
+  -H 'Content-Type: application/json' \
+  -d '{"agent_id":"maya","thread_id":"t1","channel":"api","message":"Hello!"}'
+```
+
+---
+
+## Key Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Governance pipeline** | Every LLM call passes through: route_model → check_forbidden → call_llm → check_policy. Hard limits enforced in code, not prompts. |
+| **Divisions** | Agent definitions live in `config/divisions.yaml`. Models, tools, channels, and budget limits per agent. |
+| **Checkpointing** | LangGraph `AsyncPostgresSaver` persists thread state across restarts. Falls back to `MemorySaver` when no DB available. |
+| **Event bus** | Async pub/sub (`src/brain/events.py`) wires cron, recovery, compaction, and gateway actions together. |
+| **Recovery recipes** | Declarative retry/fallback/escalation rules per error type in `config/divisions.yaml`. |
+
+---
+
+## Port Reference (local dev)
+
+| Service | Port |
+|---------|------|
+| Brain API | `9100` |
+| WhatsApp gateway | `9101` |
+| Telegram gateway | `9102` |
+| Email gateway | `9103` |
+| Dashboard | `9200` |
+| PostgreSQL | `9432` |
+
+---
+
+## Production Deploy
 
 ### Prerequisites
 
-| Tool | Required | Notes |
-|------|----------|-------|
+- VPS with Debian 12 / Ubuntu 22+ (2 vCPU / 4 GB minimum)
+- Docker + Netbird installed (see `scripts/provision-nuvex.sh`)
+- Domain or Netbird IP configured
+
+```bash
+# Provision a fresh server
+bash scripts/provision-nuvex.sh <SERVER_IP>
+
+# Deploy
+bash scripts/deploy-nuvex.sh
+```
+
+See [docs/INSTALLATION.md](docs/INSTALLATION.md) for the full guide.
+
+---
+
+## Development
+
+```bash
+# Install Python deps
+uv sync
+
+# Run tests
+python -m pytest unit-tests/ --tb=short -q
+
+# Run single module tests
+python -m pytest unit-tests/policy-engine/ -q
+```
+
+Dependency management uses [`uv`](https://github.com/astral-sh/uv). Lock file is committed — run `uv lock` to update after adding packages.
+
+---
+
+## Licence
+
+Dual-licensed: [AGPL-3.0](LICENSE-AGPL) for open-source use, [Commercial](LICENSE-COMMERCIAL) for proprietary deployments. See [NOTICE](NOTICE) for details.
+
+---
+
+*Forked from [SIDJUA Free](https://github.com/GoetzKohlberg/sidjua) — see original documentation below.*
+
+---
+
+
 | **Node.js** | >= 22.0.0 | ES modules, `fetch()`, `crypto.subtle`. [Download](https://nodejs.org) |
 | **C/C++ Toolchain** | Source builds only | `better-sqlite3` and `argon2` compile native addons |
 | **Docker** | >= 24 (optional) | Only for Docker deployment |
