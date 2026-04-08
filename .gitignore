@@ -5,6 +5,10 @@ backups/
 .env.*
 !.env.example
 
+# Secrets folder — ignore real files, track only *.example templates
+.secrets/*
+!.secrets/*.example
+
 # Dev-server skill credentials (never commit)
 config/gh-config/hosts.yml
 data/agents/*/workspace/screenshots/
