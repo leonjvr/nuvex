@@ -168,3 +168,25 @@ async def get_agent_state(agent_id: str) -> str | None:
         if db_state:
             set_registry_state(agent_id, db_state)
         return db_state
+
+
+async def record_agent_note(agent_id: str, note: str) -> None:
+    """Insert an informational lifecycle event without changing state.
+
+    Used to surface non-error events (e.g. model fallback) in the diagnostics
+    timeline without triggering a state transition.
+    """
+    async with get_session() as session:
+        result = await session.execute(select(Agent).where(Agent.id == agent_id))
+        row: Agent | None = result.scalar_one_or_none()
+        if row is None:
+            return
+        current = row.lifecycle_state
+        session.add(AgentLifecycleEvent(
+            agent_id=agent_id,
+            from_state=current,
+            to_state=current,
+            invocation_id=None,
+            reason=note[:500],
+        ))
+        await session.commit()

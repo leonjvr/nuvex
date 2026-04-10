@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 from langchain_core.language_models import BaseChatModel
 
 from ..state import AgentState
-from ..models_registry import get_model_for_state, get_active_model_name, get_failover_models, _build_model
+from ..models_registry import get_model_for_state, get_active_model_name, get_failover_models, _build_model, _build_claude_with_advisor, is_claude_model, get_advisor_enabled, make_advisor_tool
 from ..tools_registry import get_tools_for_agent
 from ..workspace import assemble_system_prompt, GOVERNANCE_PREAMBLE
 
@@ -28,10 +28,16 @@ def _compute_schema_hash(tools: list) -> tuple[str, list[dict]]:
     schema_dicts: list[dict] = []
     for tool in tools:
         if tool.args_schema is not None:
-            try:
-                params = tool.args_schema.model_json_schema()  # Pydantic v2
-            except AttributeError:
-                params = tool.args_schema.schema()  # Pydantic v1
+            if isinstance(tool.args_schema, dict):
+                params = tool.args_schema  # already a JSON schema dict (e.g. MCP tools)
+            else:
+                try:
+                    params = tool.args_schema.model_json_schema()  # Pydantic v2
+                except AttributeError:
+                    try:
+                        params = tool.args_schema.schema()  # Pydantic v1
+                    except AttributeError:
+                        params = {}
         else:
             params = {}
         schema_dicts.append({
@@ -93,6 +99,7 @@ async def _retrieve_memory_block(state: AgentState) -> str:
             division_id=division_id,
             k=memory_k,
             token_budget=token_budget,
+            org_id=getattr(state, "org_id", "") or "",
         )
         # Retrieve entries and log retrievals for outcome feedback loop (29.3)
         entries = await retriever.retrieve(query)
@@ -136,23 +143,16 @@ _RETRIABLE_PHRASES = (
     "credit balance", "credit_balance", "insufficient_quota",
     "billing", "quota", "payment",
     "tool_calls must be followed", "did not have response messages",
+    "connection error", "connection refused", "connect timeout",
+    "name or service not known", "failed to establish", "remotedisconnected",
+    "network is unreachable",
 )
 
 
 def _estimate_cost(model_name: str, input_tokens: int, output_tokens: int) -> float:
-    """Very rough token → USD estimate. Updated per model as needed."""
-    COST_PER_1K = {
-        "gpt-4o-mini": (0.00015, 0.0006),  # must come before "gpt-4o" (substring match)
-        "gpt-4o": (0.005, 0.015),
-        "claude-3-5-sonnet": (0.003, 0.015),
-        "claude-3-haiku": (0.00025, 0.00125),
-        "claude-sonnet-4": (0.003, 0.015),
-        "llama3-70b": (0.0006, 0.0008),
-    }
-    for key, (inp, out) in COST_PER_1K.items():
-        if key in model_name.lower():
-            return (input_tokens / 1000) * inp + (output_tokens / 1000) * out
-    return 0.0
+    """Delegate to canonical cost estimator in costs.py (per-1M pricing)."""
+    from ..costs import estimate_cost
+    return estimate_cost(model_name, input_tokens, output_tokens)
 
 
 def _repair_orphaned_tool_calls(messages: list) -> tuple[list, list]:
@@ -317,7 +317,7 @@ def _recent_conversation_has_unanswered_error_paste(conversation: list) -> bool:
     return True
 
 
-def _build_messages_for_llm(state: AgentState, memory_block: str = "") -> tuple[list, list]:
+def _build_messages_for_llm(state: AgentState, memory_block: str = "", contact_block: str = "") -> tuple[list, list]:
     """Return (messages_for_llm, injected_stubs).
 
     messages_for_llm: full list with fresh system prompt prepended, ready to
@@ -326,6 +326,7 @@ def _build_messages_for_llm(state: AgentState, memory_block: str = "") -> tuple[
     the LangGraph checkpoint is permanently healed on the first successful call.
 
     Pass memory_block (from MemoryRetriever.build_block()) to inject semantic memories.
+    Pass contact_block (from build_contact_context_block()) to inject contact identity.
     """
     conversation = [m for m in state.messages if not isinstance(m, SystemMessage)]
     conversation, injected_stubs = _repair_orphaned_tool_calls(conversation)
@@ -343,9 +344,11 @@ def _build_messages_for_llm(state: AgentState, memory_block: str = "") -> tuple[
             system_prompt = assemble_system_prompt(
                 state.workspace_path,
                 memory_block=memory_block,
+                contact_block=contact_block,
                 denied_actions=state.denied_actions or None,
                 response_style=_response_style,
                 agent_id=state.agent_id,
+                org_id=getattr(state, "org_id", "default"),
             )
         except Exception as exc:
             log.warning("call_llm: failed to assemble system prompt: %s", exc)
@@ -387,6 +390,30 @@ async def call_llm(state: AgentState) -> dict[str, Any]:
     is_groq = "groq" in resolved_model_name.lower() or state.model_tier == "fast"
     tools = (await get_tools_for_agent(state.agent_id)) if not is_groq else []
 
+    # Anthropic advisor tool (advisor-tool-2026-03-01 beta):
+    # Enabled by default for all Claude agents; disable per agent via model.advisor: false.
+    # Escalation policy (Phase-2 signals) may force advisor on for complex/risky tasks,
+    # or suppress it when the per-thread cap is exceeded.
+    _base_advisor_eligible = not is_groq and is_claude_model(resolved_model_name) and get_advisor_enabled(state.agent_id)
+    _routing_signals: dict[str, Any] | None = (state.metadata or {}).get("routing_decision", {}).get("signals")
+    from ..routing.escalation import EscalationPolicy, should_escalate_advisor, increment_advisor_count
+    _escalation_policy = EscalationPolicy()
+    _use_advisor, _advisor_reason = should_escalate_advisor(
+        base_advisor_enabled=_base_advisor_eligible,
+        signals=_routing_signals,
+        metadata=state.metadata or {},
+        policy=_escalation_policy,
+    )
+    _advisor_metadata_update: dict[str, Any] = {}
+    if _use_advisor:
+        log.debug(
+            "call_llm: advisor tool active reason=%s agent=%s model=%s",
+            _advisor_reason, state.agent_id, resolved_model_name,
+        )
+        base_model = _build_claude_with_advisor(resolved_model_name)
+        tools = [make_advisor_tool()] + tools
+        _advisor_metadata_update = increment_advisor_count(state.metadata or {})
+
     # Tool schema locking (§33) — hash the tool set; serve serialised schema from
     # session-level state cache when unchanged so Anthropic's prompt cache stays warm.
     new_hash, schema_dicts = _compute_schema_hash(tools)
@@ -403,19 +430,30 @@ async def call_llm(state: AgentState) -> dict[str, Any]:
     # Orphaned tool_calls are removed by _repair_orphaned_tool_calls.
     # Retrieve semantically relevant memories first (28.8)
     memory_block = await _retrieve_memory_block(state)
-    messages_for_llm, _ = _build_messages_for_llm(state, memory_block=memory_block)
+    contact_block = ""
+    if state.contact_id:
+        try:
+            from ..identity.context_block import build_contact_context_block
+            contact_block = await build_contact_context_block(state.agent_id, state.contact_id)
+        except Exception as _ce:
+            log.debug("call_llm: contact context block failed (non-fatal): %s", _ce)
+    messages_for_llm, _ = _build_messages_for_llm(state, memory_block=memory_block, contact_block=contact_block)
 
     # Attempt primary model, then failover list on retriable errors
     failover_models = get_failover_models(state.agent_id)
     candidates = [resolved_model_name] + failover_models
     last_exc: Exception | None = None
+    _primary_model_name = resolved_model_name  # remember original primary
 
     for attempt, model_name in enumerate(candidates):
         if attempt > 0:
             # Switch to failover model
             log.warning("call_llm: primary failed, trying failover model=%s", model_name)
-            fb = _build_model(model_name)
             is_groq_failover = "groq" in model_name.lower()
+            if not is_groq_failover and _use_advisor and is_claude_model(model_name):
+                fb = _build_claude_with_advisor(model_name)
+            else:
+                fb = _build_model(model_name)
             fb_tools = tools if not is_groq_failover else []
             model = fb.bind_tools(fb_tools) if fb_tools else fb
             resolved_model_name = model_name
@@ -425,6 +463,22 @@ async def call_llm(state: AgentState) -> dict[str, Any]:
             last_exc = None
             break  # success
         except Exception as exc:
+            # If advisor is active and this looks like an advisor-specific failure,
+            # retry the SAME model without advisor before moving to the next candidate.
+            _ADVISOR_FAILURE_PHRASES = ("advisor", "invalid beta", "unsupported beta", "unknown beta")
+            if _use_advisor and any(p in str(exc).lower() for p in _ADVISOR_FAILURE_PHRASES):
+                log.warning("call_llm: advisor failed (%s) — retrying %s without advisor", exc, model_name)
+                _use_advisor = False
+                tools = [t for t in tools if getattr(t, "name", "") != "advisor"]
+                no_adv_model = _build_model(model_name)
+                no_adv_bound = no_adv_model.bind_tools(tools) if tools else no_adv_model
+                try:
+                    response = await no_adv_bound.ainvoke(messages_for_llm)
+                    model = no_adv_bound
+                    last_exc = None
+                    break
+                except Exception as exc2:
+                    exc = exc2
             log.error("LLM call failed for agent=%s model=%s: %s", state.agent_id, model_name, exc)
             last_exc = exc
             # Only continue to failover on retriable errors
@@ -452,6 +506,17 @@ async def call_llm(state: AgentState) -> dict[str, Any]:
         except Exception:
             pass
         return {"error": str(last_exc), "finished": True}
+
+    # Record a note when fallback was used so the diagnostics timeline shows it
+    if resolved_model_name != _primary_model_name:
+        try:
+            from ..lifecycle import record_agent_note
+            await record_agent_note(
+                state.agent_id,
+                f"fallback: used {resolved_model_name} (primary {_primary_model_name} unavailable)",
+            )
+        except Exception:
+            pass
 
     usage = getattr(response, "usage_metadata", None) or {}
     input_tok = usage.get("input_tokens", 0)
@@ -499,6 +564,7 @@ async def call_llm(state: AgentState) -> dict[str, Any]:
             routed_from=routed_from,
             primary_cost_usd=primary_cost_usd,
             division=_division,
+            org_id=getattr(state, "org_id", "") or "",
         )
     except Exception as _le:
         log.debug("call_llm: record_llm_cost skipped: %s", _le)
@@ -508,6 +574,27 @@ async def call_llm(state: AgentState) -> dict[str, Any]:
     # §29 — low-yield turn tracking
     has_tool_calls = bool(getattr(response, "tool_calls", None))
     new_low_yield = _compute_low_yield(state, output_tok, has_tool_calls)
+
+    # Emit advisor.escalated telemetry when signals triggered escalation
+    if _use_advisor and _advisor_reason == "signals_escalated":
+        try:
+            from .. import events as _ev
+            await _ev.publish(
+                "advisor.escalated",
+                {
+                    "agent_id": state.agent_id,
+                    "invocation_id": state.invocation_id,
+                    "model": resolved_model_name,
+                    "signals": _routing_signals or {},
+                    "advisor_count": _advisor_metadata_update.get("advisor_escalation_count", 1),
+                },
+                agent_id=state.agent_id,
+                invocation_id=state.invocation_id,
+            )
+        except Exception as _ae:
+            log.debug("call_llm: advisor.escalated event skipped: %s", _ae)
+
+    _meta_update = _advisor_metadata_update if _advisor_metadata_update else {}
 
     return {
         "messages": [response],
@@ -519,6 +606,7 @@ async def call_llm(state: AgentState) -> dict[str, Any]:
         "iteration": state.iteration + 1,
         "low_yield_turns": new_low_yield,
         **schema_state_update,
+        **({"metadata": {**(state.metadata or {}), **_meta_update}} if _meta_update else {}),
     }
 
 
@@ -540,21 +628,6 @@ def _is_budget_exceeded(agent_id: str, cumulative_cost: float) -> bool:
         pass
     return False
 
-
-
-def _estimate_cost(model_name: str, input_tokens: int, output_tokens: int) -> float:
-    """Very rough token → USD estimate. Updated per model as needed."""
-    COST_PER_1K = {
-        "gpt-4o-mini": (0.00015, 0.0006),  # must come before "gpt-4o" (substring match)
-        "gpt-4o": (0.005, 0.015),
-        "claude-3-5-sonnet": (0.003, 0.015),
-        "claude-3-haiku": (0.00025, 0.00125),
-        "llama3-70b": (0.0006, 0.0008),
-    }
-    for key, (inp, out) in COST_PER_1K.items():
-        if key in model_name.lower():
-            return (input_tokens / 1000) * inp + (output_tokens / 1000) * out
-    return 0.0
 
 
 def _compute_low_yield(state: "AgentState", output_tok: int, has_tool_calls: bool) -> int:

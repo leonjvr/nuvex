@@ -1,6 +1,80 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
-import { X, Bot, Cpu, Puzzle, Radio, DollarSign, Save, Loader2, Zap, FileText, Users, ChevronDown, ChevronRight, AlertCircle, Server, Trash2, Plus, Wand2, CheckCircle2 } from "lucide-react";
+import { X, Bot, Cpu, Puzzle, Radio, DollarSign, Save, Loader2, Zap, FileText, Users, ChevronDown, ChevronRight, AlertCircle, Server, Trash2, Plus, Wand2, CheckCircle2, Monitor } from "lucide-react";
+
+// ── Known models for dropdowns ────────────────────────────────────────────────
+const KNOWN_MODELS: { label: string; value: string }[] = [
+  // Anthropic
+  { label: "Claude Opus 4.6 (anthropic)", value: "anthropic/claude-opus-4-6" },
+  { label: "Claude Sonnet 4 (anthropic)", value: "anthropic/claude-sonnet-4-20250514" },
+  { label: "Claude Haiku 4.5 (anthropic)", value: "anthropic/claude-haiku-4-5" },
+  // OpenAI
+  { label: "GPT-4o (openai)", value: "openai/gpt-4o" },
+  { label: "GPT-4o mini (openai)", value: "openai/gpt-4o-mini" },
+  { label: "o3-mini (openai)", value: "openai/o3-mini" },
+  { label: "o1 (openai)", value: "openai/o1" },
+  // Groq
+  { label: "Llama 3.3 70B (groq)", value: "groq/llama-3.3-70b-versatile" },
+  { label: "Llama 3.1 8B (groq)", value: "groq/llama-3.1-8b-instant" },
+  { label: "Mixtral 8x7B (groq)", value: "groq/mixtral-8x7b-32768" },
+  // Google
+  { label: "Gemini 2.0 Flash (google)", value: "google/gemini-2.0-flash" },
+  { label: "Gemini 1.5 Pro (google)", value: "google/gemini-1.5-pro" },
+];
+
+interface ModelSelectProps {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  allowEmpty?: boolean;
+}
+
+function ModelSelect({ value, onChange, placeholder = "— not set —", allowEmpty = false }: ModelSelectProps) {
+  const known = KNOWN_MODELS.some((m) => m.value === value);
+  const [custom, setCustom] = useState(!known && value !== "");
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value === "__custom__") { setCustom(true); }
+    else { setCustom(false); onChange(e.target.value); }
+  };
+
+  if (custom) {
+    return (
+      <div className="flex gap-2">
+        <input
+          className="flex-1 bg-gray-800 border border-indigo-600 rounded-lg px-3 py-2 text-sm text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="provider/model-name"
+          autoFocus
+        />
+        <button
+          type="button"
+          onClick={() => { setCustom(false); if (!KNOWN_MODELS.some((m) => m.value === value)) onChange(""); }}
+          className="text-xs text-gray-500 hover:text-gray-300 px-2"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      aria-label="Select model"
+      value={value || ""}
+      onChange={handleChange}
+      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500"
+    >
+      {allowEmpty && <option value="">{placeholder}</option>}
+      {!allowEmpty && !value && <option value="" disabled>{placeholder}</option>}
+      {KNOWN_MODELS.map((m) => (
+        <option key={m.value} value={m.value}>{m.label}</option>
+      ))}
+      <option value="__custom__">Custom model…</option>
+    </select>
+  );
+}
 
 const LIFECYCLE_COLORS: Record<string, string> = {
   idle:             "bg-gray-700 text-gray-300",
@@ -14,7 +88,7 @@ const LIFECYCLE_COLORS: Record<string, string> = {
   terminated:       "bg-gray-800 text-gray-500",
 };
 
-type Tab = "overview" | "models" | "channels" | "budget" | "skills" | "prompts" | "a2a" | "mcp";
+type Tab = "overview" | "models" | "channels" | "budget" | "skills" | "prompts" | "a2a" | "mcp" | "desktop";
 
 async function fetchConfig(agentId: string) {
   const r = await fetch(`/api/agents/${agentId}/config`);
@@ -341,6 +415,191 @@ function SkillPickerTab({
   );
 }
 
+// ── Desktop Tab ──────────────────────────────────────────────────────────────
+
+interface DeviceOption {
+  id: string;
+  name: string;
+  platform: string;
+  connected: boolean;
+}
+
+interface DeviceAssignment {
+  agent_id: string;
+  device_id: string;
+  enabled: boolean;
+  device_name: string;
+  device_platform: string;
+  device_connected: boolean;
+}
+
+function DevicePickerDropdown({
+  agentId,
+  currentDeviceId,
+  onSelect,
+  disabled,
+}: {
+  agentId: string;
+  currentDeviceId: string | null;
+  onSelect: (id: string) => void;
+  disabled?: boolean;
+}) {
+  const { data: devices = [] } = useQuery<DeviceOption[]>({
+    queryKey: ["devices-list"],
+    queryFn: async () => {
+      const r = await fetch("/api/devices");
+      if (!r.ok) return [];
+      return r.json();
+    },
+    refetchInterval: 10000,
+  });
+
+  return (
+    <select
+      value={currentDeviceId ?? ""}
+      onChange={(e) => onSelect(e.target.value)}
+      disabled={disabled || devices.length === 0}
+      className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+    >
+      <option value="" disabled>
+        {devices.length === 0 ? "No devices registered" : "Select a device…"}
+      </option>
+      {devices.map((d) => (
+        <option key={d.id} value={d.id}>
+          {d.name} ({d.platform}){d.connected ? " — online" : " — offline"}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function DesktopTab({ agentId, qc }: { agentId: string; qc: ReturnType<typeof useQueryClient> }) {
+  const { data: assignment, isLoading } = useQuery<DeviceAssignment | null>({
+    queryKey: ["agent-desktop-device", agentId],
+    queryFn: async () => {
+      const r = await fetch(`/api/agents/${agentId}/desktop-device`);
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    refetchInterval: 15000,
+  });
+
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+
+  const assign = useMutation({
+    mutationFn: async (deviceId: string) => {
+      const r = await fetch(`/api/agents/${agentId}/desktop-device`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.detail ?? "Failed to assign device");
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent-desktop-device", agentId] });
+      setSelectedDeviceId("");
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/agents/${agentId}/desktop-device`, { method: "DELETE" });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.detail ?? "Failed to remove assignment");
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent-desktop-device", agentId] });
+    },
+  });
+
+  if (isLoading) return <p className="text-sm text-gray-500 text-center py-8">Loading…</p>;
+
+  const isConnected = assignment?.enabled && assignment?.device_connected;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-sm font-medium text-gray-300">Desktop Device</p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Assign a registered desktop device to give this agent access to Windows desktop tools:
+          screen capture, UI automation, Outlook, clipboard, and shell execution.
+        </p>
+      </div>
+
+      {assignment && assignment.enabled ? (
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-gray-700 flex items-center justify-center flex-none">
+              <Monitor size={16} className="text-indigo-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-200">{assignment.device_name}</p>
+              <p className="text-xs text-gray-500">{assignment.device_platform} &middot; ID: {assignment.device_id}</p>
+            </div>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full ${
+                isConnected
+                  ? "bg-green-900/40 text-green-400 border border-green-700/40"
+                  : "bg-gray-700/40 text-gray-500 border border-gray-700/40"
+              }`}
+            >
+              {isConnected ? "Online" : "Offline"}
+            </span>
+          </div>
+          {remove.isError && (
+            <p className="text-xs text-red-400">{(remove.error as Error).message}</p>
+          )}
+          <button
+            onClick={() => remove.mutate()}
+            disabled={remove.isPending}
+            className="flex items-center gap-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-red-800/40"
+          >
+            {remove.isPending ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            Remove assignment
+          </button>
+        </div>
+      ) : (
+        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <AlertCircle size={12} />
+            No device assigned to this agent.
+          </div>
+          <div className="flex items-center gap-2">
+            <DevicePickerDropdown
+              agentId={agentId}
+              currentDeviceId={selectedDeviceId || null}
+              onSelect={setSelectedDeviceId}
+            />
+            <button
+              onClick={() => selectedDeviceId && assign.mutate(selectedDeviceId)}
+              disabled={!selectedDeviceId || assign.isPending}
+              className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white px-4 py-2 rounded-lg transition-colors flex-none"
+            >
+              {assign.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+              Assign
+            </button>
+          </div>
+          {assign.isError && (
+            <p className="text-xs text-red-400">{(assign.error as Error).message}</p>
+          )}
+        </div>
+      )}
+
+      <div className="text-xs text-gray-600 bg-gray-800/30 rounded-lg px-3 py-2.5 space-y-1">
+        <p className="text-gray-500 font-medium">Capability gating</p>
+        <p>Only agents explicitly assigned to a device can use desktop tools. The tier of the agent determines which tools are available — shell execution requires T1.</p>
+        <p>Register devices and generate tokens in <a href="/device-tokens" className="text-indigo-400 underline hover:text-indigo-300">Infrastructure &rarr; Device Tokens</a>.</p>
+      </div>
+    </div>
+  );
+}
+
 export default function AgentSettingsModal({
   agent,
   allAgents,
@@ -415,6 +674,7 @@ export default function AgentSettingsModal({
   const [modelCode, setModelCode] = useState("");
   const [modelFailover, setModelFailover] = useState("");
   const [modelMode, setModelMode] = useState("standard");
+  const [modelAdvisor, setModelAdvisor] = useState(true);
   const [routingSimple, setRoutingSimple] = useState("fast");
   const [routingConversation, setRoutingConversation] = useState("primary");
   const [routingCode, setRoutingCode] = useState("code");
@@ -466,6 +726,7 @@ export default function AgentSettingsModal({
     setModelCode(cfg.model?.code ?? "");
     setModelFailover((cfg.model?.failover ?? []).join(", "));
     setModelMode(cfg.model?.mode ?? "standard");
+    setModelAdvisor(cfg.model?.advisor ?? true);
     setRoutingSimple(cfg.routing?.simple_reply ?? "fast");
     setRoutingConversation(cfg.routing?.conversation ?? "primary");
     setRoutingCode(cfg.routing?.code_generation ?? "code");
@@ -529,6 +790,7 @@ export default function AgentSettingsModal({
           fast: modelFast || undefined,
           code: modelCode || undefined,
           mode: modelMode,
+          advisor: modelAdvisor,
           failover: modelFailover ? modelFailover.split(",").map((s) => s.trim()).filter(Boolean) : [],
         },
         routing: {
@@ -585,6 +847,7 @@ export default function AgentSettingsModal({
     { id: "prompts",   label: "Prompts",   icon: <FileText size={15} /> },
     { id: "a2a",       label: "Agent Card",icon: <Users size={15} /> },
     { id: "skills",    label: "Skills",    icon: <Puzzle size={15} /> },
+    { id: "desktop",   label: "Desktop",   icon: <Monitor size={15} /> },
   ];
 
   const promptFiles = ["SOUL.md", "IDENTITY.md", "AGENTS.md", "TOOLS.md", "USER.md", "HEARTBEAT.md", "BOOTSTRAP.md"];
@@ -669,12 +932,47 @@ export default function AgentSettingsModal({
                 )}
               </div>
               <Collapsible title="Model slots" defaultOpen>
-                <Field label="Primary model (complex tasks)"><Input value={modelPrimary} onChange={setModelPrimary} placeholder="anthropic/claude-sonnet-4-20250514" /></Field>
-                <Field label="Fast model (simple / budget tasks)"><Input value={modelFast} onChange={setModelFast} placeholder="groq/llama-3.3-70b-versatile" /></Field>
-                <Field label="Code model (code generation)"><Input value={modelCode} onChange={setModelCode} placeholder="openai/gpt-4o" /></Field>
-                <Field label="Failover models (comma-separated, tried on overload)">
-                  <Input value={modelFailover} onChange={setModelFailover} placeholder="openai/gpt-4o-mini, groq/llama-3.3-70b-versatile" />
+                <Field label="Primary model (complex tasks)">
+                  <ModelSelect value={modelPrimary} onChange={setModelPrimary} placeholder="— select primary model —" />
                 </Field>
+                <Field label="Fast model (simple / budget tasks)">
+                  <ModelSelect value={modelFast} onChange={setModelFast} placeholder="— same as primary —" allowEmpty />
+                </Field>
+                <Field label="Code model (code generation)">
+                  <ModelSelect value={modelCode} onChange={setModelCode} placeholder="— same as primary —" allowEmpty />
+                </Field>
+                <Field label="Failover models">
+                  <div className="space-y-1">
+                    {(modelFailover ? modelFailover.split(",").map((s) => s.trim()).filter(Boolean) : []).map((m, i) => (
+                      <div key={i} className="flex gap-2 items-center">
+                        <span className="flex-1 text-sm text-gray-300 bg-gray-800 rounded px-2 py-1 font-mono">{m}</span>
+                        <button type="button" title="Remove" onClick={() => {
+                          const arr = modelFailover.split(",").map((s) => s.trim()).filter(Boolean);
+                          arr.splice(i, 1);
+                          setModelFailover(arr.join(", "));
+                        }} className="text-gray-600 hover:text-red-400"><X size={14} /></button>
+                      </div>
+                    ))}
+                    <ModelSelect
+                      value=""
+                      onChange={(v) => {
+                        if (!v) return;
+                        const arr = modelFailover ? modelFailover.split(",").map((s) => s.trim()).filter(Boolean) : [];
+                        if (!arr.includes(v)) setModelFailover([...arr, v].join(", "));
+                      }}
+                      placeholder="+ add failover model"
+                      allowEmpty
+                    />
+                  </div>
+                </Field>
+                <div className="pt-2 border-t border-gray-800 mt-3">
+                  <Toggle
+                    checked={modelAdvisor}
+                    onChange={setModelAdvisor}
+                    label="Anthropic Advisor (extended reasoning, Claude only)"
+                  />
+                  <p className="text-xs text-gray-600 mt-1 pl-7">Sends queries through Anthropic&apos;s advisor sub-model before responding. Improves reasoning quality. Disable to reduce latency/cost.</p>
+                </div>
               </Collapsible>
               <Collapsible title="Routing rules" defaultOpen={modelMode === "standard"}>
                 <p className="text-xs text-gray-600 mb-2">Maps task type → model slot. Values: <code className="bg-gray-800 rounded px-1">primary</code> | <code className="bg-gray-800 rounded px-1">fast</code> | <code className="bg-gray-800 rounded px-1">code</code></p>
@@ -1143,6 +1441,10 @@ export default function AgentSettingsModal({
               qc={qc}
             />
           )}
+          {/* ── Desktop ── */}
+          {tab === "desktop" && (
+            <DesktopTab agentId={agent.id} qc={qc} />
+          )}
           </div>
         </div>
 
@@ -1165,7 +1467,7 @@ export default function AgentSettingsModal({
                 {saved ? "Saved!" : "Save changes"}
               </button>
             )}
-            {(tab === "skills" || tab === "a2a" || tab === "mcp" || tab === "prompts") && (
+            {(tab === "skills" || tab === "a2a" || tab === "mcp" || tab === "prompts" || tab === "desktop") && (
               <button onClick={onClose} className="text-sm text-gray-400 hover:text-gray-200 px-4 py-1.5 rounded-lg hover:bg-gray-800 transition-colors">Close</button>
             )}
           </div>

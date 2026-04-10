@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -13,18 +13,22 @@ from ...brain.db import get_session
 from ...brain.models.agent import Agent
 from ...brain.models.budget import Budget
 from ...brain.models.lifecycle import AgentLifecycleEvent
+from ...brain.models.thread import Message, Thread
 from ...shared.config import get_cached_config
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
 @router.get("")
-async def list_agents():
+async def list_agents(org_id: str | None = Query(None)):
     """Return all agents from DB merged with config, falling back to config-only entries."""
     cfg = get_cached_config()
 
     async with get_session() as session:
-        result = await session.execute(select(Agent))
+        q = select(Agent)
+        if org_id:
+            q = q.where(Agent.org_id == org_id)
+        result = await session.execute(q)
         db_agents = result.scalars().all()
 
     db_map = {a.id: a for a in db_agents}
@@ -47,6 +51,7 @@ async def list_agents():
                 "division": db.division if db else (getattr(agent_def, "division", None) if agent_def else None),
                 "lifecycle_state": db.lifecycle_state if db else "idle",
                 "model": model_primary,
+                "system": bool(getattr(agent_def, "system", False)) if agent_def else False,
             }
         )
     return rows
@@ -111,6 +116,67 @@ async def agent_lifecycle(agent_id: str, limit: int = 100):
         }
         for e in events
     ]
+
+
+@router.get("/{agent_id}/diagnostics")
+async def agent_diagnostics(agent_id: str):
+    """Return error details, recent lifecycle events, and recent messages for an agent."""
+    async with get_session() as session:
+        agent_res = await session.execute(select(Agent).where(Agent.id == agent_id))
+        agent = agent_res.scalar_one_or_none()
+        if agent is None:
+            raise HTTPException(status_code=404, detail="Agent not found")
+
+        lc_res = await session.execute(
+            select(AgentLifecycleEvent)
+            .where(AgentLifecycleEvent.agent_id == agent_id)
+            .order_by(AgentLifecycleEvent.created_at.desc())
+            .limit(20)
+        )
+        events = lc_res.scalars().all()
+
+        # Fetch latest thread for this agent then its recent messages
+        thread_res = await session.execute(
+            select(Thread)
+            .where(Thread.agent_id == agent_id)
+            .order_by(Thread.updated_at.desc())
+            .limit(1)
+        )
+        thread = thread_res.scalar_one_or_none()
+        messages: list[Message] = []
+        if thread:
+            msg_res = await session.execute(
+                select(Message)
+                .where(Message.thread_id == thread.id)
+                .order_by(Message.created_at.desc())
+                .limit(10)
+            )
+            messages = list(reversed(msg_res.scalars().all()))
+
+    return {
+        "agent_id": agent_id,
+        "lifecycle_state": agent.lifecycle_state,
+        "last_error": agent.last_error,
+        "last_error_at": agent.last_error_at.isoformat() if agent.last_error_at else None,
+        "lifecycle_events": [
+            {
+                "id": e.id,
+                "from_state": e.from_state,
+                "to_state": e.to_state,
+                "reason": e.reason,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in events
+        ],
+        "recent_messages": [
+            {
+                "role": m.role,
+                "content": m.content[:500] if m.content else "",
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m in messages
+        ],
+    }
 
 
 # ── Skill assignment ──────────────────────────────────────────────────────────
