@@ -11,7 +11,7 @@
     "print_qr_terminal": {
       "type": "boolean",
       "default": true,
-      "description": "Print QR code to terminal for first-time authentication."
+      "description": "Deprecated: ignored by current Baileys versions. Handle QR via connection.update in adapter code."
     }
   }
 }

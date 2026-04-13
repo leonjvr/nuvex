@@ -118,7 +118,7 @@ async def update_provider(provider_id: int, body: ProviderPatch):
     return _row_to_dict(row)
 
 
-@router.delete("/{provider_id}", status_code=204)
+@router.delete("/{provider_id}", status_code=204, response_model=None)
 async def delete_provider(provider_id: int):
     async with get_session() as session:
         row = await session.get(LLMProvider, provider_id)

@@ -1,0 +1,390 @@
+..................................................EEEEEEEEEEEEEEEEEEEEEE [ 88%]
+EEE......                                                                [100%]
+=================================== ERRORS ====================================
+_____________ ERROR at setup of TestHealthEndpoint.test_health_ok _____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__________ ERROR at setup of TestListAgents.test_returns_agent_list ___________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__ ERROR at setup of TestListAgents.test_model_filled_when_agent_def_present __
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__________________ ERROR at setup of TestGetAgent.test_found __________________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__________ ERROR at setup of TestGetAgent.test_not_found_returns_404 __________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_________ ERROR at setup of TestAgentStatus.test_returns_budget_info __________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+______ ERROR at setup of TestAgentStatus.test_no_budget_defaults_to_zero ______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_____ ERROR at setup of TestAgentStatus.test_agent_not_found_returns_404 ______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_________ ERROR at setup of TestCostsSummary.test_returns_budget_rows _________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+______ ERROR at setup of TestCostsSummary.test_empty_returns_empty_list _______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+____________ ERROR at setup of TestListEvents.test_returns_events _____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_________ ERROR at setup of TestListEvents.test_query_params_accepted _________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__________ ERROR at setup of TestListEvents.test_limit_cap_enforced ___________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_______ ERROR at setup of TestListServices.test_returns_service_health ________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+______ ERROR at setup of TestListServices.test_empty_returns_empty_list _______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+___________ ERROR at setup of TestListTasks.test_returns_task_list ____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_________ ERROR at setup of TestListTasks.test_query_params_accepted __________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+___________ ERROR at setup of TestListTasks.test_limit_cap_enforced ___________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+________ ERROR at setup of TestCreateTask.test_creates_and_returns_id _________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__ ERROR at setup of TestCreateTask.test_missing_required_fields_returns_422 __
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+____________ ERROR at setup of TestWorkspaceRouter.test_list_files ____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+____________ ERROR at setup of TestWorkspaceRouter.test_read_file _____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+___ ERROR at setup of TestWorkspaceRouter.test_agent_not_found_returns_404 ____
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+______ ERROR at setup of TestWorkspaceRouter.test_path_traversal_blocked ______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+____________ ERROR at setup of TestWorkspaceRouter.test_write_file ____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:36: in <module>
+    from .routers.device_assignments import router as device_assignments_router
+src\dashboard\routers\device_assignments.py:79: in <module>
+    @router.delete("/api/agents/{agent_id}/desktop-device", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+============================== warnings summary ===============================
+devices/test_device_tokens_api.py::TestDeviceTokenCreate::test_create_returns_plaintext_token
+  C:\Users\leon\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+plugin-loader/test_plugin_loader.py::TestEntryPointDiscovery::test_entry_point_plugin_loaded
+  C:\Users\leon\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\_internal\_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR unit-tests\dashboard\test_dashboard.py::TestHealthEndpoint::test_health_ok
+ERROR unit-tests\dashboard\test_dashboard.py::TestListAgents::test_returns_agent_list
+ERROR unit-tests\dashboard\test_dashboard.py::TestListAgents::test_model_filled_when_agent_def_present
+ERROR unit-tests\dashboard\test_dashboard.py::TestGetAgent::test_found - Asse...
+ERROR unit-tests\dashboard\test_dashboard.py::TestGetAgent::test_not_found_returns_404
+ERROR unit-tests\dashboard\test_dashboard.py::TestAgentStatus::test_returns_budget_info
+ERROR unit-tests\dashboard\test_dashboard.py::TestAgentStatus::test_no_budget_defaults_to_zero
+ERROR unit-tests\dashboard\test_dashboard.py::TestAgentStatus::test_agent_not_found_returns_404
+ERROR unit-tests\dashboard\test_dashboard.py::TestCostsSummary::test_returns_budget_rows
+ERROR unit-tests\dashboard\test_dashboard.py::TestCostsSummary::test_empty_returns_empty_list
+ERROR unit-tests\dashboard\test_dashboard.py::TestListEvents::test_returns_events
+ERROR unit-tests\dashboard\test_dashboard.py::TestListEvents::test_query_params_accepted
+ERROR unit-tests\dashboard\test_dashboard.py::TestListEvents::test_limit_cap_enforced
+ERROR unit-tests\dashboard\test_dashboard.py::TestListServices::test_returns_service_health
+ERROR unit-tests\dashboard\test_dashboard.py::TestListServices::test_empty_returns_empty_list
+ERROR unit-tests\dashboard\test_dashboard.py::TestListTasks::test_returns_task_list
+ERROR unit-tests\dashboard\test_dashboard.py::TestListTasks::test_query_params_accepted
+ERROR unit-tests\dashboard\test_dashboard.py::TestListTasks::test_limit_cap_enforced
+ERROR unit-tests\dashboard\test_dashboard.py::TestCreateTask::test_creates_and_returns_id
+ERROR unit-tests\dashboard\test_dashboard.py::TestCreateTask::test_missing_required_fields_returns_422
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_list_files
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_read_file
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_agent_not_found_returns_404
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_path_traversal_blocked
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_write_file
+56 passed, 2 warnings, 25 errors in 49.17s

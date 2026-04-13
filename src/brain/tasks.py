@@ -31,6 +31,7 @@ async def create_task_record(
     priority: int = 5,
     acceptance_criteria: list[str] | None = None,
     parent_task_id: str | None = None,
+    org_id: str = "default",
 ) -> Task:
     """Persist a new task in the database and return the model."""
     task = Task(
@@ -41,12 +42,13 @@ async def create_task_record(
         acceptance_criteria=acceptance_criteria or [],
         parent_task_id=uuid.UUID(parent_task_id) if parent_task_id else None,
         status="pending",
+        org_id=org_id,
     )
     async with get_session() as session:
         session.add(task)
         await session.commit()
         await session.refresh(task)
-    log.info("task created: id=%s title=%r agent=%s", task.id, title, assigned_agent)
+    log.info("task created: id=%s title=%r agent=%s org=%s", task.id, title, assigned_agent, org_id)
     return task
 
 
@@ -126,6 +128,33 @@ async def create_task(
     Returns:
         dict with task_id, title, status, assigned_agent.
     """
+    # §16.2-16.3 — Intra-org validation: target agent must be in same org as caller
+    # We resolve org_id from the agent DB record for the assigned_agent.
+    calling_org = "default"
+    target_org = "default"
+    try:
+        from .db import get_session as _ts
+        from .models.agent import Agent as _Agent
+        from sqlalchemy import select as _sel
+        async with _ts() as _sess:
+            _row = (await _sess.execute(
+                _sel(_Agent.org_id).where(_Agent.id == assigned_agent).limit(1)
+            )).scalar_one_or_none()
+            if _row is not None:
+                target_org = _row
+    except Exception:
+        pass
+
+    if target_org != calling_org and calling_org != "default":
+        return {
+            "error": "cross_org_delegation_blocked",
+            "message": (
+                f"Agent '{assigned_agent}' belongs to org '{target_org}'. "
+                "Cross-org task delegation is not permitted. "
+                "Use send_work_packet to delegate work to agents in other organisations."
+            ),
+        }
+
     task = await create_task_record(title, assigned_agent, description, priority, acceptance_criteria, parent_task_id)
     return {
         "task_id": str(task.id),

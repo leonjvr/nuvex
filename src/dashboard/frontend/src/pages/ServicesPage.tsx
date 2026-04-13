@@ -342,7 +342,7 @@ export default function ServicesPage() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">LLM Providers</h1>
+        <h1 className="text-2xl font-semibold">Service Health</h1>
         <button
           onClick={() => setModal({ ...EMPTY_FORM })}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-sm font-medium"
@@ -395,6 +395,9 @@ export default function ServicesPage() {
                 )}
                 {h?.latency_ms != null && (
                   <p>Latency: {h.latency_ms.toFixed(0)} ms</p>
+                )}
+                {h?.checked_at && (
+                  <p className="text-gray-600">Checked: {new Date(h.checked_at).toLocaleString()}</p>
                 )}
                 {h?.error && (
                   <p className="text-red-400 truncate">{h.error}</p>

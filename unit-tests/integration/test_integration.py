@@ -176,9 +176,9 @@ class TestGovernancePipeline:
 class TestModelRouterClassification:
     """Classifier sends short messages to simple_reply tier; code → code_generation."""
 
-    def test_short_message_classified_as_simple_reply(self):
+    def test_short_message_classified_as_trivial_reply(self):
         from src.brain.routing.classifier import classify
-        assert classify("Hi there") == "simple_reply"
+        assert classify("Hi there") == "trivial_reply"
 
     def test_voice_message_classified_as_voice_response(self):
         from src.brain.routing.classifier import classify

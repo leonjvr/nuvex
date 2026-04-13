@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import AsyncIterator
 
 from fastapi import APIRouter, HTTPException
@@ -12,115 +11,36 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AnyMessage, HumanMessage
 from langgraph.errors import GraphInterrupt
 from langgraph.types import Command
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from ...shared.models.requests import InvokeRequest, InvokeResponse, ResumeRequest
 from ..db import get_session
 from ..lifecycle import LifecycleState, queue_invocation, set_registry_state
 from ..models.agent import Agent
-from ..models.thread import Message, Thread
 from ..state import AgentState
 from ..graph import get_compiled_graph
+from .invoke_persist import ensure_agent_row, persist_invocation
 
 log = logging.getLogger(__name__)
+
+# Legacy aliases — callers outside this module import these names from here
+_ensure_agent_row = ensure_agent_row
+_persist_invocation = persist_invocation
 
 router = APIRouter(prefix="/invoke", tags=["invoke"])
 
 
-async def _ensure_agent_row(session, agent_id: str) -> None:
-    """Insert a minimal Agent row from config if one doesn't exist yet."""
-    existing = await session.get(Agent, agent_id)
-    if existing is not None:
-        return
-    # Load from YAML config — fall back to bare minimum if not found
-    try:
-        from ...shared.config import get_cached_config
-        cfg = get_cached_config()
-        agent_def = cfg.agents.get(agent_id)
-    except Exception:
-        agent_def = None
-
-    name = agent_def.name if agent_def else agent_id
-    tier = agent_def.tier if agent_def else "T1"
-    division = agent_def.division if agent_def else "default"
-    workspace_path = agent_def.workspace if agent_def else None
-    config_snapshot = agent_def.model_dump() if agent_def else {}
-
-    session.add(Agent(
-        id=agent_id,
-        name=name,
-        tier=tier,
-        division=division,
-        workspace_path=workspace_path,
-        config_snapshot=config_snapshot,
-        lifecycle_state="ready",
-    ))
-    await session.flush()
-
-
-async def _persist_invocation(
-    thread_id: str,
-    agent_id: str,
-    channel: str,
-    sender: str,
-    user_message: str,
-    reply: str,
-    tokens: int,
-    metadata: dict,
-) -> None:
-    """Upsert the Thread row and append user + assistant Message rows."""
-    try:
-        async with get_session() as session:
-            # Ensure agent row exists (FK: threads.agent_id → agents.id)
-            await _ensure_agent_row(session, agent_id)
-
-            # Upsert thread
-            thread = await session.get(Thread, thread_id)
-            now = datetime.now(timezone.utc)
-            if thread is None:
-                thread = Thread(
-                    id=thread_id,
-                    agent_id=agent_id,
-                    channel=channel,
-                    participants={sender: {"role": "user"}} if sender else {},
-                    message_count=0,
-                )
-                session.add(thread)
-                await session.flush()
-
-            # Persist user message
-            session.add(Message(
-                thread_id=thread_id,
-                role="user",
-                content=user_message,
-                tokens=len(user_message.split()),
-                metadata_={"sender": sender, "channel": channel, **metadata},
-            ))
-            # Persist assistant reply
-            if reply:
-                session.add(Message(
-                    thread_id=thread_id,
-                    role="assistant",
-                    content=reply,
-                    tokens=tokens,
-                    metadata_={"sender": agent_id, "channel": channel},
-                ))
-
-            # Update thread message_count + updated_at
-            thread.message_count = (thread.message_count or 0) + (2 if reply else 1)
-            thread.updated_at = now
-            await session.commit()
-    except Exception as exc:
-        log.warning("_persist_invocation failed (non-fatal): %s", exc)
-
-
-async def _get_workspace_path(agent_id: str) -> str | None:
-    """Return the workspace_path for an agent from the DB, or None."""
+async def _get_workspace_path(agent_id: str, org_id: str = "default") -> str | None:
+    """Return the workspace_path for an agent from the DB, or the org-scoped canonical path."""
     try:
         async with get_session() as session:
             result = await session.execute(select(Agent).where(Agent.id == agent_id))
             agent = result.scalar_one_or_none()
-            return agent.workspace_path if agent else None
+            if agent and agent.workspace_path:
+                return agent.workspace_path
+            # §8.4 — first-run bootstrap: use org-scoped canonical path
+            from ..workspace import resolve_workspace_path
+            return resolve_workspace_path(agent_id, org_id)
     except Exception as exc:
         log.warning("invoke: could not fetch workspace_path for %s: %s", agent_id, exc)
         return None
@@ -187,6 +107,58 @@ async def invoke(req: InvokeRequest) -> InvokeResponse:
     messages = await _build_messages(req.agent_id, req.message)
     thread_id = req.thread_id or f"{req.agent_id}:{invocation_id}"
 
+    # Resolve org_id from agent DB row when caller did not specify one
+    if req.org_id == "default":
+        try:
+            from ..models.agent import Agent as _Agent
+            from ..db import get_session as _gs
+            async with _gs() as _as:
+                _agent_row = await _as.get(_Agent, req.agent_id)
+                if _agent_row and _agent_row.org_id and _agent_row.org_id != "default":
+                    req = req.model_copy(update={"org_id": _agent_row.org_id})
+        except Exception as _oe:
+            log.debug("invoke: could not resolve agent org_id (non-fatal): %s", _oe)
+
+    # §3.4 — Cross-org thread access prevention: validate org_id prefix matches request
+    if req.thread_id:
+        parts = req.thread_id.split(":", 3)
+        if len(parts) == 4:  # v2 format: org_id:agent_id:channel:participant
+            thread_org = parts[0]
+            if thread_org != req.org_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Thread belongs to a different organisation",
+                )
+
+    # §10.3 — Channel validation: if bindings exist for this org, enforce them
+    if req.channel and req.org_id != "default":
+        try:
+            from ..models.channel_binding import ChannelBinding
+            from ..db import get_session as _cbs
+            from sqlalchemy import select as _sel
+            async with _cbs() as _cbsess:
+                _has_bindings = (await _cbsess.execute(
+                    _sel(ChannelBinding.id).where(ChannelBinding.org_id == req.org_id).limit(1)
+                )).scalar_one_or_none()
+                if _has_bindings is not None:
+                    sender_id = req.metadata.sender if req.metadata else None
+                    _match = (await _cbsess.execute(
+                        _sel(ChannelBinding.id).where(
+                            ChannelBinding.org_id == req.org_id,
+                            ChannelBinding.channel_type == req.channel,
+                            ChannelBinding.channel_identity == sender_id,
+                        ).limit(1)
+                    )).scalar_one_or_none()
+                    if _match is None:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Channel identity not bound to this organisation",
+                        )
+        except HTTPException:
+            raise
+        except Exception as _cbe:
+            log.debug("invoke: channel binding check failed (non-fatal): %s", _cbe)
+
     # Hard cap check: reject before graph invocation when budget exceeded (§38.2)
     try:
         from ...shared.config import get_cached_config
@@ -212,7 +184,7 @@ async def invoke(req: InvokeRequest) -> InvokeResponse:
         log.debug("invoke: hard cap check skipped: %s", _hce)
 
 
-    workspace_path = await _get_workspace_path(req.agent_id)
+    workspace_path = await _get_workspace_path(req.agent_id, req.org_id)
     if req.workspace_path:
         workspace_path = req.workspace_path
 
@@ -232,6 +204,7 @@ async def invoke(req: InvokeRequest) -> InvokeResponse:
 
     initial_state = AgentState(
         agent_id=req.agent_id,
+        org_id=req.org_id,
         thread_id=thread_id,
         invocation_id=invocation_id,
         messages=messages,
@@ -244,6 +217,26 @@ async def invoke(req: InvokeRequest) -> InvokeResponse:
         model_tier=model_tier,
         project_context=project_context,
     )
+
+    # Resolve contact identity before graph runs (§2.4)
+    try:
+        from ..identity.resolver import ContactResolver
+        org_id = req.metadata.model_dump().get("org_id", "default")
+        channel_type = req.channel or "unknown"
+        handle = req.metadata.sender if req.metadata.sender else None
+        sender_name = req.metadata.model_dump().get("sender_name")
+        resolution = await ContactResolver().resolve(org_id, channel_type, handle, sender_name)
+        sanction_until_iso = (
+            resolution.sanction_until.isoformat() if resolution.sanction_until else None
+        )
+        initial_state = initial_state.model_copy(update={
+            "contact_id": resolution.contact_id,
+            "contact_trust_tier": resolution.trust_tier,
+            "contact_sanction": resolution.sanction,
+            "contact_sanction_until": sanction_until_iso,
+        })
+    except Exception as _ce:
+        log.debug("invoke: contact resolution failed (non-fatal): %s", _ce)
 
     async def _run() -> InvokeResponse:
         lg_config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 100}
@@ -288,7 +281,27 @@ async def invoke(req: InvokeRequest) -> InvokeResponse:
             reply=response.reply or "",
             tokens=final_state.get("tokens_used", 0),
             metadata=req.metadata.model_dump(),
+            org_id=req.org_id or "default",
         )
+
+        # Post-invocation trust progression hook for T0 contacts (§4.2)
+        contact_id = initial_state.contact_id
+        contact_tier = initial_state.contact_trust_tier
+        if contact_id is not None and contact_tier == 0:
+            try:
+                from ..identity.progression import TrustProgressionService
+                from ..models.contact import Contact as _Contact
+                # Increment message count on the contact row
+                async with get_session() as _sess:
+                    _contact = await _sess.get(_Contact, contact_id)
+                    if _contact is not None:
+                        _contact.message_count = (_contact.message_count or 0) + 1
+                        await _sess.commit()
+                # Check auto-promotion thresholds
+                _req_org = req.metadata.model_dump().get("org_id", "default")
+                await TrustProgressionService().maybe_promote_t0(contact_id, _req_org)
+            except Exception as _pe:
+                log.debug("invoke: progression hook failed (non-fatal): %s", _pe)
 
         return response
 
@@ -301,7 +314,7 @@ async def invoke(req: InvokeRequest) -> InvokeResponse:
 
 async def _build_initial_state(req: InvokeRequest, invocation_id: str) -> AgentState:
     messages = await _build_messages(req.agent_id, req.message)
-    workspace_path = await _get_workspace_path(req.agent_id)
+    workspace_path = await _get_workspace_path(req.agent_id, req.org_id)
     if req.workspace_path:
         workspace_path = req.workspace_path
     task_type = req.metadata.task_type if hasattr(req.metadata, "task_type") else "conversation"
@@ -406,6 +419,7 @@ async def invoke_stream(req: InvokeRequest) -> StreamingResponse:
                     reply=final_reply,
                     tokens=tokens_used,
                     metadata=req.metadata.model_dump(),
+                    org_id=req.org_id or "default",
                 )
             except Exception as exc:
                 log.warning("invoke_stream: persist failed: %s", exc)
@@ -472,7 +486,7 @@ async def _invoke_internal(
             reply=reply,
             tokens=final_state.get("tokens_used", 0),
             metadata=extra,
-        )
+        )  # org_id uses DB default for delegated calls
         return reply
 
     return await queue_invocation(agent_id, _run)
@@ -519,3 +533,38 @@ async def resume_invoke(req: ResumeRequest) -> InvokeResponse:
         finished=final_state.get("finished", False),
         error=final_state.get("error"),
     )
+
+
+# ---------------------------------------------------------------------------
+# §6.2 — Org-scoped invoke: /api/v1/orgs/{org_id}/invoke
+# ---------------------------------------------------------------------------
+
+org_router = APIRouter(prefix="/orgs", tags=["orgs-invoke"])
+
+
+@org_router.post("/{org_id}/invoke", response_model=InvokeResponse)
+async def org_invoke(org_id: str, req: InvokeRequest) -> InvokeResponse:
+    """Org-scoped invoke — validates org is active, then delegates to /invoke logic."""
+    from .middleware import require_active_org
+    from ..db import get_session as _gs
+
+    async with _gs() as _session:
+        await require_active_org(org_id, _session)
+
+    # Inject org_id so downstream state carries it
+    req_with_org = req.model_copy(update={"org_id": org_id})
+    return await invoke(req_with_org)
+
+
+# ---------------------------------------------------------------------------
+# §6.2 — Legacy alias: /api/v1/invoke → default org (backward compat)
+# ---------------------------------------------------------------------------
+
+legacy_v1_router = APIRouter(prefix="/api/v1", tags=["invoke"])
+
+
+@legacy_v1_router.post("/invoke", response_model=InvokeResponse)
+async def invoke_v1_alias(req: InvokeRequest) -> InvokeResponse:
+    """Legacy /api/v1/invoke — alias for default org invoke (backward compat)."""
+    req_with_org = req.model_copy(update={"org_id": req.org_id or "default"})
+    return await invoke(req_with_org)

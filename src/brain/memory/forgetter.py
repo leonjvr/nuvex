@@ -1,9 +1,10 @@
-"""Memory forgetter — daily pruning of personal-scope memories.
+"""Memory forgetter — daily archival of personal-scope memories.
 
-Runs as a daily cron job. Prunes old/low-confidence personal memories
-while preserving frequently-accessed entries (retrieval_count >= 5).
-Division and org scope entries are never auto-pruned.
-"""
+Runs as a daily cron job. Archives old/low-confidence personal memories
+(sets scope = 'archived') instead of deleting them — like human long-term
+storage: hard to retrieve but not permanently lost.
+Division and org scope entries are never auto-archived.
+Frequently-accessed entries (retrieval_count >= 5) are immune."""
 from __future__ import annotations
 
 import logging
@@ -54,13 +55,15 @@ class MemoryForgetter:
         async with get_session() as session:
             result = await session.execute(
                 text("""
-                    DELETE FROM memories
+                    UPDATE memories
+                    SET scope = 'archived'
                     WHERE id IN (
                         SELECT id FROM memories
                         WHERE agent_id = :agent_id
                           AND scope = 'personal'
                           AND confidence < :conf_limit
                           AND retrieval_count < :immune
+                          AND (source IS NULL OR source != 'wiki')
                         ORDER BY created_at ASC
                         LIMIT :limit
                     )
@@ -78,7 +81,7 @@ class MemoryForgetter:
             await session.commit()
 
         log.info(
-            "memory.forgetter: pruned %d/%d over-limit personal memories for agent %s",
+            "memory.forgetter: archived %d/%d over-limit personal memories for agent %s",
             pruned, to_prune, self.agent_id,
         )
         return pruned
@@ -91,13 +94,15 @@ class MemoryForgetter:
         async with get_session() as session:
             result = await session.execute(
                 text("""
-                    DELETE FROM memories
+                    UPDATE memories
+                    SET scope = 'archived'
                     WHERE id IN (
                         SELECT id FROM memories
                         WHERE agent_id = :agent_id
                           AND scope = 'personal'
                           AND confidence < :conf_limit
                           AND retrieval_count < :immune
+                          AND (source IS NULL OR source != 'wiki')
                           AND created_at < now() - INTERVAL '30 days'
                         ORDER BY created_at ASC
                     )
@@ -114,7 +119,7 @@ class MemoryForgetter:
             await session.commit()
 
         log.info(
-            "memory.forgetter: budget-pressure pruned %d personal memories for agent %s",
+            "memory.forgetter: budget-pressure archived %d personal memories for agent %s",
             pruned, self.agent_id,
         )
         return pruned

@@ -1,0 +1,599 @@
+"""Screenshot tool using mss."""
+from __future__ import annotations
+
+import base64
+import io
+
+
+async def screenshot(monitor: int | None = None) -> dict:
+    try:
+        import mss
+        import mss.tools
+        from PIL import Image
+
+        with mss.mss() as sct:
+            mon_idx = (monitor or 1)
+            if mon_idx >= len(sct.monitors):
+                mon_idx = 1
+            mon = sct.monitors[mon_idx]
+            raw = sct.grab(mon)
+            img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+
+            # Resize if wider than 1920px
+            if img.width > 1920:
+                ratio = 1920 / img.width
+                img = img.resize((1920, int(img.height * ratio)), Image.LANCZOS)
+
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            b64 = base64.b64encode(buf.getvalue()).decode()
+            return {
+                "image_base64": b64,
+                "width": img.width,
+                "height": img.height,
+                "monitor": mon_idx,
+            }
+    except ImportError as exc:
+        return {"error": f"mss or PIL not installed: {exc}"}
+    except Exception as exc:
+        return {"error": str(exc)}
+"""Keyboard, mouse, and clipboard input tools."""
+from __future__ import annotations
+
+import sys
+
+
+async def type_text(text: str, interval: float = 0.02) -> dict:
+    try:
+        from pynput.keyboard import Controller
+        kb = Controller()
+        for ch in text:
+            kb.type(ch)
+            if interval > 0:
+                import asyncio
+                await asyncio.sleep(interval)
+        return {"typed": True, "length": len(text)}
+    except ImportError:
+        return {"typed": False, "error": "pynput not installed"}
+    except Exception as exc:
+        return {"typed": False, "error": str(exc)}
+
+
+async def hotkey(keys: list[str]) -> dict:
+    try:
+        import pyautogui
+        pyautogui.hotkey(*keys)
+        return {"sent": True, "keys": keys}
+    except ImportError:
+        return {"sent": False, "error": "pyautogui not installed"}
+    except Exception as exc:
+        return {"sent": False, "error": str(exc)}
+
+
+async def mouse_click(x: int, y: int, button: str = "left") -> dict:
+    try:
+        import pyautogui
+        pyautogui.click(x, y, button=button)
+        return {"clicked": True, "x": x, "y": y}
+    except ImportError:
+        return {"clicked": False, "error": "pyautogui not installed"}
+    except Exception as exc:
+        return {"clicked": False, "error": str(exc)}
+"""Clipboard tools using pyperclip."""
+from __future__ import annotations
+
+
+async def get_clipboard() -> dict:
+    try:
+        import pyperclip
+        return {"content": pyperclip.paste()}
+    except ImportError:
+        return {"content": "", "error": "pyperclip not installed"}
+    except Exception as exc:
+        return {"content": "", "error": str(exc)}
+
+
+async def set_clipboard(text: str) -> dict:
+    try:
+        import pyperclip
+        pyperclip.copy(text)
+        return {"set": True}
+    except ImportError:
+        return {"set": False, "error": "pyperclip not installed"}
+    except Exception as exc:
+        return {"set": False, "error": str(exc)}
+"""Shell and application launch tools (T1 only)."""
+from __future__ import annotations
+
+import subprocess
+
+
+async def run_app(executable: str, args: list[str] | None = None) -> dict:
+    try:
+        cmd = [executable] + (args or [])
+        proc = subprocess.Popen(cmd)
+        return {"pid": proc.pid, "started": True}
+    except FileNotFoundError:
+        return {"pid": -1, "started": False, "error": f"Executable not found: {executable}"}
+    except Exception as exc:
+        return {"pid": -1, "started": False, "error": str(exc)}
+
+
+async def shell_exec(command: str, timeout: int = 30) -> dict:
+    _MAX_OUTPUT = 10 * 1024  # 10 KB
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        return {
+            "stdout": result.stdout[:_MAX_OUTPUT],
+            "stderr": result.stderr[:_MAX_OUTPUT],
+            "exit_code": result.returncode,
+        }
+    except subprocess.TimeoutExpired:
+        return {"stdout": "", "stderr": "timed out", "exit_code": -1}
+    except Exception as exc:
+        return {"stdout": "", "stderr": str(exc), "exit_code": -1}
+"""Desktop agent tool registry — maps tool names to async callables."""
+from __future__ import annotations
+
+from typing import Any, Callable, Awaitable
+
+# Import tool implementations (conditional on platform availability)
+try:
+    from .screen import screenshot
+except Exception:
+    async def screenshot(**kwargs) -> dict: return {"error": "not available"}
+
+try:
+    from .uia import list_windows, find_control, click_control, get_control_text
+except Exception:
+    async def list_windows(**kwargs) -> dict: return {"error": "not available"}
+    async def find_control(**kwargs) -> dict: return {"error": "not available"}
+    async def click_control(**kwargs) -> dict: return {"error": "not available"}
+    async def get_control_text(**kwargs) -> dict: return {"error": "not available"}
+
+try:
+    from .input import type_text, hotkey, mouse_click
+except Exception:
+    async def type_text(**kwargs) -> dict: return {"error": "not available"}
+    async def hotkey(**kwargs) -> dict: return {"error": "not available"}
+    async def mouse_click(**kwargs) -> dict: return {"error": "not available"}
+
+try:
+    from .clipboard import get_clipboard, set_clipboard
+except Exception:
+    async def get_clipboard(**kwargs) -> dict: return {"error": "not available"}
+    async def set_clipboard(**kwargs) -> dict: return {"error": "not available"}
+
+try:
+    from .com_outlook import get_emails, send_email, reply_email, move_email
+except Exception:
+    async def get_emails(**kwargs) -> dict: return {"error": "not available"}
+    async def send_email(**kwargs) -> dict: return {"error": "not available"}
+    async def reply_email(**kwargs) -> dict: return {"error": "not available"}
+    async def move_email(**kwargs) -> dict: return {"error": "not available"}
+
+try:
+    from .shell import run_app, shell_exec
+except Exception:
+    async def run_app(**kwargs) -> dict: return {"error": "not available"}
+    async def shell_exec(**kwargs) -> dict: return {"error": "not available"}
+
+
+TOOL_REGISTRY: dict[str, Callable] = {
+    "desktop_screenshot": screenshot,
+    "desktop_list_windows": list_windows,
+    "desktop_find_control": find_control,
+    "desktop_click_control": click_control,
+    "desktop_get_control_text": get_control_text,
+    "desktop_type_text": type_text,
+    "desktop_hotkey": hotkey,
+    "desktop_mouse_click": mouse_click,
+    "desktop_get_clipboard": get_clipboard,
+    "desktop_set_clipboard": set_clipboard,
+    "desktop_outlook_get_emails": get_emails,
+    "desktop_outlook_send_email": send_email,
+    "desktop_outlook_reply": reply_email,
+    "desktop_outlook_move": move_email,
+    "desktop_run_app": run_app,
+    "desktop_shell": shell_exec,
+}
+"""Notifications — Windows toast via winotify and tkinter popups."""
+from __future__ import annotations
+
+import asyncio
+import logging
+import sys
+import threading
+from typing import Any
+
+log = logging.getLogger(__name__)
+
+
+class NotificationManager:
+    def notify_pending(self, count: int) -> None:
+        self._toast(
+            "NUVEX Desktop Agent",
+            f"You have {count} task(s) ready — waiting for your desktop to be free",
+        )
+
+    def notify_executing(self, task_name: str) -> None:
+        self._toast("NUVEX Desktop Agent", f"Executing: {task_name}")
+
+    def notify_complete(self, summary: str) -> None:
+        self._toast("NUVEX Desktop Agent", f"Done: {summary}")
+
+    def notify_error(self, message: str) -> None:
+        self._toast("NUVEX Desktop Agent", f"Error: {message}")
+
+    def _toast(self, title: str, message: str) -> None:
+        if sys.platform != "win32":
+            log.info("[toast] %s: %s", title, message)
+            return
+        try:
+            from winotify import Notification
+            n = Notification(app_id="NUVEX", title=title, msg=message)
+            n.show()
+        except Exception as exc:
+            log.debug("toast failed: %s", exc)
+
+    async def show_approval_popup(self, tasks: list) -> bool:
+        """Show approval dialog. Returns True if user approves."""
+        if sys.platform != "win32":
+            return True  # auto-approve in non-GUI environments
+        result: list[bool] = []
+        event = threading.Event()
+
+        def _show() -> None:
+            try:
+                import tkinter as tk
+                from tkinter import ttk
+                root = tk.Tk()
+                root.title("NUVEX — Approve Tasks")
+                root.geometry("400x300")
+                root.attributes("-topmost", True)
+                tk.Label(root, text=f"NUVEX wants to run {len(tasks)} task(s):", font=("Arial", 11)).pack(pady=10)
+                for t in tasks[:5]:
+                    tk.Label(root, text=f"• {getattr(t, 'tool', str(t))}").pack(anchor="w", padx=20)
+                if len(tasks) > 5:
+                    tk.Label(root, text=f"... and {len(tasks) - 5} more").pack(anchor="w", padx=20)
+                frame = tk.Frame(root)
+                frame.pack(pady=20)
+                def _approve():
+                    result.append(True)
+                    root.destroy()
+                def _reject():
+                    result.append(False)
+                    root.destroy()
+                tk.Button(frame, text="Approve All", command=_approve, bg="#4CAF50", fg="white").pack(side="left", padx=5)
+                tk.Button(frame, text="Reject All", command=_reject, bg="#f44336", fg="white").pack(side="left", padx=5)
+                root.after(300_000, _reject)  # auto-reject after 5 min
+                root.mainloop()
+            except Exception as exc:
+                log.warning("approval popup failed: %s", exc)
+                result.append(False)
+            finally:
+                event.set()
+
+        t = threading.Thread(target=_show, daemon=True)
+        t.start()
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, event.wait)
+        return bool(result) and result[0]
+"""First-run setup wizard (tkinter)."""
+from __future__ import annotations
+
+import logging
+import sys
+
+log = logging.getLogger(__name__)
+
+
+def run_wizard():
+    """Show first-run wizard. Returns DesktopAgentConfig or None if cancelled."""
+    if sys.platform != "win32":
+        log.info("setup_wizard: non-Windows platform, returning default config")
+        from .config import DesktopAgentConfig
+        return DesktopAgentConfig()
+
+    try:
+        import tkinter as tk
+        from tkinter import ttk
+        from .config import DesktopAgentConfig, save_config
+
+        result: list = []
+
+        root = tk.Tk()
+        root.title("NUVEX Desktop Agent — Setup")
+        root.geometry("500x400")
+        root.resizable(False, False)
+
+        tk.Label(root, text="NUVEX Desktop Agent Setup", font=("Arial", 14, "bold")).pack(pady=15)
+
+        frame = tk.Frame(root)
+        frame.pack(padx=30, fill="x")
+
+        tk.Label(frame, text="Brain URL:").grid(row=0, column=0, sticky="w", pady=5)
+        brain_url_var = tk.StringVar(value="http://localhost:9100")
+        tk.Entry(frame, textvariable=brain_url_var, width=40).grid(row=0, column=1, pady=5)
+
+        tk.Label(frame, text="Device Token:").grid(row=1, column=0, sticky="w", pady=5)
+        token_var = tk.StringVar()
+        tk.Entry(frame, textvariable=token_var, width=40, show="*").grid(row=1, column=1, pady=5)
+
+        tk.Label(frame, text="Mode:").grid(row=2, column=0, sticky="w", pady=5)
+        mode_var = tk.StringVar(value="ask")
+        mode_frame = tk.Frame(frame)
+        mode_frame.grid(row=2, column=1, sticky="w")
+        tk.Radiobutton(mode_frame, text="Ask for permission", variable=mode_var, value="ask").pack(side="left")
+        tk.Radiobutton(mode_frame, text="Auto", variable=mode_var, value="auto").pack(side="left")
+
+        tk.Label(frame, text="Idle threshold (s):").grid(row=3, column=0, sticky="w", pady=5)
+        idle_var = tk.IntVar(value=60)
+        tk.Scale(frame, variable=idle_var, from_=15, to=300, orient="horizontal", length=200).grid(row=3, column=1)
+
+        status_label = tk.Label(root, text="", fg="gray")
+        status_label.pack(pady=5)
+
+        def _test_connection():
+            import urllib.request
+            url = brain_url_var.get().rstrip("/") + "/health"
+            try:
+                urllib.request.urlopen(url, timeout=3)
+                status_label.config(text="Connection OK", fg="green")
+            except Exception as exc:
+                status_label.config(text=f"Failed: {exc}", fg="red")
+
+        def _save():
+            cfg = DesktopAgentConfig(
+                brain_url=brain_url_var.get().strip(),
+                auth_token=token_var.get().strip(),
+                desktop_mode=mode_var.get(),
+                idle_threshold_seconds=idle_var.get(),
+            )
+            save_config(cfg)
+            result.append(cfg)
+            root.destroy()
+
+        def _cancel():
+            root.destroy()
+
+        btn_frame = tk.Frame(root)
+        btn_frame.pack(pady=10)
+        tk.Button(btn_frame, text="Test Connection", command=_test_connection).pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Save & Start", command=_save, bg="#4CAF50", fg="white").pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Cancel", command=_cancel).pack(side="left", padx=5)
+
+        root.mainloop()
+        return result[0] if result else None
+
+    except Exception as exc:
+        log.warning("setup_wizard: failed: %s", exc)
+        return None
+
+
+def open_settings(cfg=None, conn=None) -> None:
+    """Open the settings window pre-filled with current config. Blocks until closed."""
+    if sys.platform != "win32":
+        return
+
+    try:
+        import tkinter as tk
+        from desktop_agent.config import DesktopAgentConfig, load_config, save_config
+
+        if cfg is None:
+            cfg = load_config()
+
+        root = tk.Tk()
+        root.title("NUVEX Desktop Agent — Settings")
+        root.geometry("500x450")
+        root.resizable(False, False)
+        root.lift()
+        root.focus_force()
+
+        tk.Label(root, text="NUVEX Desktop Agent Settings", font=("Arial", 14, "bold")).pack(pady=15)
+
+        # Live connection status banner
+        conn_status_var = tk.StringVar()
+        conn_status_label = tk.Label(root, textvariable=conn_status_var, font=("Arial", 10))
+        conn_status_label.pack(pady=(0, 8))
+
+        def _update_conn_status():
+            if conn is not None and conn.is_connected:
+                conn_status_var.set("● Connected to NUVEX")
+                conn_status_label.config(fg="#4CAF50")
+            else:
+                conn_status_var.set("● Disconnected")
+                conn_status_label.config(fg="#9E9E9E")
+            root.after(1000, _update_conn_status)
+
+        _update_conn_status()
+
+        frame = tk.Frame(root)
+        frame.pack(padx=30, fill="x")
+
+        tk.Label(frame, text="Brain URL:").grid(row=0, column=0, sticky="w", pady=5)
+        brain_url_var = tk.StringVar(value=cfg.brain_url)
+        tk.Entry(frame, textvariable=brain_url_var, width=40).grid(row=0, column=1, pady=5)
+
+        tk.Label(frame, text="Device Token:").grid(row=1, column=0, sticky="w", pady=5)
+        token_var = tk.StringVar(value=cfg.auth_token)
+        tk.Entry(frame, textvariable=token_var, width=40, show="*").grid(row=1, column=1, pady=5)
+
+        tk.Label(frame, text="Mode:").grid(row=2, column=0, sticky="w", pady=5)
+        mode_var = tk.StringVar(value=cfg.desktop_mode)
+        mode_frame = tk.Frame(frame)
+        mode_frame.grid(row=2, column=1, sticky="w")
+        tk.Radiobutton(mode_frame, text="Ask for permission", variable=mode_var, value="ask").pack(side="left")
+        tk.Radiobutton(mode_frame, text="Auto", variable=mode_var, value="auto").pack(side="left")
+
+        tk.Label(frame, text="Idle threshold (s):").grid(row=3, column=0, sticky="w", pady=5)
+        idle_var = tk.IntVar(value=cfg.idle_threshold_seconds)
+        tk.Scale(frame, variable=idle_var, from_=15, to=300, orient="horizontal", length=200).grid(row=3, column=1)
+
+        status_label = tk.Label(root, text="", fg="gray")
+        status_label.pack(pady=5)
+
+        def _test_connection():
+            import urllib.request
+            url = brain_url_var.get().rstrip("/") + "/health"
+            try:
+                urllib.request.urlopen(url, timeout=3)
+                status_label.config(text="Connection OK", fg="green")
+            except Exception as exc:
+                status_label.config(text=f"Failed: {exc}", fg="red")
+
+        def _save():
+            new_cfg = DesktopAgentConfig(
+                brain_url=brain_url_var.get().strip(),
+                device_id=cfg.device_id,
+                auth_token=token_var.get().strip(),
+                desktop_mode=mode_var.get(),
+                idle_threshold_seconds=idle_var.get(),
+            )
+            save_config(new_cfg)
+            status_label.config(text="Saved. Reconnecting...", fg="green")
+            root.after(800, root.destroy)
+
+        def _cancel():
+            root.destroy()
+
+        btn_frame = tk.Frame(root)
+        btn_frame.pack(pady=10)
+        tk.Button(btn_frame, text="Test Connection", command=_test_connection).pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Save", command=_save, bg="#4CAF50", fg="white").pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Cancel", command=_cancel).pack(side="left", padx=5)
+
+        root.mainloop()
+
+    except Exception as exc:
+        log.warning("setup_wizard: open_settings failed: %s", exc)
+"""Scheduler — holds local task queue, manages execution based on idle/permission state."""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Awaitable
+
+log = logging.getLogger(__name__)
+
+_MAX_TOOL_CALLS_PER_SECOND = 5
+
+
+@dataclass
+class LocalTask:
+    call_id: str
+    tool: str
+    args: dict[str, Any]
+    conn: Any  # Connection reference
+
+
+class Scheduler:
+    """Manages local task execution with cooperative idle/permission scheduling."""
+
+    def __init__(self, config) -> None:
+        self._cfg = config
+        self._queue: list[LocalTask] = []
+        self._executing = False
+        self._paused = False
+        self._mode = config.desktop_mode
+        self._rate_tokens = _MAX_TOOL_CALLS_PER_SECOND
+        self._last_token_refill = time.monotonic()
+        self._load_persisted()
+
+    def enqueue(self, task: LocalTask) -> None:
+        self._queue.append(task)
+        self._persist()
+
+    def on_idle_start(self) -> None:
+        if self._queue and not self._executing:
+            asyncio.create_task(self._run_queued())
+
+    def on_idle_end(self) -> None:
+        self._paused = True
+
+    async def _run_queued(self) -> None:
+        if self._mode == "ask":
+            await self._ask_permission()
+        else:
+            await self._execute_all()
+
+    async def _ask_permission(self) -> None:
+        from .notifications import NotificationManager
+        nm = NotificationManager()
+        approved = await nm.show_approval_popup(self._queue)
+        if approved:
+            await self._execute_all()
+        else:
+            log.info("scheduler: tasks rejected by user")
+
+    async def _execute_all(self) -> None:
+        self._executing = True
+        self._paused = False
+        try:
+            while self._queue:
+                if self._paused:
+                    log.info("scheduler: pausing — user is active")
+                    break
+                task = self._queue.pop(0)
+                await self._execute_one(task)
+                self._persist()
+        finally:
+            self._executing = False
+
+    async def _execute_one(self, task: LocalTask) -> None:
+        await self._rate_limit()
+        from .dispatcher import Dispatcher
+        from .tools import TOOL_REGISTRY
+        dispatcher = Dispatcher(TOOL_REGISTRY)
+        await dispatcher.dispatch(
+            {"type": "tool_call", "call_id": task.call_id, "tool": task.tool, "args": task.args},
+            task.conn,
+        )
+
+    async def _rate_limit(self) -> None:
+        now = time.monotonic()
+        elapsed = now - self._last_token_refill
+        self._rate_tokens = min(_MAX_TOOL_CALLS_PER_SECOND, self._rate_tokens + elapsed * _MAX_TOOL_CALLS_PER_SECOND)
+        self._last_token_refill = now
+        if self._rate_tokens < 1:
+            await asyncio.sleep(1.0 / _MAX_TOOL_CALLS_PER_SECOND)
+        else:
+            self._rate_tokens -= 1
+
+    def _queue_path(self) -> Path:
+        appdata = os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming"))
+        return Path(appdata) / "Nuvex" / "queue.json"
+
+    def _persist(self) -> None:
+        try:
+            path = self._queue_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            data = [{"call_id": t.call_id, "tool": t.tool, "args": t.args} for t in self._queue]
+            path.write_text(json.dumps(data), encoding="utf-8")
+        except Exception as exc:
+            log.warning("scheduler: persist failed: %s", exc)
+
+    def _load_persisted(self) -> None:
+        try:
+            path = self._queue_path()
+            if path.is_file():
+                data = json.loads(path.read_text(encoding="utf-8"))
+                for item in data:
+                    self._queue.append(LocalTask(
+                        call_id=item["call_id"], tool=item["tool"],
+                        args=item.get("args", {}), conn=None,
+                    ))
+                log.info("scheduler: restored %d tasks from disk", len(self._queue))
+        except Exception as exc:
+            log.warning("scheduler: load persisted failed: %s", exc)

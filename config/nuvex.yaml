@@ -1,11 +1,7 @@
-# System-wide administrator. Skills and agents use this instead of hardcoding a name.
-# contact_channel: a WhatsApp contact name, Telegram handle, or "leon" / any channel ID
-# recognized by the messaging layer.
 system:
   admin:
-    name: "Leon"
-    contact_channel: "leon"
-
+    name: Leon
+    contact_channel: leon
 agents:
 - name: maya
   tier: T1
@@ -16,8 +12,10 @@ agents:
     fast: groq/llama-3.3-70b-versatile
     code: openai/gpt-4o
     failover:
-      - openai/gpt-4o
-      - groq/llama-3.3-70b-versatile
+    - openai/gpt-4o
+    - groq/llama-3.3-70b-versatile
+    mode: standard
+    advisor: true
   routing:
     simple_reply: fast
     conversation: primary
@@ -40,33 +38,24 @@ agents:
     whatsapp:
       enabled: true
       sync_full_history: true
-      humanise_enabled: true
-      humanise_read_receipt_delay_ms: 1500
-      humanise_thinking_delay_ms: 2500
-      humanise_typing_speed_wpm: 45
-      humanise_chunk_messages: true
     telegram:
       enabled: false
       bot_token: ''
       allowed_users: ''
     email:
-      enabled: false
-      imap_host: ''
+      enabled: true
+      imap_host: mail.nuvex.co.za
       imap_port: 993
-      smtp_host: ''
+      smtp_host: mail.nuvex.co.za
       smtp_port: 587
-      email_user: ''
-      email_pass: ''
+      email_user: maya@nuvex.co.za
+      email_pass: vg0(h&]qB!qj7@^z
     slack:
       enabled: false
       bot_token: ''
-      signing_secret: ''
-      default_channel: ''
     discord:
       enabled: false
       bot_token: ''
-      guild_id: ''
-      webhook_url: ''
   forbidden_tools:
   - rm -rf /
   - format
@@ -128,6 +117,31 @@ agents:
   forbidden_tools: []
   skills: []
   description: Test agent
+- name: gatekeeper
+  tier: T3
+  division: ai-governance
+  description: System agent for contact identity management and trust governance
+  system: true
+  model:
+    primary: anthropic/claude-sonnet-4-20250514
+    fast: groq/llama-3.3-70b-versatile
+  budget:
+    per_task_usd: 0.1
+    daily_usd: 2
+    monthly_usd: 20
+  channels:
+    whatsapp:
+      enabled: false
+    telegram:
+      enabled: false
+    email:
+      enabled: false
+    slack:
+      enabled: false
+    discord:
+      enabled: false
+  forbidden_tools: []
+  skills: []
 whatsapp:
   enabled: true
   agent_id: maya
@@ -142,3 +156,27 @@ database:
   url: null
 health:
   gateway_check_interval_seconds: 30
+# Parallel tool execution (hermes-inspired-runtime §1)
+tools:
+  parallel:
+    enabled: true
+    max_concurrency: 8
+    safe_tools:
+      - read_file
+      - web_fetch
+      - web_search
+      - session_search
+      - read_tool_result
+      - memory_retrieve
+  result_budget:
+    enabled: true
+    default_max_chars: 30000
+    turn_budget_chars: 200000
+    per_tool:
+      shell: 50000
+      web_fetch: 20000
+# Multi-credential failover pool (hermes-inspired-runtime §3)
+# Add keys as env var references: ${ANTHROPIC_API_KEY_1}
+llm:
+  credential_pools:
+    providers: {}

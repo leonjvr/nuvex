@@ -1,0 +1,18 @@
+schema: spec-driven
+id: system-service-management
+title: System-Level Service Management & Self-Repair
+status: speccing
+priority: low
+created: 2025-07-22
+tags:
+  - self-repair
+  - service-graph
+  - health-monitoring
+  - resilience
+artifacts:
+  - proposal.md
+  - design.md
+  - specs/service-dependency-graph/spec.md
+  - specs/auto-recovery/spec.md
+  - specs/health-orchestrator/spec.md
+  - tasks.md

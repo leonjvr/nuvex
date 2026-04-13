@@ -21,6 +21,7 @@ from src.brain.outcomes import (
     IMMUNITY_RETRIEVAL_COUNT,
     USER_CONFIRMED_MULTIPLIER,
     adjust_memory_confidence,
+    record_routing_outcome,
     score_thread,
 )
 from src.brain.state import AgentState
@@ -258,3 +259,27 @@ class TestMemoryConfidenceAdjustment:
         expected_delta = BASE_SUCCESS_DELTA * USER_CONFIRMED_MULTIPLIER
         expected_conf = min(1.0, initial_confidence + expected_delta)
         assert abs(params["conf"] - expected_conf) < 1e-9
+
+
+class TestRoutingOutcomeRecorder:
+    async def test_record_routing_outcome_persists_metadata(self):
+        mock_session = AsyncMock()
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+
+        # record_routing_outcome opens a session internally; verify with patched context manager
+        with patch("src.brain.outcomes.get_session", return_value=_make_session_cm(mock_session)):
+            await record_routing_outcome(
+                agent_id="maya",
+                task_type="conversation",
+                model_name="gpt-4o-mini",
+                succeeded=True,
+                cost_usd=0.01,
+                duration_s=0.25,
+                invocation_id="inv-123",
+                route_metadata={"decision_reason": "routing_config", "fallback_used": False},
+            )
+
+        row = mock_session.add.call_args[0][0]
+        assert row.invocation_id == "inv-123"
+        assert row.route_metadata["decision_reason"] == "routing_config"

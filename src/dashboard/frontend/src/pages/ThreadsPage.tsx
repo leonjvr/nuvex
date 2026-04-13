@@ -164,10 +164,16 @@ export default function ThreadsPage() {
           <div className="space-y-3 max-w-3xl mx-auto">
             <p className="text-xs text-gray-600 mb-4">
               Thread: <span className="font-mono text-gray-500">{selected}</span>
-              {auditEntries && (
-                <span className="ml-3">
-                  · {auditEntries.length} governance entries
-                </span>
+              {auditEntries && auditEntries.length > 0 && (
+                <button
+                  onClick={() => {
+                    const first = document.querySelector('[data-gov-toggle]') as HTMLButtonElement;
+                    first?.click();
+                  }}
+                  className="ml-3 px-1.5 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs"
+                >
+                  {auditEntries.length} governance {auditEntries.length === 1 ? 'decision' : 'decisions'} ↕
+                </button>
               )}
             </p>
             {messages.map((m: any) => (

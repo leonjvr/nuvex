@@ -107,3 +107,45 @@ def _to_out(r: CronEntry) -> CronEntryOut:
         next_run_at=r.next_run_at.isoformat() if r.next_run_at else None,
         created_at=r.created_at.isoformat(),
     )
+
+
+# ── Org-scoped cron endpoints  (task 15.3) ────────────────────────────────────
+
+org_cron_router = APIRouter(tags=["cron"])
+
+
+@org_cron_router.get("", response_model=list[CronEntryOut])
+async def list_org_cron_jobs(org_id: str) -> list[CronEntryOut]:
+    """Return all cron jobs for a specific organisation."""
+    async with get_session() as session:
+        result = await session.execute(
+            select(CronEntry)
+            .where(CronEntry.org_id == org_id)
+            .order_by(CronEntry.name)
+        )
+        rows = list(result.scalars())
+    return [_to_out(r) for r in rows]
+
+
+@org_cron_router.post("", response_model=CronEntryOut, status_code=201)
+async def create_org_cron_job(org_id: str, body: CronCreate) -> CronEntryOut:
+    """Register a cron job scoped to a specific organisation."""
+    try:
+        await register_cron(
+            name=body.name,
+            agent_id=body.agent_id,
+            schedule=body.schedule,
+            task_payload=body.task_payload,
+            org_id=org_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    async with get_session() as session:
+        result = await session.execute(select(CronEntry).where(CronEntry.name == body.name))
+        row = result.scalar_one_or_none()
+    if row is None:  # pragma: no cover
+        raise HTTPException(status_code=500, detail="Job was registered but not found")
+    return _to_out(row)

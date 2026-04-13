@@ -16,6 +16,7 @@ class BudgetLedger(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    org_id: Mapped[str] = mapped_column(String(100), nullable=False, server_default="")
     division: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     model: Mapped[str] = mapped_column(String(200), nullable=False)
     provider: Mapped[str] = mapped_column(String(100), nullable=False, default="")

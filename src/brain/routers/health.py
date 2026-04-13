@@ -63,4 +63,20 @@ async def probe_llm_providers() -> dict:
 
     results = await asyncio.gather(*[_probe(p, m) for p, m in PROBES])
     all_ok = all(r["status"] == "ok" for r in results)
+
+    # Persist probe results so the dashboard service health table stays current
+    from ..health import get_health_monitor
+    monitor = get_health_monitor()
+    for r in results:
+        monitor.record(
+            r["model"],
+            success=r["status"] == "ok",
+            latency_ms=r.get("latency_ms"),
+            error=r.get("error"),
+        )
+    try:
+        await monitor.persist_all()
+    except Exception:
+        pass
+
     return {"overall": "ok" if all_ok else "partial", "providers": list(results)}

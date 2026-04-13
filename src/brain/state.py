@@ -16,6 +16,7 @@ class AgentState(BaseModel):
 
     # Core inputs
     agent_id: str
+    org_id: str = "default"
     thread_id: str
     invocation_id: str = Field(default_factory=lambda: str(uuid4()))
 
@@ -50,6 +51,12 @@ class AgentState(BaseModel):
     channel: str = ""
     sender: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    # Contact identity resolution (populated by ContactResolver in invoke.py)
+    contact_id: str | None = None
+    contact_trust_tier: int = 0  # 0=T0 .. 4=T4
+    contact_sanction: str | None = None  # NULL | temp_ban | hard_ban | shadowban | under_review
+    contact_sanction_until: str | None = None  # ISO8601 if temp_ban
 
     # Workspace & tool context
     workspace_path: str | None = None

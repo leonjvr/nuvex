@@ -1,0 +1,13 @@
+C:\Users\leon\repos\nuvex\src\nuvex-desktop\target\debug\deps\toml-7a5b3fb846d50187.d: C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\lib.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\map.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\value.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\de.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\ser.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\macros.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\edit.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\fmt.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\table.rs
+
+C:\Users\leon\repos\nuvex\src\nuvex-desktop\target\debug\deps\libtoml-7a5b3fb846d50187.rmeta: C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\lib.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\map.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\value.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\de.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\ser.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\macros.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\edit.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\fmt.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\table.rs
+
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\lib.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\map.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\value.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\de.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\ser.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\macros.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\edit.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\fmt.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.2\src\table.rs:

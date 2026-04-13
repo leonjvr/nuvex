@@ -26,6 +26,7 @@ class FailureScenario(str, Enum):
     DatabaseConnectionLost = "database_connection_lost"
     OutOfBudget = "out_of_budget"
     ContextWindowOverflow = "context_window_overflow"
+    CredentialExhausted = "credential_exhausted"
     Unknown = "unknown"
 
 
@@ -75,6 +76,10 @@ _RECIPES: dict[FailureScenario, list[RecoveryStep]] = {
     FailureScenario.ContextWindowOverflow: [
         RecoveryStep.trigger_compaction,
         RecoveryStep.retry_with_delay,
+    ],
+    FailureScenario.CredentialExhausted: [
+        RecoveryStep.switch_fallback_model,
+        RecoveryStep.escalate,
     ],
     FailureScenario.Unknown: [
         RecoveryStep.retry_with_delay,

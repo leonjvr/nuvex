@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useOrg } from "../OrgContext";
 
 const API = "/api/costs";
 
@@ -8,6 +10,179 @@ async function fetchSummary() {
   if (!res.ok) throw new Error("Failed to fetch summary");
   return res.json() as Promise<AgentSummary[]>;
 }
+
+interface LedgerItem {
+  id: string;
+  agent_id: string;
+  org_id: string;
+  division: string;
+  model: string;
+  provider: string;
+  thread_id: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  routed_from: string | null;
+  primary_cost_usd: number | null;
+  timestamp: string;
+}
+
+interface LedgerPage {
+  total: number;
+  page: number;
+  page_size: number;
+  items: LedgerItem[];
+}
+
+async function fetchLedger(params: Record<string, string | number | null | undefined>): Promise<LedgerPage> {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== null && v !== undefined && v !== "") p.set(k, String(v));
+  }
+  const res = await fetch(`${API}/ledger?${p}`);
+  if (!res.ok) throw new Error("Failed to fetch ledger");
+  return res.json();
+}
+
+function LedgerPanel() {
+  const { activeOrg } = useOrg();
+  const [agentFilter, setAgentFilter] = useState("");
+  const [modelFilter, setModelFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["costs-ledger", activeOrg, agentFilter, modelFilter, page],
+    queryFn: () => fetchLedger({ org_id: activeOrg, agent_id: agentFilter || null, model: modelFilter || null, page, page_size: PAGE_SIZE }),
+  });
+
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const totalCost = items.reduce((s, r) => s + r.cost_usd, 0);
+  const totalIn = items.reduce((s, r) => s + r.input_tokens, 0);
+  const totalOut = items.reduce((s, r) => s + r.output_tokens, 0);
+
+  return (
+    <div className="space-y-3">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <input
+          value={agentFilter}
+          onChange={(e) => { setAgentFilter(e.target.value); setPage(1); }}
+          placeholder="Filter by agent…"
+          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500 placeholder:text-gray-600 w-48"
+        />
+        <input
+          value={modelFilter}
+          onChange={(e) => { setModelFilter(e.target.value); setPage(1); }}
+          placeholder="Filter by model…"
+          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500 placeholder:text-gray-600 w-48"
+        />
+        {(agentFilter || modelFilter) && (
+          <button onClick={() => { setAgentFilter(""); setModelFilter(""); setPage(1); }}
+            className="text-xs text-gray-500 hover:text-gray-300 px-2">Clear</button>
+        )}
+        <span className="ml-auto text-xs text-gray-500 self-center">{total.toLocaleString()} transactions</span>
+      </div>
+
+      {/* Page totals — always visible */}
+      {!isLoading && (
+        <div className="flex gap-6 text-xs text-gray-400 bg-gray-800/40 px-4 py-2 rounded-lg">
+          <span>Page total: <span className="font-mono text-yellow-300">${totalCost.toFixed(6)}</span></span>
+          <span>Tokens in: <span className="font-mono">{totalIn.toLocaleString()}</span></span>
+          <span>Tokens out: <span className="font-mono">{totalOut.toLocaleString()}</span></span>
+        </div>
+      )}
+
+      {/* Table */}
+      {isLoading ? (
+        <p className="text-gray-400 text-sm">Loading…</p>
+      ) : items.length === 0 ? (
+        <>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-gray-500 border-b border-gray-800">
+                <th className="pb-2 pr-4">Time</th>
+                <th className="pb-2 pr-4">Agent</th>
+                <th className="pb-2 pr-4">Model</th>
+                <th className="pb-2 pr-4">Thread</th>
+                <th className="pb-2 pr-4 text-right">Tokens In</th>
+                <th className="pb-2 pr-4 text-right">Tokens Out</th>
+                <th className="pb-2 pr-4 text-right">Cost (USD)</th>
+                <th className="pb-2 text-right">Savings</th>
+              </tr>
+            </thead>
+          </table>
+          <p className="text-gray-500 text-sm py-8 text-center">No transactions recorded yet. Transactions appear here after each LLM call.</p>
+        </>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-gray-500 border-b border-gray-800">
+                <th className="pb-2 pr-4">Time</th>
+                <th className="pb-2 pr-4">Agent</th>
+                <th className="pb-2 pr-4">Model</th>
+                <th className="pb-2 pr-4">Thread</th>
+                <th className="pb-2 pr-4 text-right">Tokens In</th>
+                <th className="pb-2 pr-4 text-right">Tokens Out</th>
+                <th className="pb-2 pr-4 text-right">Cost (USD)</th>
+                <th className="pb-2 text-right">Savings</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((r) => {
+                const savings = r.primary_cost_usd != null ? Math.max(0, r.primary_cost_usd - r.cost_usd) : null;
+                return (
+                  <tr key={r.id} className="border-b border-gray-800/40 hover:bg-gray-800/20">
+                    <td className="py-1.5 pr-4 text-gray-500 whitespace-nowrap">
+                      {new Date(r.timestamp).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                    </td>
+                    <td className="py-1.5 pr-4 font-medium text-gray-200">{r.agent_id}</td>
+                    <td className="py-1.5 pr-4 font-mono text-gray-400 max-w-[160px] truncate" title={r.model}>
+                      {r.routed_from ? (
+                        <span className="text-emerald-400" title={`Routed from ${r.routed_from}`}>{r.model} ↩</span>
+                      ) : r.model}
+                    </td>
+                    <td className="py-1.5 pr-4 font-mono text-gray-600 max-w-[100px] truncate" title={r.thread_id}>
+                      {r.thread_id ? r.thread_id.slice(0, 8) + "…" : "—"}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right font-mono">{r.input_tokens.toLocaleString()}</td>
+                    <td className="py-1.5 pr-4 text-right font-mono">{r.output_tokens.toLocaleString()}</td>
+                    <td className="py-1.5 pr-4 text-right font-mono text-yellow-300">${r.cost_usd.toFixed(6)}</td>
+                    <td className="py-1.5 text-right font-mono">
+                      {savings != null && savings > 0 ? (
+                        <span className="text-emerald-400">-${savings.toFixed(6)}</span>
+                      ) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pagination — always visible */}
+      {!isLoading && (
+        <div className="flex items-center justify-between pt-2">
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 disabled:opacity-30">
+            <ChevronLeft size={14} /> Prev
+          </button>
+          <span className="text-xs text-gray-500">Page {page} of {totalPages}</span>
+          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 disabled:opacity-30">
+            Next <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 async function fetchBreakdown(groupBy: string) {
   const res = await fetch(`${API}/breakdown?group_by=${groupBy}`);
@@ -329,7 +504,11 @@ function AlertsPanel() {
   );
 }
 
+const COST_TABS = ["Overview", "Transactions"] as const;
+type CostTab = (typeof COST_TABS)[number];
+
 export default function CostsPage() {
+  const [tab, setTab] = useState<CostTab>("Overview");
   const [groupBy, setGroupBy] = useState<"model" | "division">("model");
 
   const { data: summary = [], isLoading: loadingSummary } = useQuery({
@@ -346,63 +525,87 @@ export default function CostsPage() {
   });
 
   return (
-    <div className="p-6 space-y-8">
-      <h1 className="text-2xl font-semibold">Cost Analytics</h1>
-
-      {/* Summary Cards */}
-      <section>
-        <h2 className="text-lg font-medium mb-4">Agent Budget Summary</h2>
-        {loadingSummary ? (
-          <p className="text-gray-400 text-sm">Loading…</p>
-        ) : summary.length === 0 ? (
-          <p className="text-gray-500 text-sm">No cost data recorded yet.</p>
-        ) : (
-          <SummaryCards rows={summary} />
-        )}
-      </section>
-
-      {/* Breakdown Table */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium">Cost Breakdown</h2>
-          <div className="flex gap-2">
-            {(["model", "division"] as const).map((g) => (
-              <button
-                key={g}
-                onClick={() => setGroupBy(g)}
-                className={`text-xs px-3 py-1 rounded ${
-                  groupBy === g
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                }`}
-              >
-                By {g}
-              </button>
-            ))}
-          </div>
+    <div className="p-6">
+      {/* Header + tabs */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold">Cost Analytics</h1>
+        <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-lg p-1">
+          {COST_TABS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`text-sm px-4 py-1.5 rounded ${
+                tab === t
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
-        {loadingBreakdown ? (
-          <p className="text-gray-400 text-sm">Loading…</p>
-        ) : (
-          <BreakdownTable rows={breakdown} groupBy={groupBy} />
-        )}
-      </section>
+      </div>
 
-      {/* Routing Savings */}
-      <section>
-        <h2 className="text-lg font-medium mb-4">Routing Savings</h2>
-        {loadingSavings ? (
-          <p className="text-gray-400 text-sm">Loading…</p>
-        ) : (
-          <SavingsPanel rows={savings} />
-        )}
-      </section>
+      {tab === "Overview" && (
+        <div className="space-y-8">
+          {/* Summary Cards */}
+          <section>
+            <h2 className="text-lg font-medium mb-4">Agent Budget Summary</h2>
+            {loadingSummary ? (
+              <p className="text-gray-400 text-sm">Loading…</p>
+            ) : summary.length === 0 ? (
+              <p className="text-gray-500 text-sm">No cost data recorded yet.</p>
+            ) : (
+              <SummaryCards rows={summary} />
+            )}
+          </section>
 
-      {/* Alert Configuration */}
-      <section>
-        <h2 className="text-lg font-medium mb-4">Budget Alerts</h2>
-        <AlertsPanel />
-      </section>
+          {/* Breakdown Table */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium">Cost Breakdown</h2>
+              <div className="flex gap-2">
+                {(["model", "division"] as const).map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setGroupBy(g)}
+                    className={`text-xs px-3 py-1 rounded ${
+                      groupBy === g
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                  >
+                    By {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {loadingBreakdown ? (
+              <p className="text-gray-400 text-sm">Loading…</p>
+            ) : (
+              <BreakdownTable rows={breakdown} groupBy={groupBy} />
+            )}
+          </section>
+
+          {/* Routing Savings */}
+          <section>
+            <h2 className="text-lg font-medium mb-4">Routing Savings</h2>
+            {loadingSavings ? (
+              <p className="text-gray-400 text-sm">Loading…</p>
+            ) : (
+              <SavingsPanel rows={savings} />
+            )}
+          </section>
+
+          {/* Alert Configuration */}
+          <section>
+            <h2 className="text-lg font-medium mb-4">Budget Alerts</h2>
+            <AlertsPanel />
+          </section>
+        </div>
+      )}
+
+      {tab === "Transactions" && <LedgerPanel />}
     </div>
   );
 }

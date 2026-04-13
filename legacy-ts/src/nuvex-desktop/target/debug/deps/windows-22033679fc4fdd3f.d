@@ -1,0 +1,10 @@
+C:\Users\leon\repos\nuvex\src\nuvex-desktop\target\debug\deps\windows-22033679fc4fdd3f.d: C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\lib.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\mod.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\mod.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\Foundation\mod.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\Graphics\mod.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\Graphics\Gdi\mod.rs
+
+C:\Users\leon\repos\nuvex\src\nuvex-desktop\target\debug\deps\libwindows-22033679fc4fdd3f.rmeta: C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\lib.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\mod.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\mod.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\Foundation\mod.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\Graphics\mod.rs C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\Graphics\Gdi\mod.rs
+
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\lib.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\mod.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\mod.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\Foundation\mod.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\Graphics\mod.rs:
+C:\Users\leon\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.51.1\src\Windows\Win32\Graphics\Gdi\mod.rs:

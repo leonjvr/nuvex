@@ -105,14 +105,12 @@ const plugin: MessagingAdapterPlugin = {
     const authDir        = typeof config["auth_dir"] === "string"
       ? config["auth_dir"]
       : "./data/whatsapp-auth";
-    const printQr        = (config["print_qr_terminal"] as boolean | undefined) ?? true;
 
     async function connect(): Promise<void> {
       const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
       sock = makeWASocket({
         auth:             state,
-        printQRInTerminal: printQr,
         logger:           { level: "silent" } as never,
       });
 

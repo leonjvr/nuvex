@@ -181,6 +181,79 @@ async def memory_stats() -> dict[str, Any]:
     }
 
 
+@router.get("/edges")
+async def list_memory_edges(
+    agent_id: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """Return memory edges (relationships) with source/target memory content inline."""
+    async with get_session() as session:
+        agent_filter = "AND e.agent_id = :agent_id" if agent_id else ""
+        result = await session.execute(
+            text(f"""
+                SELECT
+                    e.id,
+                    e.source_id,
+                    e.target_id,
+                    e.edge_type,
+                    e.confidence,
+                    e.agent_id,
+                    e.created_at,
+                    src.content  AS source_content,
+                    src.scope    AS source_scope,
+                    tgt.content  AS target_content,
+                    tgt.scope    AS target_scope
+                FROM memory_edges e
+                JOIN memories src ON src.id = e.source_id
+                JOIN memories tgt ON tgt.id = e.target_id
+                WHERE 1=1 {agent_filter}
+                ORDER BY e.created_at DESC
+                LIMIT :limit
+            """),
+            {"limit": limit, **({"agent_id": agent_id} if agent_id else {})},
+        )
+        rows = result.mappings().all()
+    return [
+        {
+            "id": r["id"],
+            "source_id": r["source_id"],
+            "target_id": r["target_id"],
+            "edge_type": r["edge_type"],
+            "confidence": float(r["confidence"]),
+            "agent_id": r["agent_id"],
+            "created_at": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"]),
+            "source_content": str(r["source_content"])[:150],
+            "source_scope": r["source_scope"],
+            "target_content": str(r["target_content"])[:150],
+            "target_scope": r["target_scope"],
+        }
+        for r in rows
+    ]
+
+
+@router.get("/dream-log")
+async def list_dream_log() -> list[dict[str, Any]]:
+    """Return per-agent dream state: last dream, thread count, total dreams."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT agent_id, last_dream_at, threads_since_dream, dream_count, updated_at
+                FROM memory_dream_log
+                ORDER BY agent_id
+            """)
+        )
+        rows = result.mappings().all()
+    return [
+        {
+            "agent_id": r["agent_id"],
+            "last_dream_at": r["last_dream_at"].isoformat() if r["last_dream_at"] else None,
+            "threads_since_dream": int(r["threads_since_dream"]),
+            "dream_count": int(r["dream_count"]),
+        }
+        for r in rows
+    ]
+
+
 @router.get("/{memory_id}", response_model=MemoryOut)
 async def get_memory(memory_id: int) -> MemoryOut:
     """Get a single memory entry by ID."""

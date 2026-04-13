@@ -168,3 +168,43 @@ async def agent_status(agent_id: str) -> dict:
     if state is None:
         raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")
     return {"agent_id": agent_id, "lifecycle_state": state}
+
+
+# ---------------------------------------------------------------------------
+# §6.4 — Org-scoped thread endpoints: /api/v1/orgs/{org_id}/threads
+# ---------------------------------------------------------------------------
+
+org_threads_router = APIRouter(prefix="/orgs", tags=["orgs-threads"])
+
+
+@org_threads_router.get("/{org_id}/threads", response_model=list[ThreadOut])
+async def list_org_threads(org_id: str, agent_id: str | None = None, limit: int = 50) -> list[ThreadOut]:
+    """List threads scoped to an organisation with optional agent_id filter."""
+    if limit < 1 or limit > 500:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 500")
+    async with get_session() as session:
+        from .middleware import require_active_org
+        await require_active_org(org_id, session)
+        # Threads scoped by org via thread_id prefix (org_id:agent_id:...)
+        q = (
+            select(Thread)
+            .where(Thread.id.like(f"{org_id}:%"))
+            .order_by(Thread.updated_at.desc())
+            .limit(limit)
+        )
+        if agent_id:
+            q = q.where(Thread.agent_id == agent_id)
+        result = await session.execute(q)
+        rows = list(result.scalars())
+    return [
+        ThreadOut(
+            id=r.id,
+            agent_id=r.agent_id,
+            channel=r.channel,
+            participants=r.participants,
+            message_count=r.message_count,
+            created_at=r.created_at.isoformat(),
+            updated_at=r.updated_at.isoformat(),
+        )
+        for r in rows
+    ]

@@ -16,6 +16,7 @@ class CronEntry(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, server_default="default", index=True)
     schedule: Mapped[str] = mapped_column(String(100), nullable=False)  # cron expression
     task_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)

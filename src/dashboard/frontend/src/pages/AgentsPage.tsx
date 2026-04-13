@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, ChevronDown, Loader2, MessageCircle, MessageSquare, Plus, Puzzle, Send, Settings, Terminal, X } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Loader2, MessageCircle, MessageSquare, Plus, Puzzle, Send, Settings, Shield, Terminal, X } from "lucide-react";
 import AgentChatPanel from "./AgentChatPanel";
 import AgentSettingsModal from "./AgentSettingsModal";
+import { useOrg } from "../OrgContext";
 
 // ── Agent Log Modal ───────────────────────────────────────────────────────────
 
@@ -361,9 +362,19 @@ function AgentDiagnosticsModal({ agent, onClose }: { agent: any; onClose: () => 
                     <p className="text-red-300 text-sm font-mono break-all whitespace-pre-wrap">{data.last_error}</p>
                     <p className="text-xs text-gray-500 mt-1">{formatTime(data.last_error_at)}</p>
                   </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No error recorded. Current state: {stateBadge(data.lifecycle_state)}</p>
-                )}
+                ) : (() => {
+                  const fallback = data.lifecycle_events.find(
+                    (e: { to_state: string; reason: string | null; created_at: string | null }) => e.to_state === "error" && e.reason
+                  );
+                  return fallback ? (
+                    <div className="bg-red-950/40 border border-red-800/40 rounded-lg p-3">
+                      <p className="text-red-300 text-sm font-mono break-all whitespace-pre-wrap">{fallback.reason}</p>
+                      <p className="text-xs text-gray-500 mt-1">{formatTime(fallback.created_at)} (from lifecycle event)</p>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm">No error recorded. Current state: {stateBadge(data.lifecycle_state)}</p>
+                  );
+                })()}
               </section>
 
               {/* Lifecycle events */}
@@ -547,8 +558,9 @@ function agentAvatarColor(id: string) {
   return AGENT_AVATAR_COLORS[h % AGENT_AVATAR_COLORS.length];
 }
 
-async function fetchAgents() {
-  const res = await fetch("/api/agents");
+async function fetchAgents(orgId?: string) {
+  const url = orgId ? `/api/agents?org_id=${encodeURIComponent(orgId)}` : "/api/agents";
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch agents");
   return res.json();
 }
@@ -557,6 +569,7 @@ async function fetchAgents() {
 
 function InvokeModal({ agent, onClose }: { agent: any; onClose: () => void }) {
   const qc = useQueryClient();
+  const { activeOrg } = useOrg();
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<{ reply?: string; error?: string; thread_id?: string } | null>(null);
 
@@ -565,7 +578,7 @@ function InvokeModal({ agent, onClose }: { agent: any; onClose: () => void }) {
       const res = await fetch("/api/invoke", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agent_id: agent.id, message, channel: "dashboard" }),
+        body: JSON.stringify({ agent_id: agent.id, message, channel: "dashboard", org_id: activeOrg || "default" }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -767,7 +780,8 @@ function CreateAgentModal({ onClose }: { onClose: () => void }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AgentsPage() {
-  const { data, isLoading, error } = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
+  const { activeOrg } = useOrg();
+  const { data, isLoading, error } = useQuery({ queryKey: ["agents", activeOrg], queryFn: () => fetchAgents(activeOrg) });
   const [invokingAgent, setInvokingAgent] = useState<any | null>(null);
   const [chatAgent, setChatAgent] = useState<any | null>(null);
   const [settingsAgent, setSettingsAgent] = useState<any | null>(null);
@@ -794,7 +808,7 @@ export default function AgentsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.isArray(data) &&
-          data.map((agent: any) => {
+          data.filter((a: any) => !a.system).map((agent: any) => {
             const state = agent.lifecycle_state ?? "idle";
             const badgeClass = LIFECYCLE_COLORS[state] ?? "bg-gray-700 text-gray-300";
             const avatarColor = agentAvatarColor(agent.id);
@@ -881,6 +895,89 @@ export default function AgentsPage() {
             );
           })}
       </div>
+
+      {Array.isArray(data) && data.some((a: any) => a.system) && (
+        <>
+          <div className="flex items-center gap-2 mt-6 mb-3">
+            <Shield size={15} className="text-gray-400" />
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">System Agents</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {data.filter((a: any) => a.system).map((agent: any) => {
+              const state = agent.lifecycle_state ?? "idle";
+              const badgeClass = LIFECYCLE_COLORS[state] ?? "bg-gray-700 text-gray-300";
+              const avatarColor = agentAvatarColor(agent.id);
+              const initials = (agent.name || agent.id).slice(0, 2).toUpperCase();
+              return (
+                <div key={agent.id} className="bg-gray-800 rounded-xl p-4 border border-gray-700/60 flex flex-col gap-3 opacity-90">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setChatAgent(agent)}
+                      className={`w-10 h-10 rounded-full flex-none flex items-center justify-center text-sm font-bold text-white ${avatarColor} hover:opacity-80 transition-opacity cursor-pointer`}
+                      title="Open chat"
+                    >
+                      {initials}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium truncate">{agent.name || agent.id}</p>
+                        <span title="System agent"><Shield size={10} className="text-gray-500 flex-none" /></span>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${badgeClass}`}>{state}</span>
+                    </div>
+                    <button
+                      onClick={() => setSettingsAgent(agent)}
+                      className="text-gray-500 hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
+                      title="Agent settings"
+                    >
+                      <Settings size={15} />
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-400">
+                      <span className="text-gray-500">Model</span>{" "}
+                      <span className="font-mono text-xs text-gray-300">{agent.model ?? "—"}</span>
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      <span className="text-gray-500">Tier</span> {agent.tier ?? "—"}
+                    </p>
+                    {agent.division && (
+                      <p className="text-sm text-gray-400">
+                        <span className="text-gray-500">Division</span> {agent.division}
+                      </p>
+                    )}
+                  </div>
+                  <AgentSkillsEditor agentId={agent.id} />
+                  <div className="pt-1 border-t border-gray-700/50 flex items-center gap-2">
+                    <button
+                      onClick={() => setChatAgent(agent)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors"
+                    >
+                      <MessageCircle size={12} />
+                      Chats
+                    </button>
+                    <button
+                      onClick={() => setInvokingAgent(agent)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md transition-colors"
+                    >
+                      <MessageSquare size={12} />
+                      Invoke
+                    </button>
+                    <button
+                      onClick={() => setLogAgent(agent)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md transition-colors ml-auto"
+                      title="View LLM trace log"
+                    >
+                      <Terminal size={12} />
+                      Log
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {creating && (
         <CreateAgentModal onClose={() => setCreating(false)} />

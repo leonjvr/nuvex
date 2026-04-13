@@ -1,0 +1,418 @@
+"""Desktop agent entry point — asyncio event loop."""
+from __future__ import annotations
+
+import asyncio
+import logging
+
+log = logging.getLogger(__name__)
+
+
+async def _main() -> None:
+    from desktop_agent.config import load_config, is_first_run
+    from desktop_agent.connection import Connection
+
+    cfg = load_config()
+    if is_first_run(cfg):
+        from desktop_agent.setup_wizard import run_wizard
+        cfg = run_wizard()
+        if cfg is None:
+            log.info("Setup cancelled — exiting")
+            return
+
+    from desktop_agent.dispatcher import Dispatcher
+    from desktop_agent.tools import TOOL_REGISTRY
+
+    dispatcher = Dispatcher(TOOL_REGISTRY)
+    conn = Connection(cfg, dispatcher)
+
+    # Start tray in separate thread (pystray blocks its own thread)
+    try:
+        import threading
+        from desktop_agent.tray import DesktopTray
+        tray = DesktopTray(conn)
+        conn.add_connect_callback(lambda: tray.set_state("connected_idle"))
+        conn.add_disconnect_callback(lambda: tray.set_state("disconnected"))
+        tray_thread = threading.Thread(target=tray.run, daemon=True)
+        tray_thread.start()
+    except Exception as exc:
+        log.warning("Tray unavailable: %s", exc)
+
+    await conn.connect_loop()
+
+
+def main() -> None:
+    import os
+    from pathlib import Path
+
+    appdata = os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming"))
+    log_dir = Path(appdata) / "Nuvex"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "desktop-agent.log"
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        handlers=[
+            logging.FileHandler(log_file, encoding="utf-8"),
+            logging.StreamHandler(),
+        ],
+    )
+    log.info("NUVEX Desktop Agent 0.1.2 starting — log: %s", log_file)
+    asyncio.run(_main())
+
+
+if __name__ == "__main__":
+    main()
+"""WebSocket connection client with reconnect loop and heartbeat."""
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Any, AsyncGenerator, Callable
+
+log = logging.getLogger(__name__)
+
+_INITIAL_BACKOFF = 2.0
+_MAX_BACKOFF = 60.0
+
+
+class Connection:
+    def __init__(self, config, dispatcher) -> None:
+        self._cfg = config
+        self._dispatcher = dispatcher
+        self._ws = None
+        self._connected = False
+        self._on_connect_callbacks: list[Callable] = []
+        self._on_disconnect_callbacks: list[Callable] = []
+
+    @property
+    def is_connected(self) -> bool:
+        return self._connected
+
+    def add_connect_callback(self, cb: Callable) -> None:
+        self._on_connect_callbacks.append(cb)
+
+    def add_disconnect_callback(self, cb: Callable) -> None:
+        self._on_disconnect_callbacks.append(cb)
+
+    async def send(self, msg: dict) -> None:
+        if self._ws:
+            try:
+                import json
+                await self._ws.send(json.dumps(msg))
+            except Exception as exc:
+                log.warning("connection: send failed: %s", exc)
+
+    async def connect_loop(self) -> None:
+        backoff = _INITIAL_BACKOFF
+        while True:
+            try:
+                await self._run()
+                backoff = _INITIAL_BACKOFF
+            except Exception as exc:
+                log.warning("connection: error %s — reconnecting in %.0fs", exc, backoff)
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, _MAX_BACKOFF)
+
+    async def _run(self) -> None:
+        try:
+            import websockets
+        except ImportError:
+            log.error("connection: 'websockets' package not installed")
+            await asyncio.sleep(10)
+            return
+
+        if not self._cfg.auth_token:
+            log.warning("connection: no auth token configured — waiting for setup")
+            await asyncio.sleep(10)
+            return
+
+        # Step 1: register to obtain/confirm device_id
+        device_id = await self._register()
+        if not device_id:
+            return  # error already logged; backoff handled by connect_loop
+
+        ws_base = self._cfg.brain_url.replace("http://", "ws://").replace("https://", "wss://")
+        url = f"{ws_base}/devices/{device_id}/ws"
+        log.info("connection: connecting to %s", url)
+        async with websockets.connect(url) as ws:
+            self._ws = ws
+            self._connected = True
+            log.info("connection: connected")
+            for cb in self._on_connect_callbacks:
+                try:
+                    cb()
+                except Exception:
+                    pass
+            try:
+                async for raw in ws:
+                    try:
+                        import json
+                        msg = json.loads(raw)
+                        await self._handle(msg)
+                    except Exception as exc:
+                        log.warning("connection: message error: %s", exc)
+            finally:
+                self._connected = False
+                self._ws = None
+                for cb in self._on_disconnect_callbacks:
+                    try:
+                        cb()
+                    except Exception:
+                        pass
+
+    async def _register(self) -> str | None:
+        """Call POST /devices/register, persist device_id, return it (or None on failure)."""
+        import json as _json
+        import socket
+        import urllib.request
+
+        url = self._cfg.brain_url.rstrip("/") + "/devices/register"
+        payload = _json.dumps({
+            "token": self._cfg.auth_token,
+            "device_name": socket.gethostname(),
+            "platform": "windows",
+        }).encode()
+        try:
+            req = urllib.request.Request(
+                url, data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read())
+            device_id = data["device_id"]
+            if device_id != self._cfg.device_id:
+                self._cfg.device_id = device_id
+                from desktop_agent.config import save_config
+                save_config(self._cfg)
+                log.info("connection: registered as device %s", device_id)
+            return device_id
+        except urllib.error.HTTPError as exc:
+            log.error("connection: register failed HTTP %s — check token", exc.code)
+        except Exception as exc:
+            log.error("connection: register failed: %s", exc)
+        return None
+
+    async def _handle(self, msg: dict) -> None:
+        msg_type = msg.get("type")
+        if msg_type == "heartbeat":
+            await self.send({"type": "heartbeat"})
+        elif msg_type == "tool_call":
+            asyncio.create_task(self._dispatcher.dispatch(msg, self))
+        elif msg_type == "queue_drain":
+            for task in msg.get("tasks", []):
+                asyncio.create_task(self._dispatcher.dispatch(
+                    {"type": "tool_call", "call_id": task["call_id"],
+                     "tool": task["tool"], "args": task.get("args", {})},
+                    self,
+                ))
+"""Dispatcher — routes tool_call frames to registered tool implementations."""
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Any, Callable, Awaitable
+
+log = logging.getLogger(__name__)
+
+ToolFn = Callable[..., Awaitable[Any]]
+
+
+class Dispatcher:
+    def __init__(self, registry: dict[str, ToolFn]) -> None:
+        self._registry = registry
+
+    async def dispatch(self, frame: dict, conn) -> None:
+        call_id = frame.get("call_id", "")
+        tool_name = frame.get("tool", "")
+        args = frame.get("args", {})
+
+        fn = self._registry.get(tool_name)
+        if fn is None:
+            log.warning("dispatcher: unknown tool '%s'", tool_name)
+            await conn.send({
+                "type": "tool_error",
+                "call_id": call_id,
+                "error": f"unknown tool: {tool_name}",
+                "category": "not_available",
+            })
+            return
+
+        try:
+            result = await fn(**args) if asyncio.iscoroutinefunction(fn) else fn(**args)
+            await conn.send({"type": "tool_result", "call_id": call_id, "result": result})
+        except Exception as exc:
+            log.warning("dispatcher: tool '%s' error: %s", tool_name, exc)
+            category = _classify_error(exc)
+            await conn.send({
+                "type": "tool_error",
+                "call_id": call_id,
+                "error": str(exc),
+                "category": category,
+            })
+
+
+def _classify_error(exc: Exception) -> str:
+    name = type(exc).__name__.lower()
+    if "com" in name or "pywintypes" in name:
+        return "com_error"
+    if "uia" in name or "auto" in name:
+        return "uia_error"
+    if "timeout" in name:
+        return "timeout"
+    if "permission" in name or "access" in name:
+        return "permission_error"
+    return "unknown"
+"""System tray icon with state machine (pystray)."""
+from __future__ import annotations
+
+import logging
+import sys
+import threading
+from typing import Any
+
+log = logging.getLogger(__name__)
+
+_STATES = {
+    "disconnected": "grey",
+    "connected_idle": "green",
+    "queued_user_active": "orange",
+    "awaiting_permission": "orange",
+    "executing": "green",
+    "error": "red",
+}
+
+
+class DesktopTray:
+    def __init__(self, conn) -> None:
+        self._conn = conn
+        self._state = "disconnected"
+        self._icon = None
+        self._pending_count = 0
+        self._settings_open = False
+
+    def set_state(self, state: str, pending: int = 0) -> None:
+        self._state = state
+        self._pending_count = pending
+        if self._icon:
+            try:
+                self._icon.title = self._tooltip()
+                self._icon.icon = self._make_icon(state)
+            except Exception:
+                pass
+
+    def open_settings(self) -> None:
+        """Open the settings window in its own thread (tkinter needs a thread)."""
+        if self._settings_open:
+            return
+        self._settings_open = True
+        def _run():
+            try:
+                from desktop_agent.setup_wizard import open_settings
+                open_settings(self._conn._cfg, self._conn)
+                # Reload config in-place so the running connection picks it up
+                from desktop_agent.config import load_config
+                new_cfg = load_config()
+                self._conn._cfg = new_cfg
+            except Exception as exc:
+                log.warning("tray: settings window error: %s", exc)
+            finally:
+                self._settings_open = False
+        threading.Thread(target=_run, daemon=True).start()
+
+    def run(self) -> None:
+        if sys.platform != "win32":
+            return
+        try:
+            import pystray
+
+            def _on_open_settings(icon, item):
+                self.open_settings()
+
+            def _on_quit(icon, item):
+                icon.stop()
+
+            menu = pystray.Menu(
+                pystray.MenuItem(
+                    "Open Settings",
+                    _on_open_settings,
+                    default=True,
+                ),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Quit", _on_quit),
+            )
+            self._icon = pystray.Icon(
+                "NUVEX Desktop Agent",
+                icon=self._make_icon("disconnected"),
+                title=self._tooltip(),
+                menu=menu,
+            )
+            self._icon.run()
+        except Exception as exc:
+            log.warning("tray: failed to start: %s", exc)
+
+    def _tooltip(self) -> str:
+        base = f"NUVEX Desktop Agent — {self._state}"
+        if self._pending_count:
+            base += f" ({self._pending_count} pending)"
+        return base
+
+    def _make_icon(self, state: str):
+        try:
+            from PIL import Image, ImageDraw
+            color_map = {
+                "grey": "#9E9E9E", "green": "#4CAF50",
+                "orange": "#FF9800", "red": "#f44336",
+            }
+            color_name = _STATES.get(state, "grey")
+            color = color_map.get(color_name, "#9E9E9E")
+            img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.ellipse([8, 8, 56, 56], fill=color)
+            return img
+        except Exception:
+            return None
+"""Desktop agent configuration — load/save from %APPDATA%\\Nuvex\\desktop-agent.json."""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class DesktopAgentConfig(BaseModel):
+    brain_url: str = "http://localhost:9100"
+    device_id: str = ""
+    auth_token: str = ""
+    desktop_mode: Literal["ask", "auto"] = "ask"
+    idle_threshold_seconds: int = 60
+
+
+def _config_path() -> Path:
+    appdata = os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming"))
+    return Path(appdata) / "Nuvex" / "desktop-agent.json"
+
+
+def load_config() -> DesktopAgentConfig:
+    path = _config_path()
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return DesktopAgentConfig(**data)
+        except Exception:
+            pass
+    return DesktopAgentConfig()
+
+
+def save_config(cfg: DesktopAgentConfig) -> None:
+    path = _config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(cfg.model_dump_json(indent=2), encoding="utf-8")
+
+
+def is_first_run(cfg: DesktopAgentConfig) -> bool:
+    return not cfg.brain_url or not cfg.auth_token

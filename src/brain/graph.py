@@ -11,6 +11,7 @@ from .governance.budget import enforce_budget
 from .governance.check_policy import check_policy
 from .governance.classification import check_classification
 from .governance.forbidden import check_forbidden
+from .governance.identity_gate import identity_gate_node
 from .compaction import maybe_compact
 from .lifecycle import set_agent_state
 from .nodes.call_llm import call_llm
@@ -91,17 +92,18 @@ async def _run_consolidation(state: AgentState, outcome: str) -> None:
     try:
         from .memory.consolidator import MemoryConsolidator
         from ..shared.config import get_cached_config
+        from .nodes.call_llm import get_auxiliary_model_name
         cfg = get_cached_config()
         agent_def = cfg.agents.get(state.agent_id)
-        fast_model = "gpt-4o-mini"
+        fast_model = get_auxiliary_model_name(state.agent_id)
         division_id = "default"
         if agent_def:
-            fast_model = (agent_def.model.fast or agent_def.model.primary or fast_model)
             division_id = agent_def.division or "default"
         consolidator = MemoryConsolidator(
             agent_id=state.agent_id,
             division_id=division_id,
             fast_model=fast_model,
+            org_id=getattr(state, "org_id", "") or "",
         )
         facts_written = await consolidator.consolidate(
             messages=state.messages,
@@ -112,6 +114,9 @@ async def _run_consolidation(state: AgentState, outcome: str) -> None:
             "memory consolidation: thread=%s agent=%s outcome=%s facts=%d",
             state.thread_id, state.agent_id, outcome, facts_written,
         )
+        # Increment threads_since_dream counter for the dreamer gate
+        from .memory.dreamer import increment_thread_count
+        await increment_thread_count(state.agent_id)
     except Exception as exc:
         log.warning("memory consolidation failed (non-fatal): %s", exc)
 
@@ -127,6 +132,7 @@ async def _run_outcome_scoring(state: AgentState, end_time: "datetime") -> None:
 
         # 29.4.2 — record routing outcome
         task_type = state.metadata.get("task_type", "conversation") if state.metadata else "conversation"
+        route_metadata = state.metadata.get("routing_decision", {}) if state.metadata else {}
         await record_routing_outcome(
             agent_id=state.agent_id,
             task_type=task_type,
@@ -134,6 +140,8 @@ async def _run_outcome_scoring(state: AgentState, end_time: "datetime") -> None:
             succeeded=outcome.succeeded,
             cost_usd=state.cost_usd,
             duration_s=outcome.duration_s,
+            invocation_id=state.invocation_id,
+            route_metadata=route_metadata if isinstance(route_metadata, dict) else {},
         )
     except Exception as exc:
         log.warning("outcome scoring failed (non-fatal): %s", exc)
@@ -215,6 +223,7 @@ def build_graph() -> StateGraph:
     g = StateGraph(AgentState)
 
     g.add_node("lifecycle_start", _lifecycle_start)
+    g.add_node("identity_gate", identity_gate_node)
     g.add_node("route_model", route_model)
     g.add_node("auto_compact", _auto_compact)
     g.add_node("call_llm", call_llm)
@@ -231,7 +240,10 @@ def build_graph() -> StateGraph:
 
     # Pre-LLM: budget gate prevents calling LLM when over budget
     g.add_edge(START, "lifecycle_start")
-    g.add_edge("lifecycle_start", "route_model")
+    g.add_edge("lifecycle_start", "identity_gate")
+    g.add_conditional_edges(
+        "identity_gate", _governance_gate, {"next": "route_model", "end": "lifecycle_end"}
+    )
     g.add_conditional_edges("route_model", _check_budget, {"llm": "auto_compact", "end": "lifecycle_end"})
     g.add_edge("auto_compact", "call_llm")
 

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, Eye, EyeOff, Loader2, Save } from "lucide-react";
-import { CHANNEL_FIELDS, GATEWAY_STATUS, fetchAgentChannel, fetchAgentList, saveAgentChannel, type AgentChannelConfig } from "./api";
+import { CheckCircle2, ChevronDown, ChevronRight, Eye, EyeOff, Loader2, Save, Wifi, WifiOff } from "lucide-react";
+import { CHANNEL_FIELDS, GATEWAY_STATUS, fetchAgentChannel, fetchAgentList, fetchChannelGatewayStatus, saveAgentChannel, type AgentChannelConfig } from "./api";
 
 function SecretInput({ value, placeholder, onChange }: { value: string; placeholder: string; onChange: (v: string) => void }) {
   const [visible, setVisible] = useState(false);
@@ -112,15 +112,37 @@ function AgentCard({ agentId, channel }: { agentId: string; channel: string }) {
   );
 }
 
+const GATEWAY_CHANNELS = ["telegram", "email"];
+
 export default function AgentChannelSection({ channel }: { channel: string }) {
   const { data: agents = [], isLoading } = useQuery({ queryKey: ["channel-agents"], queryFn: fetchAgentList });
   const [open, setOpen] = useState(true);
   const note = GATEWAY_STATUS[channel];
+  const hasGateway = GATEWAY_CHANNELS.includes(channel);
+
+  const { data: gwStatus } = useQuery({
+    queryKey: ["channel-gateway", channel],
+    queryFn: () => fetchChannelGatewayStatus(channel),
+    enabled: hasGateway,
+    refetchInterval: 8000,
+  });
 
   if (isLoading) return <div className="text-gray-500 text-sm"><Loader2 size={14} className="animate-spin inline mr-1" />Loading agents…</div>;
 
   return (
     <div className="space-y-3">
+      {hasGateway && gwStatus && (
+        <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded border ${
+          gwStatus.connected
+            ? "bg-green-900/20 border-green-700/40 text-green-300"
+            : "bg-red-900/20 border-red-700/40 text-red-300"
+        }`}>
+          {gwStatus.connected
+            ? <Wifi size={13} />
+            : <WifiOff size={13} />}
+          <span className="capitalize">{gwStatus.state}</span>
+        </div>
+      )}
       {note && (
         <div className="bg-yellow-900/20 border border-yellow-700/40 rounded p-3 text-xs text-yellow-300">
           {note}

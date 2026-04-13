@@ -44,6 +44,7 @@ def _fake_audit(**kw):
     a.decision = kw.get("decision", "approved")
     a.stage = kw.get("stage", "execute_tools")
     a.reason = kw.get("reason", None)
+    a.org_id = kw.get("org_id", "default")
     a.sha256_hash = "a" * 64
     a.prev_hash = None
     a.cost_usd = 0.001

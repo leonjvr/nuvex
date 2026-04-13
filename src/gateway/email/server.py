@@ -2,19 +2,31 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import threading
 
 import uvicorn
 from fastapi import FastAPI
 
+from src.gateway.email._state import get_imap_state
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
 health_app = FastAPI(title="NUVEX Email Gateway", version="0.1.0")
-_running = False
 
 
 @health_app.get("/health")
 async def health():
-    return {"status": "ok", "poller": "running" if _running else "starting"}
+    state = get_imap_state()
+    return {
+        "status": "ok",
+        "imap": state,
+        "connected": state == "connected",
+    }
 
 
 def _run_health():
@@ -27,10 +39,8 @@ def _run_health():
 
 
 async def main():
-    global _running
     t = threading.Thread(target=_run_health, daemon=True)
     t.start()
-    _running = True
     from .poller import run_poller
     await run_poller()
 

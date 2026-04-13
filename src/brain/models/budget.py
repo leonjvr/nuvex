@@ -14,6 +14,7 @@ class Budget(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, server_default="default", index=True)
     division: Mapped[str] = mapped_column(String(100), nullable=False)
 
     daily_usd_used: Mapped[float] = mapped_column(default=0.0)

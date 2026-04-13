@@ -73,6 +73,7 @@ function InvocationGroup({ invocationId, events }: { invocationId: string; event
                   </div>
                   <p className="text-xs text-gray-600 mt-0.5">
                     {e.created_at ? new Date(e.created_at).toLocaleString() : ""}
+                    {e.reason && <span className="ml-2 text-gray-500">— {e.reason}</span>}
                   </p>
                 </div>
               </div>
@@ -108,7 +109,7 @@ export default function LifecyclePage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-6">
       <h1 className="text-2xl font-semibold mb-4">Agent Lifecycle</h1>
 
       {/* Agent picker */}

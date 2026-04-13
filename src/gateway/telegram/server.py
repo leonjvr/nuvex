@@ -10,12 +10,13 @@ from fastapi import FastAPI
 
 health_app = FastAPI(title="NUVEX Telegram Gateway", version="0.1.0")
 
-_bot_running = False
+# "starting" | "connecting" | "connected" | "error: <reason>"
+bot_state: str = "starting"
 
 
 @health_app.get("/health")
 async def health():
-    return {"status": "ok", "bot": "running" if _bot_running else "starting"}
+    return {"status": "ok", "bot": bot_state, "connected": bot_state == "connected"}
 
 
 def _run_health_server():
@@ -24,7 +25,7 @@ def _run_health_server():
 
 
 async def main():
-    global _bot_running
+    global bot_state
     # Start health server in background thread
     t = threading.Thread(target=_run_health_server, daemon=True)
     t.start()
@@ -41,11 +42,20 @@ async def main():
 
     from .bot import build_app, start_action_poller
 
-    app = build_app()
-    _bot_running = True
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling(drop_pending_updates=True)
+    try:
+        bot_state = "connecting"
+        app = build_app()
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(drop_pending_updates=True)
+        bot_state = "connected"
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Telegram bot failed to start: %s", exc)
+        bot_state = f"error: {str(exc)[:80]}"
+        await asyncio.Event().wait()
+        return
+
     # Start cross-channel action poller as a background task
     asyncio.create_task(start_action_poller(app))
     # Block forever

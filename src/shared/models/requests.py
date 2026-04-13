@@ -18,6 +18,7 @@ class MessageMetadata(BaseModel):
 
 class InvokeRequest(BaseModel):
     agent_id: str
+    org_id: str = "default"
     message: str
     thread_id: str | None = None
     channel: str = "test"  # whatsapp | telegram | email | test

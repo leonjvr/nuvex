@@ -43,6 +43,7 @@ async def append_audit(
 
         row_data = {
             "agent_id": state.agent_id,
+            "org_id": state.org_id,
             "invocation_id": state.invocation_id,
             "thread_id": state.thread_id,
             "action": action,

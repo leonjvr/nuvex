@@ -93,8 +93,9 @@ class TestMaybeCompactPerforms:
         thread_result = MagicMock()
         thread_result.scalar_one_or_none.return_value = thread
 
-        # execute may be called for messages, then delete, then thread lookup
-        session.execute = AsyncMock(side_effect=[exec_result_msgs, MagicMock(), thread_result])
+        # execute may be called for messages, then delete, then stub lookup, then thread lookup
+        no_stubs = MagicMock(); no_stubs.scalars.return_value.all.return_value = []
+        session.execute = AsyncMock(side_effect=[exec_result_msgs, MagicMock(), no_stubs, thread_result])
         session.add = MagicMock()
         session.commit = AsyncMock()
         session.__aenter__ = AsyncMock(return_value=session)
@@ -135,7 +136,8 @@ class TestMaybeCompactPerforms:
         thread_result = MagicMock()
         thread_result.scalar_one_or_none.return_value = thread
 
-        session.execute = AsyncMock(side_effect=[exec_msgs, MagicMock(), thread_result])
+        no_stubs = MagicMock(); no_stubs.scalars.return_value.all.return_value = []
+        session.execute = AsyncMock(side_effect=[exec_msgs, MagicMock(), no_stubs, thread_result])
         session.add = MagicMock()
         session.commit = AsyncMock()
         session.__aenter__ = AsyncMock(return_value=session)
@@ -162,7 +164,8 @@ class TestMaybeCompactPerforms:
         thread_result = MagicMock()
         thread_result.scalar_one_or_none.return_value = thread
 
-        session.execute = AsyncMock(side_effect=[exec_msgs, MagicMock(), thread_result])
+        no_stubs = MagicMock(); no_stubs.scalars.return_value.all.return_value = []
+        session.execute = AsyncMock(side_effect=[exec_msgs, MagicMock(), no_stubs, thread_result])
         session.add = MagicMock(side_effect=lambda obj: added_stubs.append(obj))
         session.commit = AsyncMock()
         session.__aenter__ = AsyncMock(return_value=session)
@@ -172,12 +175,7 @@ class TestMaybeCompactPerforms:
             await maybe_compact("thread-1", token_limit=100)
 
         assert len(added_stubs) == 1
-        assert "[Compacted history" in added_stubs[0].content
-
-
-# ---------------------------------------------------------------------------
-# 18.8 — Integration: 60-message thread compacts to summary + recent tail
-# ---------------------------------------------------------------------------
+        assert "[CONTEXT COMPACTION" in added_stubs[0].content
 
 class TestCompactionIntegration60Messages:
     """18.8: thread with 60 messages compacts to summary + recent tail."""
@@ -191,8 +189,9 @@ class TestCompactionIntegration60Messages:
         thread_result = MagicMock()
         thread_result.scalar_one_or_none.return_value = thread
 
-        # execute(1) = message fetch, execute(2) = delete stmt, execute(3) = thread fetch
-        session.execute = AsyncMock(side_effect=[exec_msgs, MagicMock(), thread_result])
+        # execute(1) = message fetch, execute(2) = delete stmt, execute(3) = stub lookup, execute(4) = thread fetch
+        no_stubs = MagicMock(); no_stubs.scalars.return_value.all.return_value = []
+        session.execute = AsyncMock(side_effect=[exec_msgs, MagicMock(), no_stubs, thread_result])
         session.add = MagicMock()
         session.commit = AsyncMock()
         session.__aenter__ = AsyncMock(return_value=session)
@@ -225,7 +224,7 @@ class TestCompactionIntegration60Messages:
             await maybe_compact("thread-60", token_limit=1000)
 
         assert len(added_stubs) == 1
-        assert "[Compacted history" in added_stubs[0].content
+        assert "[CONTEXT COMPACTION" in added_stubs[0].content
 
     @pytest.mark.asyncio
     async def test_60_messages_keeps_recent_tail(self):
@@ -256,7 +255,7 @@ class TestCompactionIntegration60Messages:
         exec_msgs.scalars.return_value.all.return_value = messages
         thread_result = MagicMock()
         thread_result.scalar_one_or_none.return_value = thread
-        session.execute = AsyncMock(side_effect=[exec_msgs, capture_execute, thread_result])
+        session.execute = AsyncMock(side_effect=[exec_msgs, capture_execute, MagicMock(), thread_result])
         session.add = MagicMock()
         session.commit = AsyncMock()
         session.__aenter__ = AsyncMock(return_value=session)

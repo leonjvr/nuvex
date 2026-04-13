@@ -1,0 +1,18 @@
+schema: spec-driven
+id: local-model-routing
+title: Local Model Routing & Offline Inference
+status: speccing
+priority: low
+created: 2025-07-22
+tags:
+  - llm-routing
+  - offline
+  - ollama
+  - local-inference
+artifacts:
+  - proposal.md
+  - design.md
+  - specs/local-model-provider/spec.md
+  - specs/routing-fallback/spec.md
+  - specs/model-management/spec.md
+  - tasks.md

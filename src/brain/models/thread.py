@@ -15,6 +15,7 @@ class Thread(Base):
 
     id: Mapped[str] = mapped_column(String(200), primary_key=True)
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, server_default="default")
     channel: Mapped[str] = mapped_column(String(50), nullable=False)
     participants: Mapped[dict] = mapped_column(JSONB, default=dict)
     message_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -38,6 +39,7 @@ class Message(Base):
     thread_id: Mapped[str] = mapped_column(
         String(200), ForeignKey("threads.id"), nullable=False, index=True
     )
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, server_default="default")
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # user | assistant | tool
     content: Mapped[str] = mapped_column(Text, nullable=False)
     metadata_: Mapped[dict] = mapped_column("metadata_", JSONB, default=dict)

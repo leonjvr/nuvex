@@ -1,0 +1,567 @@
+........................................................................ [  6%]
+...................................................................EEEEE [ 12%]
+EEEEEEEEEEEEEEEEEEEE........................FFFF........................ [ 18%]
+........................................................................ [ 24%]
+........................................................................ [ 30%]
+........................................................................ [ 36%]
+........................................................................ [ 42%]
+........................................................................ [ 48%]
+........................................................................ [ 54%]
+........................................................................ [ 60%]
+..........................................F............................. [ 66%]
+........................................................................ [ 72%]
+........................................................................ [ 78%]
+....................................sss................................. [ 84%]
+........................................................................ [ 90%]
+........................................................................ [ 96%]
+.......................................                                  [100%]
+=================================== ERRORS ====================================
+_____________ ERROR at setup of TestHealthEndpoint.test_health_ok _____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__________ ERROR at setup of TestListAgents.test_returns_agent_list ___________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__ ERROR at setup of TestListAgents.test_model_filled_when_agent_def_present __
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__________________ ERROR at setup of TestGetAgent.test_found __________________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__________ ERROR at setup of TestGetAgent.test_not_found_returns_404 __________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_________ ERROR at setup of TestAgentStatus.test_returns_budget_info __________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+______ ERROR at setup of TestAgentStatus.test_no_budget_defaults_to_zero ______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_____ ERROR at setup of TestAgentStatus.test_agent_not_found_returns_404 ______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_________ ERROR at setup of TestCostsSummary.test_returns_budget_rows _________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+______ ERROR at setup of TestCostsSummary.test_empty_returns_empty_list _______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+____________ ERROR at setup of TestListEvents.test_returns_events _____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_________ ERROR at setup of TestListEvents.test_query_params_accepted _________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__________ ERROR at setup of TestListEvents.test_limit_cap_enforced ___________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_______ ERROR at setup of TestListServices.test_returns_service_health ________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+______ ERROR at setup of TestListServices.test_empty_returns_empty_list _______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+___________ ERROR at setup of TestListTasks.test_returns_task_list ____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+_________ ERROR at setup of TestListTasks.test_query_params_accepted __________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+___________ ERROR at setup of TestListTasks.test_limit_cap_enforced ___________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+________ ERROR at setup of TestCreateTask.test_creates_and_returns_id _________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__ ERROR at setup of TestCreateTask.test_missing_required_fields_returns_422 __
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+____________ ERROR at setup of TestWorkspaceRouter.test_list_files ____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+____________ ERROR at setup of TestWorkspaceRouter.test_read_file _____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+___ ERROR at setup of TestWorkspaceRouter.test_agent_not_found_returns_404 ____
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+______ ERROR at setup of TestWorkspaceRouter.test_path_traversal_blocked ______
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+____________ ERROR at setup of TestWorkspaceRouter.test_write_file ____________
+unit-tests\dashboard\test_dashboard.py:117: in client
+    from src.dashboard.server import create_app
+src\dashboard\server.py:35: in <module>
+    from .routers.device_tokens import router as device_tokens_router
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+================================== FAILURES ===================================
+__________ TestDeviceTokenCreate.test_create_returns_plaintext_token __________
+unit-tests\devices\test_device_tokens_api.py:19: in test_create_returns_plaintext_token
+    with patch("src.dashboard.routers.device_tokens.get_session", return_value=mock_session):
+..\..\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py:1447: in __enter__
+    self.target = self.getter()
+..\..\AppData\Local\Programs\Python\Python312\Lib\pkgutil.py:518: in resolve_name
+    mod = importlib.import_module(s)
+..\..\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+<frozen importlib._bootstrap_external>:995: in exec_module
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+__________ TestDeviceTokenCreate.test_list_does_not_expose_plaintext __________
+unit-tests\devices\test_device_tokens_api.py:48: in test_list_does_not_expose_plaintext
+    with patch("src.dashboard.routers.device_tokens.get_session", return_value=mock_session):
+..\..\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py:1447: in __enter__
+    self.target = self.getter()
+..\..\AppData\Local\Programs\Python\Python312\Lib\pkgutil.py:518: in resolve_name
+    mod = importlib.import_module(s)
+..\..\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+<frozen importlib._bootstrap_external>:995: in exec_module
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+______________ TestDeviceTokenCreate.test_revoke_sets_revoked_at ______________
+unit-tests\devices\test_device_tokens_api.py:73: in test_revoke_sets_revoked_at
+    with patch("src.dashboard.routers.device_tokens.get_session", return_value=mock_session), \
+..\..\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py:1447: in __enter__
+    self.target = self.getter()
+..\..\AppData\Local\Programs\Python\Python312\Lib\pkgutil.py:518: in resolve_name
+    mod = importlib.import_module(s)
+..\..\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+<frozen importlib._bootstrap_external>:995: in exec_module
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+________ TestDeviceTokenValidation.test_plaintext_stored_as_hash_only _________
+unit-tests\devices\test_device_tokens_api.py:95: in test_plaintext_stored_as_hash_only
+    with patch("src.dashboard.routers.device_tokens.get_session", return_value=mock_session):
+..\..\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py:1447: in __enter__
+    self.target = self.getter()
+..\..\AppData\Local\Programs\Python\Python312\Lib\pkgutil.py:518: in resolve_name
+    mod = importlib.import_module(s)
+..\..\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+<frozen importlib._bootstrap_external>:995: in exec_module
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+src\dashboard\routers\device_tokens.py:75: in <module>
+    @router.delete("/{token_id}", status_code=204)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:944: in decorator
+    self.add_api_route(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:883: in add_api_route
+    route = route_class(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:468: in __init__
+    assert is_body_allowed_for_status_code(
+E   AssertionError: Status code 204 must not have a response body
+___________ TestEntryPointDiscovery.test_entry_point_plugin_loaded ____________
+unit-tests\plugin-loader\test_plugin_loader.py:41: in test_entry_point_plugin_loaded
+    assert "ep-plugin" in _loaded_plugins
+E   AssertionError: assert 'ep-plugin' in {}
+------------------------------ Captured log call ------------------------------
+WARNING  src.brain.plugins.loader:loader.py:238 plugin_loader: DB sync failed (non-fatal): DATABASE_URL not set
+============================== warnings summary ===============================
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\_internal\_config.py:323
+integration/test_integration.py::TestInvokeEndpoint::test_invoke_returns_reply
+  C:\Users\leon\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\_internal\_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\formparsers.py:12
+  C:\Users\leon\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+cost-tracking/test_costs.py::TestSoftCap::test_no_warn_below_threshold
+  C:\Users\leon\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py:2208: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    def __init__(self, name, parent):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+cost-tracking/test_costs.py::TestProjectionFormula::test_mid_month
+  C:\Users\leon\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\_internal\_known_annotated_metadata.py:361: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    elif (annotation_type := type(annotation)) in (at_to_constraint_map := _get_at_to_constraint_map()):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+hooks/test_hooks.py::TestHookExecutionOrder::test_hooks_called_in_registration_order
+  C:\Users\leon\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py:712: RuntimeWarning: coroutine 'ServiceStats._emit_event' was never awaited
+    self._ready.clear()
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+organisation-isolation/test_org_scope.py::TestOrgScope::test_org_scope_adds_where_to_orm_select
+organisation-isolation/test_org_scope.py::TestOrgScope::test_org_scope_adds_where_to_orm_select
+organisation-isolation/test_org_scope.py::TestOrgScope::test_org_scope_filters_to_correct_org
+organisation-isolation/test_org_scope.py::TestOrgScope::test_org_scope_filters_to_correct_org
+organisation-isolation/test_org_scope.py::TestOrgScope::test_org_scope_returns_statement
+organisation-isolation/test_org_scope.py::TestOrgScope::test_org_scope_returns_statement
+organisation-isolation/test_org_scope.py::TestOrgScope::test_org_scope_chaining
+organisation-isolation/test_org_scope.py::TestOrgScope::test_org_scope_chaining
+  C:\Users\leon\repos\nuvex\src\brain\org_scope.py:20: SADeprecationWarning: The Select.froms attribute is moved to the Select.get_final_froms() method. (deprecated since: 1.4.23)
+    froms = list(query.froms) if hasattr(query, "froms") else []
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED unit-tests\devices\test_device_tokens_api.py::TestDeviceTokenCreate::test_create_returns_plaintext_token
+FAILED unit-tests\devices\test_device_tokens_api.py::TestDeviceTokenCreate::test_list_does_not_expose_plaintext
+FAILED unit-tests\devices\test_device_tokens_api.py::TestDeviceTokenCreate::test_revoke_sets_revoked_at
+FAILED unit-tests\devices\test_device_tokens_api.py::TestDeviceTokenValidation::test_plaintext_stored_as_hash_only
+FAILED unit-tests\plugin-loader\test_plugin_loader.py::TestEntryPointDiscovery::test_entry_point_plugin_loaded
+ERROR unit-tests\dashboard\test_dashboard.py::TestHealthEndpoint::test_health_ok
+ERROR unit-tests\dashboard\test_dashboard.py::TestListAgents::test_returns_agent_list
+ERROR unit-tests\dashboard\test_dashboard.py::TestListAgents::test_model_filled_when_agent_def_present
+ERROR unit-tests\dashboard\test_dashboard.py::TestGetAgent::test_found - Asse...
+ERROR unit-tests\dashboard\test_dashboard.py::TestGetAgent::test_not_found_returns_404
+ERROR unit-tests\dashboard\test_dashboard.py::TestAgentStatus::test_returns_budget_info
+ERROR unit-tests\dashboard\test_dashboard.py::TestAgentStatus::test_no_budget_defaults_to_zero
+ERROR unit-tests\dashboard\test_dashboard.py::TestAgentStatus::test_agent_not_found_returns_404
+ERROR unit-tests\dashboard\test_dashboard.py::TestCostsSummary::test_returns_budget_rows
+ERROR unit-tests\dashboard\test_dashboard.py::TestCostsSummary::test_empty_returns_empty_list
+ERROR unit-tests\dashboard\test_dashboard.py::TestListEvents::test_returns_events
+ERROR unit-tests\dashboard\test_dashboard.py::TestListEvents::test_query_params_accepted
+ERROR unit-tests\dashboard\test_dashboard.py::TestListEvents::test_limit_cap_enforced
+ERROR unit-tests\dashboard\test_dashboard.py::TestListServices::test_returns_service_health
+ERROR unit-tests\dashboard\test_dashboard.py::TestListServices::test_empty_returns_empty_list
+ERROR unit-tests\dashboard\test_dashboard.py::TestListTasks::test_returns_task_list
+ERROR unit-tests\dashboard\test_dashboard.py::TestListTasks::test_query_params_accepted
+ERROR unit-tests\dashboard\test_dashboard.py::TestListTasks::test_limit_cap_enforced
+ERROR unit-tests\dashboard\test_dashboard.py::TestCreateTask::test_creates_and_returns_id
+ERROR unit-tests\dashboard\test_dashboard.py::TestCreateTask::test_missing_required_fields_returns_422
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_list_files
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_read_file
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_agent_not_found_returns_404
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_path_traversal_blocked
+ERROR unit-tests\dashboard\test_dashboard.py::TestWorkspaceRouter::test_write_file
+5 failed, 1158 passed, 3 skipped, 14 warnings, 25 errors in 122.63s (0:02:02)

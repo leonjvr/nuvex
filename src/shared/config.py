@@ -23,6 +23,14 @@ def _resolve_model(raw: Any) -> ModelConfig:
 def _parse_agent(raw: dict[str, Any]) -> AgentDefinition:
     if "model" in raw:
         raw = {**raw, "model": _resolve_model(raw["model"])}
+    # §8.2 — expand skills: [x, y] → plugins: {x: {enabled: true}, y: {enabled: true}}
+    # plugins: key takes precedence on conflict
+    raw = dict(raw)
+    skills_list = raw.get("skills", [])
+    if skills_list:
+        expanded = {s: {"enabled": True} for s in skills_list}
+        # merge: plugins: key wins over skills expansion
+        raw["plugins"] = {**expanded, **raw.get("plugins", {})}
     return AgentDefinition(**raw)
 
 
@@ -61,6 +69,27 @@ def load_config(path: str | Path | None = None) -> NuvexConfig:
 
 def get_agent(cfg: NuvexConfig, agent_id: str) -> AgentDefinition | None:
     return cfg.agents.get(agent_id)
+
+
+def validate_plugin_references(cfg: NuvexConfig) -> None:
+    """Warn if any agent config references a plugin id not found in plugin_registry (§8.3).
+
+    Called at startup after plugins are loaded; non-fatal.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+    try:
+        from src.brain.plugins import get_loaded_plugins
+        loaded_ids = set(get_loaded_plugins().keys())
+        for agent_id, agent_def in cfg.agents.items():
+            for plugin_id in agent_def.plugins:
+                if plugin_id not in loaded_ids:
+                    log.warning(
+                        "config: agent '%s' references plugin '%s' which is not loaded",
+                        agent_id, plugin_id,
+                    )
+    except Exception as exc:
+        log.debug("validate_plugin_references: skipped (%s)", exc)
 
 
 @lru_cache(maxsize=1)

@@ -16,6 +16,11 @@ const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
 const BRAIN_URL = process.env.BRAIN_URL || "http://brain:8100";
 const AGENT_ID = process.env.NUVEX_AGENT_ID || "maya";
+const ORG_ID = (() => {
+  const id = process.env.NUVEX_ORG_ID || "";
+  if (!id) logger.warn("NUVEX_ORG_ID is not set — defaulting to 'default'. Set this env var to avoid this warning.");
+  return id || "default";
+})();
 const CREDS_PATH = process.env.WA_CREDS_PATH || "/data/wa-creds";
 const GROUP_POLICY = (process.env.WA_GROUP_POLICY || "allowlist").toLowerCase();
 const DM_POLICY = (process.env.WA_DM_POLICY || "pairing").toLowerCase();
@@ -110,7 +115,7 @@ function writeQrState(state) {
 const contactSessions = {};
 const activeSession = {};
 
-function defaultThread(jid) { return `${AGENT_ID}:whatsapp:${jid}`; }
+function defaultThread(jid) { return `${ORG_ID}:${AGENT_ID}:whatsapp:${jid}`; }
 
 function getActiveThread(jid) {
   if (!activeSession[jid]) activeSession[jid] = defaultThread(jid);
@@ -120,7 +125,7 @@ function getActiveThread(jid) {
 
 function newSession(jid, name) {
   const slug = name ? name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30) : `s${Date.now()}`;
-  const threadId = `${AGENT_ID}:whatsapp:${jid}:${slug}`;
+  const threadId = `${ORG_ID}:${AGENT_ID}:whatsapp:${jid}:${slug}`;
   if (!contactSessions[jid]) contactSessions[jid] = [defaultThread(jid)];
   contactSessions[jid].push(threadId);
   activeSession[jid] = threadId;
@@ -177,15 +182,16 @@ function loadChatMap() {
 loadChatMap();
 
 // ── Brain invoke ──────────────────────────────────────────────────────────────
-async function invokeAgent(message, threadId, sender, channel, workspacePath, projectLabel) {
+async function invokeAgent(message, threadId, sender, channel, workspacePath, projectLabel, senderName) {
   try {
     const body = {
       agent_id: AGENT_ID,
+      org_id: ORG_ID,
       message,
       thread_id: threadId,
       channel,
       sender,
-      metadata: { channel, sender, ...(projectLabel ? { project_label: projectLabel } : {}) },
+      metadata: { channel, sender, ...(senderName ? { sender_name: senderName } : {}), ...(projectLabel ? { project_label: projectLabel } : {}) },
     };
     if (workspacePath) body.workspace_path = workspacePath;
     const res = await fetch(`${BRAIN_URL}/invoke`, {
@@ -207,15 +213,16 @@ async function invokeAgent(message, threadId, sender, channel, workspacePath, pr
 // delivered immediately without waiting for the full LangGraph run to finish.
 // Humanise settings (thinking_delay, typing_speed, chunk_messages) are honoured
 // for each message chunk that arrives from the stream.
-async function invokeAgentStream(message, threadId, sender, channel, workspacePath, projectLabel, jid, humanise) {
+async function invokeAgentStream(message, threadId, sender, channel, workspacePath, projectLabel, jid, humanise, senderName) {
   try {
     const body = JSON.stringify({
       agent_id: AGENT_ID,
+      org_id: ORG_ID,
       message,
       thread_id: threadId,
       channel,
       sender,
-      metadata: { channel, sender, ...(projectLabel ? { project_label: projectLabel } : {}) },
+      metadata: { channel, sender, ...(senderName ? { sender_name: senderName } : {}), ...(projectLabel ? { project_label: projectLabel } : {}) },
       ...(workspacePath ? { workspace_path: workspacePath } : {}),
     });
     const res = await fetch(`${BRAIN_URL}/invoke/stream`, {
@@ -297,7 +304,7 @@ async function syncChatsToBrain() {
       const jid = c.id || "";
       const isGroup = jid.endsWith("@g.us");
       return {
-        thread_id: `${AGENT_ID}:whatsapp:${jid}`,
+        thread_id: `${ORG_ID}:${AGENT_ID}:whatsapp:${jid}`,
         agent_id: AGENT_ID,
         channel: isGroup ? "whatsapp-group" : "whatsapp",
         contact: jid,
@@ -380,6 +387,7 @@ async function handleMessage(msg) {
   const jid = msg.key.remoteJid || "";
   const isGroup = jid.endsWith("@g.us");
   const sender = isGroup ? msg.key.participant || jid : jid;
+  const senderName = msg.pushName || null;
   const channel = isGroup ? "whatsapp-group" : "whatsapp";
 
   if (isGroup && GROUP_POLICY !== "allowlist") return;
@@ -449,12 +457,12 @@ async function handleMessage(msg) {
   //    in WA within seconds while the long dev-server task runs in the background.
   //    Regular messages use the sync endpoint.
   if (projectLabel) {
-    await invokeAgentStream(text, threadId, sender, channel, workspacePath, projectLabel, jid, h);
+    await invokeAgentStream(text, threadId, sender, channel, workspacePath, projectLabel, jid, h, senderName);
     return; // replies already sent inside invokeAgentStream
   }
 
   const _brainStart = Date.now();
-  const result = await invokeAgent(text, threadId, sender, channel, workspacePath, projectLabel);
+  const result = await invokeAgent(text, threadId, sender, channel, workspacePath, projectLabel, senderName);
   const reply = result.reply || "";
   if (h.enabled) {
     const target = randomBetween(h.thinking_delay_ms * 0.5, h.thinking_delay_ms * 1.5);
@@ -514,7 +522,6 @@ async function connectToWhatsApp() {
   const socketOptions = {
     version,
     logger: logger.child({ level: "silent" }),
-    printQRInTerminal: true,
     auth: {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger),

@@ -76,6 +76,17 @@ def _register_system_jobs(sched: AsyncIOScheduler) -> None:
         )
         log.info("cron: registered system:routing_tracker (Monday 03:05 UTC)")
 
+    # Memory dreaming — daily at 03:30 UTC for all agents
+    if not sched.get_job("system:memory_dream"):
+        sched.add_job(
+            _run_memory_dream,
+            "cron",
+            id="system:memory_dream",
+            hour=3,
+            minute=30,
+        )
+        log.info("cron: registered system:memory_dream (daily 03:30 UTC)")
+
 
 async def _run_arousal_update() -> None:
     """Update arousal state for all registered agents (30.3.1)."""
@@ -133,11 +144,42 @@ async def _run_routing_tracker() -> None:
         log.error("routing_tracker job failed: %s", exc)
 
 
+async def _run_memory_dream() -> None:
+    """Daily memory dream job — deep reflection pass for all agents."""
+    try:
+        from ..shared.config import get_cached_config
+        cfg = get_cached_config()
+        agent_ids = list(cfg.agents.keys())
+    except Exception as exc:
+        log.warning("memory_dream: could not load agent list: %s", exc)
+        return
+
+    from .memory.dreamer import MemoryDreamer
+
+    for agent_id in agent_ids:
+        try:
+            dreamer = MemoryDreamer(agent_id=agent_id)
+            result = await dreamer.dream()
+            if result.get("skipped"):
+                log.debug("memory_dream: skipped agent=%s reason=%s", agent_id, result.get("reason"))
+            else:
+                log.info(
+                    "memory_dream: agent=%s reviewed=%d boosted=%d decayed=%d",
+                    agent_id,
+                    result.get("memories_reviewed", 0),
+                    result.get("boosted", 0),
+                    result.get("decayed", 0),
+                )
+        except Exception as exc:
+            log.warning("memory_dream: failed for agent=%s: %s", agent_id, exc)
+
+
 async def register_cron(
     name: str,
     agent_id: str,
     schedule: str,
     task_payload: dict[str, Any],
+    org_id: str = "default",
 ) -> None:
     """Persist a cron entry and add it to the live scheduler."""
     if not croniter.is_valid(schedule):
@@ -147,7 +189,7 @@ async def register_cron(
         result = await session.execute(select(CronEntry).where(CronEntry.name == name))
         row: CronEntry | None = result.scalar_one_or_none()
         if row is None:
-            row = CronEntry(name=name, agent_id=agent_id, schedule=schedule, task_payload=task_payload)
+            row = CronEntry(name=name, agent_id=agent_id, schedule=schedule, task_payload=task_payload, org_id=org_id)
             session.add(row)
         else:
             row.schedule = schedule
@@ -255,7 +297,7 @@ def parse_heartbeat_md(content: str) -> list[dict[str, Any]]:
     return jobs
 
 
-async def load_heartbeat_file(workspace_path: str, default_agent_id: str = "") -> int:
+async def load_heartbeat_file(workspace_path: str, default_agent_id: str = "", org_id: str = "default") -> int:
     """Parse HEARTBEAT.md and register all defined cron jobs.
 
     Returns the number of jobs registered.
@@ -281,9 +323,10 @@ async def load_heartbeat_file(workspace_path: str, default_agent_id: str = "") -
                 agent_id=agent_id,
                 schedule=job["schedule"],
                 task_payload=job.get("payload", {}),
+                org_id=org_id,  # §15.2 — tag cron entries with agent's org_id
             )
             count += 1
         except Exception as exc:
             log.warning("cron: failed to register '%s': %s", job["name"], exc)
-    log.info("cron: loaded %d jobs from HEARTBEAT.md", count)
+    log.info("cron: loaded %d jobs from HEARTBEAT.md (org=%s)", count, org_id)
     return count

@@ -1,0 +1,43 @@
+#pragma code_page(65001)
+1 VERSIONINFO
+FILEFLAGSMASK 0x3f
+FILESUBTYPE 0x0
+PRODUCTVERSION 0, 2, 2, 0
+FILEFLAGS 0x0
+FILEOS 0x40004
+FILEVERSION 0, 2, 2, 0
+FILETYPE 0x1
+{
+BLOCK "StringFileInfo"
+{
+BLOCK "000004b0"
+{
+VALUE "FileDescription", "nuvex-desktop"
+VALUE "FileVersion", "0.2.2"
+VALUE "ProductName", "nuvex-desktop"
+VALUE "ProductVersion", "0.2.2"
+}
+}
+BLOCK "VarFileInfo" {
+VALUE "Translation", 0x0, 0x04b0
+}
+}
+1 24
+{
+" <?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?> "
+" <assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0""> "
+" <assemblyIdentity version=""1.0.0.0"" name=""nuvex-desktop"" type=""win32""/> "
+" <dependency> "
+" <dependentAssembly> "
+" <assemblyIdentity "
+" type=""win32"" "
+" name=""Microsoft.Windows.Common-Controls"" "
+" version=""6.0.0.0"" "
+" processorArchitecture=""*"" "
+" publicKeyToken=""6595b64144ccf1df"" "
+" language=""*""/> "
+" </dependentAssembly> "
+" </dependency> "
+" </assembly> "
+}
+

@@ -71,8 +71,13 @@ services:
       NUVEX_CONFIG: "config/nuvex.yaml"
       DASHBOARD_PORT: "8200"
       BRAIN_URL: "http://brain:8100"
+      BRAIN_PUBLIC_URL: "${BRAIN_PUBLIC_URL:-http://localhost:9100}"
+      DESKTOP_AGENT_DOWNLOAD_PATH: "/data/nuvex-desktop.exe"
+      DESKTOP_AGENT_VERSION: "0.2.0"
       WA_CONTAINER: "nuvex-gateway-wa-local"
       GATEWAY_WA_URL: "http://gateway-wa:8101"
+      GATEWAY_TG_URL: "http://gateway-tg:8102"
+      GATEWAY_MAIL_URL: "http://gateway-email:8103"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       GROQ_API_KEY: "${GROQ_API_KEY:-}"
@@ -104,6 +109,7 @@ services:
     environment:
       BRAIN_URL: "http://brain:8100"
       NUVEX_CONFIG: "config/nuvex.yaml"
+      NUVEX_ORG_ID: "${NUVEX_ORG_ID:-default}"
     volumes:
       - ./config:/app/config:ro
     depends_on:
@@ -112,8 +118,6 @@ services:
     ports:
       - "127.0.0.1:9102:8102"
     restart: unless-stopped
-    profiles:
-      - gateways
 
   gateway-wa:
     build:
@@ -126,6 +130,7 @@ services:
     environment:
       BRAIN_URL: "http://brain:8100"
       WA_CREDS_PATH: /data/wa-creds
+      NUVEX_ORG_ID: "${NUVEX_ORG_ID:-default}"
     volumes:
       - ./data:/data
     depends_on:
@@ -147,14 +152,13 @@ services:
         required: false
     environment:
       BRAIN_URL: "http://brain:8100"
+      NUVEX_ORG_ID: "${NUVEX_ORG_ID:-default}"
     depends_on:
       brain:
         condition: service_healthy
     ports:
       - "127.0.0.1:9103:8103"
     restart: unless-stopped
-    profiles:
-      - gateways
 
 volumes:
   nuvex_pg_local:

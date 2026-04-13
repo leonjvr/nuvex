@@ -229,3 +229,59 @@ async def evaluate_with_ratelimit(engine: PolicyEngine, ctx: PolicyContext) -> P
                 return PolicyDecision(action=rule.action, reason=rule.reason, matched_rule=rule.name)
 
     return engine.evaluate(ctx)
+
+
+async def build_merged_engine(org_id: str, agent_id: str) -> PolicyEngine:
+    """Build a PolicyEngine from three-tier merged policies (7.2).
+
+    Loads:
+    1. Global policies from shared config
+    2. Org policies from DB organisations.policies JSONB
+    3. Agent policies from agent config
+
+    Returns a PolicyEngine with rules from all three tiers merged.
+    """
+    from .policy_merge import merge_policies
+    from ...shared.config import get_cached_config
+    from ..db import get_session
+    from ..models.organisation import Organisation
+
+    try:
+        cfg = get_cached_config()
+        global_policies = getattr(cfg, "global_policies", {}) or {}
+        agent_def = cfg.agents.get(agent_id)
+        agent_policies = {}
+        if agent_def and hasattr(agent_def, "policies"):
+            agent_policies = agent_def.policies or {}
+    except Exception:
+        global_policies = {}
+        agent_policies = {}
+
+    try:
+        async with get_session() as session:
+            org = await session.get(Organisation, org_id)
+            org_policies = org.policies if org and org.policies else {}
+    except Exception:
+        org_policies = {}
+
+    merged = merge_policies(global_policies, org_policies, agent_policies)
+
+    engine = PolicyEngine(default_action=get_policy_engine().default_action)
+    # Add merged forbidden-tools as deny rules
+    for tool_name in merged.get("forbidden_tools", []):
+        engine.add_rule(PolicyRule(
+            name=f"merged_forbidden:{tool_name}",
+            condition={
+                "op": "and",
+                "conditions": [
+                    {"field": "action_type", "comparator": "eq", "value": "tool_call"},
+                    {"field": "payload.tool_name", "comparator": "eq", "value": tool_name},
+                ],
+            },
+            action="deny",
+            reason=f"Tool '{tool_name}' is forbidden in merged org/agent policy",
+        ))
+    # Add base engine rules (global defaults)
+    for rule in get_policy_engine().rules:
+        engine.add_rule(rule)
+    return engine

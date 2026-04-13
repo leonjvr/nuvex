@@ -30,7 +30,7 @@ which requires Meta Business verification but provides official support.
        enabled: true
        config:
          auth_dir: "./data/whatsapp-auth"
-         print_qr_terminal: true
+         print_qr_terminal: true  # deprecated, ignored
        rate_limit_per_min: 5
    ```
 2. Start SIDJUA — a QR code will appear in the terminal
@@ -67,7 +67,7 @@ Each instance requires a separate QR scan and maintains its own auth state direc
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | auth_dir | yes | — | Directory for WhatsApp auth state (must be writable, persistent) |
-| print_qr_terminal | no | true | Show QR code in terminal for authentication |
+| print_qr_terminal | no | true | Deprecated and ignored in current Baileys versions |
 
 ## User Mapping
 

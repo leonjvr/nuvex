@@ -1,5 +1,6 @@
 node_modules
 !src/gateway/whatsapp/node_modules
+src/nuvex-desktop/target
 sidjua-gui/node_modules
 sidjua-gui/src-tauri
 dist

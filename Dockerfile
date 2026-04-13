@@ -21,8 +21,8 @@ WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci --production=false
 
-# Copy source files
-COPY src/ ./src/
+# Copy source files (TS legacy archived to legacy-ts/)
+COPY legacy-ts/src/ ./src/
 COPY tsup.config.ts tsconfig.json vitest.config.ts ./
 
 # Compile TypeScript → dist/

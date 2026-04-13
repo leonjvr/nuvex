@@ -2,6 +2,7 @@
 
 Run at the end of every agent thread (Finished or Failed lifecycle event).
 Uses fast_model to extract up to 5 key facts, then embeds and stores them.
+Edge extraction (§37): second LLM pass writes typed relationships to memory_edges.
 """
 from __future__ import annotations
 
@@ -81,6 +82,10 @@ async def _fast_extract(conversation_text: str, fast_model: str, outcome: str) -
         if "claude" in fast_model.lower() or "anthropic" in fast_model.lower():
             model_name = fast_model.split("/")[-1] if "/" in fast_model else fast_model
             llm = ChatAnthropic(model=model_name)  # type: ignore[call-arg]
+        elif "groq" in fast_model.lower() or "llama" in fast_model.lower() or "mixtral" in fast_model.lower():
+            from langchain_groq import ChatGroq
+            model_name = fast_model.split("/")[-1] if "/" in fast_model else fast_model
+            llm = ChatGroq(model=model_name)  # type: ignore[call-arg]
         else:
             model_name = fast_model.split("/")[-1] if "/" in fast_model else fast_model
             llm = ChatOpenAI(model=model_name)  # type: ignore[call-arg]
@@ -100,6 +105,11 @@ async def _fast_extract(conversation_text: str, fast_model: str, outcome: str) -
                 continue
         return facts
     except Exception as exc:
+        # If rate limited on Groq/non-OpenAI model, fall back to gpt-4o-mini
+        exc_str = str(exc).lower()
+        if fast_model != "gpt-4o-mini" and ("rate_limit" in exc_str or "rate limit" in exc_str or "429" in exc_str or "quota" in exc_str):
+            log.warning("memory.consolidator: fast extract rate-limited (%s), retrying with gpt-4o-mini", fast_model)
+            return await _fast_extract(conversation_text, "gpt-4o-mini", outcome)
         log.warning("memory.consolidator: fast extract failed: %s", exc)
         return []
 
@@ -107,10 +117,11 @@ async def _fast_extract(conversation_text: str, fast_model: str, outcome: str) -
 class MemoryConsolidator:
     """Extract facts from a thread and write them to the memories table."""
 
-    def __init__(self, agent_id: str, division_id: str = "default", fast_model: str = "gpt-4o-mini") -> None:
+    def __init__(self, agent_id: str, division_id: str = "default", fast_model: str = "gpt-4o-mini", org_id: str = "") -> None:
         self.agent_id = agent_id
         self.division_id = division_id
         self.fast_model = fast_model
+        self.org_id = org_id
 
     async def consolidate(self, messages: list[Any], thread_id: str, outcome: str = "finished") -> int:
         """Run fact extraction and persist results. Returns count of facts written."""
@@ -150,6 +161,16 @@ class MemoryConsolidator:
             if not content:
                 continue
 
+            # Reject memory writes that contain credentials or secrets
+            from .secret_scan import scan as _secret_scan
+            is_secret, pattern_name = _secret_scan(content)
+            if is_secret:
+                log.warning(
+                    "memory.consolidator: skipping fact — secret pattern '%s' detected thread=%s",
+                    pattern_name, thread_id,
+                )
+                continue
+
             metadata: dict[str, Any] = {"source_outcome": outcome}
             embedding = await _embed(content)
             embedding_str = ("[" + ",".join(str(v) for v in embedding) + "]") if embedding else None
@@ -159,14 +180,15 @@ class MemoryConsolidator:
                     await session.execute(
                         text("""
                             INSERT INTO memories
-                                (agent_id, content, embedding, scope, owner_id, confidence,
+                                (agent_id, org_id, content, embedding, scope, owner_id, confidence,
                                  source_agent, source_thread, access_tier, metadata_)
                             VALUES
-                                (:agent_id, :content, :embedding ::vector, :scope, :owner_id,
-                                 :confidence, :source_agent, :source_thread, :access_tier, :metadata_::jsonb)
+                                (:agent_id, :org_id, :content, CAST(:embedding AS vector), :scope, :owner_id,
+                                 :confidence, :source_agent, :source_thread, :access_tier, CAST(:metadata_ AS jsonb))
                         """),
                         {
                             "agent_id": self.agent_id,
+                            "org_id": self.org_id,
                             "content": content,
                             "embedding": embedding_str,
                             "scope": scope,
@@ -204,4 +226,90 @@ class MemoryConsolidator:
             except Exception as exc:
                 log.warning("memory.consolidator: failed to write fact: %s", exc)
 
+        return written
+
+    async def extract_edges(self, fact_ids: list[int], fact_contents: list[str]) -> int:
+        """Second LLM pass: extract typed relations between facts; write to memory_edges (§37).
+
+        Skips silently if fewer than 2 facts. Returns count of edges written.
+        Failure must not bubble — caller sees 0 on error (§37.4).
+        """
+        if len(fact_ids) < 2:
+            return 0
+        try:
+            return await self._extract_edges_inner(fact_ids, fact_contents)
+        except Exception as exc:
+            log.warning("memory.consolidator: edge extraction failed (non-fatal): %s", exc)
+            return 0
+
+    async def _extract_edges_inner(self, fact_ids: list[int], fact_contents: list[str]) -> int:
+        """Inner edge extraction — separate so outer can catch all exceptions."""
+        index_lines = [f"{i}: {c[:100]}" for i, c in zip(fact_ids, fact_contents)]
+        prompt = (
+            "You are a knowledge graph assistant. Given the numbered facts below, identify typed "
+            "relationships between them.\n"
+            "For each relationship output a JSON object on its own line:\n"
+            '  {"source": <id>, "target": <id>, "edge_type": "<type>", "confidence": <float>}\n'
+            "edge_type must be one of: supports, contradicts, evolved_into, depends_on, related_to\n"
+            "Output ONLY JSON objects, one per line. No markdown.\n\n"
+            "Facts:\n" + "\n".join(index_lines)
+        )
+        edges_raw: list[dict] = []
+        try:
+            from langchain_anthropic import ChatAnthropic
+            from langchain_openai import ChatOpenAI
+
+            if "claude" in self.fast_model.lower() or "anthropic" in self.fast_model.lower():
+                model_name = self.fast_model.split("/")[-1] if "/" in self.fast_model else self.fast_model
+                llm = ChatAnthropic(model=model_name)  # type: ignore[call-arg]
+            elif "groq" in self.fast_model.lower() or "llama" in self.fast_model.lower() or "mixtral" in self.fast_model.lower():
+                from langchain_groq import ChatGroq
+                model_name = self.fast_model.split("/")[-1] if "/" in self.fast_model else self.fast_model
+                llm = ChatGroq(model=model_name)  # type: ignore[call-arg]
+            else:
+                model_name = self.fast_model.split("/")[-1] if "/" in self.fast_model else self.fast_model
+                llm = ChatOpenAI(model=model_name)  # type: ignore[call-arg]
+
+            response = await llm.ainvoke(prompt)
+            content = response.content if hasattr(response, "content") else str(response)
+            for line in str(content).splitlines():
+                line = line.strip()
+                if not line or not line.startswith("{"):
+                    continue
+                try:
+                    obj = json.loads(line)
+                    if all(k in obj for k in ("source", "target", "edge_type")):
+                        edges_raw.append(obj)
+                except json.JSONDecodeError:
+                    continue
+        except Exception as exc:
+            log.warning("memory.consolidator: edge LLM call failed: %s", exc)
+            return 0
+
+        _VALID_TYPES = {"supports", "contradicts", "evolved_into", "depends_on", "related_to"}
+        id_set = set(fact_ids)
+        written = 0
+        for edge in edges_raw:
+            src = edge.get("source")
+            tgt = edge.get("target")
+            etype = str(edge.get("edge_type", ""))
+            conf = float(edge.get("confidence", 1.0))
+            if src not in id_set or tgt not in id_set or etype not in _VALID_TYPES or src == tgt:
+                continue
+            try:
+                async with get_session() as session:
+                    # Upsert: keep GREATEST(existing, new) confidence (§37.3)
+                    await session.execute(
+                        text("""
+                            INSERT INTO memory_edges (source_id, target_id, edge_type, confidence, agent_id)
+                            VALUES (:src, :tgt, :etype, :conf, :agent_id)
+                            ON CONFLICT (source_id, target_id, edge_type)
+                            DO UPDATE SET confidence = GREATEST(memory_edges.confidence, EXCLUDED.confidence)
+                        """),
+                        {"src": src, "tgt": tgt, "etype": etype, "conf": conf, "agent_id": self.agent_id},
+                    )
+                    await session.commit()
+                    written += 1
+            except Exception as exc:
+                log.warning("memory.consolidator: edge upsert failed: %s", exc)
         return written

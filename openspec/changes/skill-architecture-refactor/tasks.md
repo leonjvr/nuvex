@@ -61,9 +61,9 @@
 - [x] 9.2 Write unit test for `parse_skill_md()` — valid frontmatter, missing frontmatter, OpenClaw metadata
 - [x] 9.3 Write unit test for `parse_env_example()` — all tag combinations, no comments, edge cases
 - [x] 9.4 Write unit test for `encrypt_env()` / `decrypt_env()` — round-trip, missing key error
-- [ ] 9.5 Write integration test for skill env injection flow — agent invokes skill script, receives DB-stored env vars
-- [ ] 9.6 Write integration test for progressive disclosure — prompt contains only summaries, activation adds full body
-- [ ] 9.7 Write integration test for backward compatibility — agent with workspace-only skills still works correctly
+- [x] 9.5 Write integration test for skill env injection flow — agent invokes skill script, receives DB-stored env vars
+- [x] 9.6 Write integration test for progressive disclosure — prompt contains only summaries, activation adds full body
+- [x] 9.7 Write integration test for backward compatibility — agent with workspace-only skills still works correctly
 
 ## 10. Hook Block/Approval Semantics
 

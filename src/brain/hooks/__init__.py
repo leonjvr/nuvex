@@ -6,6 +6,7 @@ It supersedes src/brain/hooks.py (which is shadowed by this package directory).
 from __future__ import annotations
 
 import asyncio
+import bisect
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
@@ -53,32 +54,58 @@ class HookContext:
     # Skill env injection (§6)
     skill_name: str | None = None
     skill_env: dict[str, str] | None = None
+    # Plugin context (§6 refactor)
+    plugin_id: str | None = None
+    plugin_config: dict[str, Any] | None = None
 
 
 @dataclass
 class HookRegistry:
     pre_hooks: list[HookFn] = field(default_factory=list)
     post_hooks: list[HookFn] = field(default_factory=list)
+    # Parallel priority lists — aligned index-by-index with pre_hooks/post_hooks
+    _pre_prio: list[int] = field(default_factory=list, repr=False)
+    _post_prio: list[int] = field(default_factory=list, repr=False)
 
-    def register_pre(self, fn: HookFn) -> None:
-        self.pre_hooks.append(fn)
+    def register_pre(self, fn: HookFn, priority: int = 0) -> None:
+        """Register a pre-hook at the given priority (lower runs first)."""
+        pos = bisect.bisect_right(self._pre_prio, priority)
+        self.pre_hooks.insert(pos, fn)
+        self._pre_prio.insert(pos, priority)
 
-    def register_post(self, fn: HookFn) -> None:
-        self.post_hooks.append(fn)
+    def register_post(self, fn: HookFn, priority: int = 0) -> None:
+        """Register a post-hook at the given priority (lower runs first)."""
+        pos = bisect.bisect_right(self._post_prio, priority)
+        self.post_hooks.insert(pos, fn)
+        self._post_prio.insert(pos, priority)
+
+    def register_plugin_hook(
+        self, event: str, fn: HookFn, priority: int = 100
+    ) -> None:
+        """Register a plugin hook. Priority must be >= 100."""
+        from src.nuvex_plugin import PluginPermissionError
+        if priority < 100:
+            raise PluginPermissionError(
+                f"Plugin hooks must have priority >= 100 (got {priority})"
+            )
+        if event == "pre":
+            self.register_pre(fn, priority)
+        else:
+            self.register_post(fn, priority)
 
 
 _registry = HookRegistry()
 
 
 def register_pre_hook(fn: HookFn) -> HookFn:
-    """Decorator — register a pre-tool-use hook."""
-    _registry.register_pre(fn)
+    """Decorator — register a pre-tool-use hook at priority 0 (governance priority)."""
+    _registry.register_pre(fn, priority=0)
     return fn
 
 
 def register_post_hook(fn: HookFn) -> HookFn:
-    """Decorator — register a post-tool-use hook."""
-    _registry.register_post(fn)
+    """Decorator — register a post-tool-use hook at priority 0 (governance priority)."""
+    _registry.register_post(fn, priority=0)
     return fn
 
 
@@ -138,6 +165,11 @@ async def _run_post_hooks_chained(hooks: list[HookFn], ctx: HookContext) -> str 
 async def run_pre_hooks(ctx: HookContext) -> None:
     """Run all pre-tool-use hooks. Hooks may set ctx.mutated_input or ctx.abort."""
     await _run_pre_hooks(_registry.pre_hooks, ctx)
+
+
+def get_registry() -> HookRegistry:
+    """Return the global hook registry (for plugin hook registration at startup)."""
+    return _registry
 
 
 # Backward-compat alias (pre-package refactor tests import _run_hooks)

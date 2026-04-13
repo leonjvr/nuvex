@@ -33,6 +33,10 @@ ALLOWED_USERS = set(
     int(x) for x in os.environ.get("TELEGRAM_ALLOWED_USERS", "").split(",") if x.strip()
 )
 AGENT_ID = os.environ.get("NUVEX_AGENT_ID", "maya")
+ORG_ID = os.environ.get("NUVEX_ORG_ID", "")
+if not ORG_ID:
+    log.warning("NUVEX_ORG_ID not set in Telegram gateway — defaulting to 'default' (deprecated)")
+    ORG_ID = "default"
 
 # pending_approvals: invocation_id → {chat_id, thread_id}
 _pending: dict[str, dict] = {}
@@ -45,7 +49,7 @@ _active_session: dict[int, str] = {}
 
 
 def _default_thread(chat_id: int) -> str:
-    return f"{AGENT_ID}:telegram:{chat_id}"
+    return f"{ORG_ID}:{AGENT_ID}:telegram:{chat_id}"
 
 
 def _get_active_thread(chat_id: int) -> str:
@@ -82,18 +86,23 @@ HELP_TEXT = (
 # ── Brain invoke ──────────────────────────────────────────────────────────────
 
 async def _invoke(
-    agent_id: str, message: str, thread_id: str, sender: str, channel: str = "telegram"
+    agent_id: str, message: str, thread_id: str, sender: str, channel: str = "telegram",
+    sender_name: str = "",
 ) -> dict:
     async with httpx.AsyncClient(timeout=120) as client:
+        metadata: dict = {"channel": channel, "sender": sender}
+        if sender_name:
+            metadata["sender_name"] = sender_name
         r = await client.post(
             f"{BRAIN_URL}/invoke",
             json={
                 "agent_id": agent_id,
+                "org_id": ORG_ID,
                 "message": message,
                 "thread_id": thread_id,
                 "channel": channel,
                 "sender": sender,
-                "metadata": {"channel": channel, "sender": sender},
+                "metadata": metadata,
             },
         )
         r.raise_for_status()
@@ -174,8 +183,9 @@ async def cmd_who(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     thread_id = _get_active_thread(chat_id)
     sender = str(user.id) if user else "unknown"
+    sender_name = " ".join(filter(None, [x for x in [getattr(user, "first_name", ""), getattr(user, "last_name", "")] if isinstance(x, str)])) if user else ""
     try:
-        result = await _invoke(AGENT_ID, "Who are you? Briefly introduce yourself in one paragraph.", thread_id, sender)
+        result = await _invoke(AGENT_ID, "Who are you? Briefly introduce yourself in one paragraph.", thread_id, sender, sender_name=sender_name)
         await update.message.reply_text(result.get("reply") or "I'm your AI assistant.")
     except Exception as exc:
         await update.message.reply_text(f"[Error] {exc}")
@@ -196,9 +206,10 @@ async def message_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
 
     thread_id = _get_active_thread(chat.id)
     sender = str(user.id) if user else "unknown"
+    sender_name = " ".join(filter(None, [x for x in [getattr(user, "first_name", ""), getattr(user, "last_name", "")] if isinstance(x, str)])) if user else ""
 
     try:
-        result = await _invoke(AGENT_ID, msg.text, thread_id, sender)
+        result = await _invoke(AGENT_ID, msg.text, thread_id, sender, sender_name=sender_name)
     except Exception as exc:
         log.error("invoke failed: %s", exc)
         await msg.reply_text(f"[Error] {exc}")

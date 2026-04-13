@@ -79,7 +79,12 @@ class TestEmailInvoke:
 
     @pytest.mark.asyncio
     async def test_invoke_posts_to_brain(self):
-        from src.gateway.email.poller import _invoke
+        from src.gateway.email.poller import _invoke, EmailConfig
+
+        cfg = EmailConfig(
+            imap_host="h", imap_port=993, smtp_host="h", smtp_port=587,
+            email_user="u@x.com", email_pass="p",
+        )
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -92,7 +97,7 @@ class TestEmailInvoke:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch("src.gateway.email.poller.httpx.AsyncClient", return_value=mock_client):
-            reply = await _invoke("Hello there", "user@test.com", "Test Subject")
+            reply = await _invoke(cfg, "Hello there", "user@test.com", "Test Subject")
 
         assert reply == "I got your email"
         call_args = mock_client.post.call_args
@@ -104,7 +109,12 @@ class TestEmailInvoke:
 
     @pytest.mark.asyncio
     async def test_invoke_empty_reply_returns_empty_string(self):
-        from src.gateway.email.poller import _invoke
+        from src.gateway.email.poller import _invoke, EmailConfig
+
+        cfg = EmailConfig(
+            imap_host="h", imap_port=993, smtp_host="h", smtp_port=587,
+            email_user="u@x.com", email_pass="p",
+        )
 
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
@@ -116,7 +126,7 @@ class TestEmailInvoke:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch("src.gateway.email.poller.httpx.AsyncClient", return_value=mock_client):
-            reply = await _invoke("msg", "sender@x.com", "subj")
+            reply = await _invoke(cfg, "msg", "sender@x.com", "subj")
 
         assert reply == ""
 
@@ -211,7 +221,7 @@ class TestTelegramApprovalPending:
             "approval_pending": True,
             "invocation_id": "inv-001",
             "approval_tool": "shell",
-            "thread_id": "maya:telegram:9999",
+            "thread_id": "default:maya:telegram:9999",
         }
         with patch("src.gateway.telegram.bot._invoke", AsyncMock(return_value=invoke_result)):
             await tg_bot.message_handler(update, ctx)
@@ -223,7 +233,8 @@ class TestTelegramApprovalPending:
 
         assert "inv-001" in tg_bot._pending
         assert tg_bot._pending["inv-001"]["chat_id"] == 9999
-        assert tg_bot._pending["inv-001"]["thread_id"] == "maya:telegram:9999"
+        # thread_id is built from ORG_ID at runtime — check structure not literal value
+        assert tg_bot._pending["inv-001"]["thread_id"].endswith(":maya:telegram:9999")
         tg_bot._pending.clear()
 
     @pytest.mark.asyncio

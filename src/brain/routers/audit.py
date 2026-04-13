@@ -15,6 +15,7 @@ router = APIRouter(prefix="/audit", tags=["audit"])
 class AuditEntryOut(BaseModel):
     id: int
     agent_id: str
+    org_id: str
     invocation_id: str
     thread_id: str
     action: str
@@ -31,22 +32,25 @@ class AuditEntryOut(BaseModel):
 
 
 @router.get("/{agent_id}", response_model=list[AuditEntryOut])
-async def list_audit_entries(agent_id: str, limit: int = 50) -> list[AuditEntryOut]:
-    """Return the most recent audit entries for an agent (newest first)."""
+async def list_audit_entries(agent_id: str, org_id: str = "default", limit: int = 50) -> list[AuditEntryOut]:
+    """Return the most recent audit entries for an agent (newest first), scoped by org."""
     if limit < 1 or limit > 1000:
         raise HTTPException(status_code=422, detail="limit must be between 1 and 1000")
     async with get_session() as session:
-        result = await session.execute(
+        q = (
             select(GovernanceAudit)
             .where(GovernanceAudit.agent_id == agent_id)
+            .where(GovernanceAudit.org_id == org_id)
             .order_by(GovernanceAudit.id.desc())
             .limit(limit)
         )
+        result = await session.execute(q)
         rows = list(result.scalars())
     return [
         AuditEntryOut(
             id=r.id,
             agent_id=r.agent_id,
+            org_id=getattr(r, "org_id", "default"),
             invocation_id=r.invocation_id,
             thread_id=r.thread_id,
             action=r.action,

@@ -1,0 +1,67 @@
+[package]
+name = "nuvex-desktop"
+version = "0.2.4"
+edition = "2021"
+rust-version = "1.75"
+
+[[bin]]
+name = "nuvex-desktop"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# WebSocket
+tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
+futures-util = { version = "0.3", features = ["sink"] }
+
+# HTTP (device registration + settings test-connection)
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls", "blocking"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Screenshot
+screenshots = "0.8"
+image = { version = "0.25", default-features = false, features = ["png"] }
+base64 = "0.22"
+
+# Input simulation
+enigo = "0.3"
+
+# Clipboard
+arboard = "3"
+
+# Config directory
+directories = "5"
+
+# Tray + event loop
+tray-icon = "0.22"
+tao = "0.35"
+
+# Modern settings UI
+eframe = { version = "0.29", default-features = false, features = ["glow", "default_fonts"] }
+winit = { version = "0.30", features = ["rwh_06"] }
+
+# Hostname for device name default
+hostname = "0.4"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+
+# Error handling
+anyhow = "1"
+
+[build-dependencies]
+winres = "0.1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { useOrg } from "../OrgContext";
 
-async function fetchTasks() {
-  const res = await fetch("/api/tasks");
+async function fetchTasks(orgId?: string) {
+  const url = orgId ? `/api/tasks?org_id=${encodeURIComponent(orgId)}` : "/api/tasks";
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -191,8 +193,9 @@ function CreateTaskModal({ onClose }: { onClose: () => void }) {
 
 export default function TasksPage() {
   const qc = useQueryClient();
+  const { activeOrg } = useOrg();
   const [showCreate, setShowCreate] = useState(false);
-  const { data, isLoading } = useQuery({ queryKey: ["tasks"], queryFn: fetchTasks });
+  const { data, isLoading } = useQuery({ queryKey: ["tasks", activeOrg], queryFn: () => fetchTasks(activeOrg) });
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
