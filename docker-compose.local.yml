@@ -6,6 +6,7 @@ services:
   db:
     image: pgvector/pgvector:pg16
     container_name: nuvex-db-local
+    restart: unless-stopped
     environment:
       POSTGRES_USER: nuvex
       POSTGRES_PASSWORD: nuvex
@@ -132,6 +133,7 @@ services:
     environment:
       BRAIN_URL: "http://brain:8100"
       WA_CREDS_PATH: /data/wa-creds
+      WA_SYNC_FULL_HISTORY: "false"
       NUVEX_ORG_ID: "${NUVEX_ORG_ID:-default}"
     volumes:
       - ./data:/data

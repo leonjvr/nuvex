@@ -513,7 +513,11 @@ async function fetchAgentChannelConfig() {
 
 async function connectToWhatsApp() {
   const waCfg = await fetchAgentChannelConfig();
-  const syncFullHistory = waCfg.sync_full_history === true;
+  const envSyncOverride = process.env.WA_SYNC_FULL_HISTORY;
+  const syncFullHistory =
+    envSyncOverride != null
+      ? String(envSyncOverride).toLowerCase() === "true"
+      : waCfg.sync_full_history === true;
   logger.info({ syncFullHistory }, "WA channel config loaded");
 
   const { state, saveCreds } = await useMultiFileAuthState(CREDS_PATH);

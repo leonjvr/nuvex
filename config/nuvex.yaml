@@ -37,7 +37,7 @@ agents:
   channels:
     whatsapp:
       enabled: true
-      sync_full_history: true
+      sync_full_history: false
     telegram:
       enabled: false
       bot_token: ''
@@ -95,7 +95,7 @@ agents:
   channels:
     whatsapp:
       enabled: false
-      sync_full_history: true
+      sync_full_history: false
     telegram:
       enabled: false
       bot_token: ''
