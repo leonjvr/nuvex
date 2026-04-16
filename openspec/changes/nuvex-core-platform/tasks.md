@@ -362,3 +362,211 @@
 - [x] 28.44 Write unit test: closed segment produces 1-line summary in prompt; verbatim messages excluded
 - [x] 28.45 Write unit test: group chat with 40 messages, 28 low-relevance → 28 compressed to single-line form
 - [x] 28.46 Write integration test: topic boundary detected → segment closes → consolidation fires → facts in memory store for next invocation
+
+## 29. Tool Surface Governance
+
+> Spec: `specs/tool-surface-governance/spec.md`
+>
+> Per-agent tool manifests with token budgets, usage analytics, dead-tool detection, and
+> error-rate alerting. Prevents prompt bloat from unused tool definitions and catches
+> misrouted/broken tools. Learned from OB1's tool-audit methodology.
+
+### 29.1 Database migration
+- [ ] 29.1 Write migration: create `tool_usage_stats` table (id, agent_id, tool_name, call_count, error_count, last_used, window_start; unique on agent_id+tool_name+window_start)
+
+### 29.2 Tool manifest
+- [ ] 29.2 Implement `src/brain/tools/manifest.py` — `ToolManifestEntry` dataclass, `build_manifest()` that collects all tools from built-in, skills, MCP, plugins with per-tool token cost estimation
+- [ ] 29.3 Implement `prune_to_budget()` — given a manifest and `tool_token_budget`, prune least-used-in-24h tools first; never prune tools used in the most recent invocation
+
+### 29.3 Usage tracking
+- [ ] 29.4 Implement `tool_usage_hook()` PostToolUse hook in `src/brain/hooks/__init__.py` — upsert `tool_usage_stats` row after every tool call (call_count += 1, error_count += 1 on failure, update last_used)
+- [ ] 29.5 Wire `tool_usage_hook()` into `register_default_hooks()` — no change to existing hooks
+
+### 29.4 Token budget enforcement
+- [ ] 29.6 Add optional `tool_token_budget: int` (default 4000) and `tool_auto_prune: bool` (default false) to agent config in `src/shared/config.py`
+- [ ] 29.7 Integrate `prune_to_budget()` into `src/brain/workspace/__init__.py` tool definition assembly — call before serialising tool defs into the system prompt. When budget is null/omitted, skip pruning (backward compatible).
+
+### 29.5 Dead tool detection
+- [ ] 29.8 Implement `detect_dead_tools()` in `src/brain/tools/manifest.py` — identify tools with 0 calls in the last 7 days per agent
+- [ ] 29.9 Register `dead_tool_scan` daily cron in `src/brain/cron.py` — calls `detect_dead_tools()`, emits `tool.dead_detected` events
+- [ ] 29.10 Implement auto-hide: when `tool_auto_prune: true` and a tool has been dead 14+ days, exclude from prompt until manually re-enabled
+
+### 29.6 Error rate alerting
+- [ ] 29.11 Implement error rate check: when a tool's error rate > 50% with ≥ 5 calls in the last 24h, emit `tool.high_error_rate` event and mark manifest entry as `status: "degraded"`
+
+### 29.7 API & dashboard
+- [ ] 29.12 Implement `GET /api/v1/agents/{id}/tools` — return tool manifest with usage stats
+- [ ] 29.13 Build dashboard tool manifest panel on agent detail page
+
+### 29.8 Tests
+- [ ] 29.14 Write unit test: `build_manifest()` collects tools from all sources with correct token estimates
+- [ ] 29.15 Write unit test: `prune_to_budget()` removes least-used tools first, preserves recent-invocation tools
+- [ ] 29.16 Write unit test: `detect_dead_tools()` flags tools with 0 calls over 7 days
+- [ ] 29.17 Write unit test: `tool_usage_hook()` upserts stats correctly on success and failure
+- [ ] 29.18 Write integration test: agent with 40 tools and 4000-token budget → prompt contains only high-usage tools within budget
+
+## 30. Schema-Aware Capture Router
+
+> Spec: `specs/capture-router/spec.md`
+>
+> Multi-fragment extraction from a single inbound message, dispatched to typed handlers
+> (contacts, tasks, facts, preferences). Opt-in per agent. Learned from OB1's
+> schema-aware-routing recipe.
+
+### 30.1 Capture registry
+- [ ] 30.1 Implement `src/brain/capture/registry.py` — `CaptureSchema` model, `CaptureRegistry` with `register()` and `get_schemas()`. Built-in schemas: contact, task, preference, fact.
+- [ ] 30.2 Implement JSON Schema definitions for each built-in capture schema (contact requires name; task requires title; fact requires text; preference requires key+value)
+
+### 30.2 Extractor
+- [ ] 30.3 Implement `src/brain/capture/extractor.py` — `extract_fragments()` using fast model with structured output. Returns array of `{schema, data}` fragments. Skips messages shorter than `min_message_length`.
+
+### 30.3 Router & dispatch
+- [ ] 30.4 Implement `src/brain/capture/router.py` — `dispatch_fragments()` validates each fragment against its schema, calls the corresponding write handler. Invalid fragments logged and discarded.
+- [ ] 30.5 Implement dedup check before dispatch: fingerprint each fragment, skip if matching fingerprint written in last 5 minutes (integrates with Section 32 if available, else standalone hash check)
+
+### 30.4 Write handlers
+- [ ] 30.6 Implement `src/brain/capture/handlers/contact.py` — writes/updates `workspace/contacts/people/<name>.md` per Section 16 format. Merges fields if file exists.
+- [ ] 30.7 Implement `src/brain/capture/handlers/task.py` — calls `create_task()` from Section 23. Checks for duplicate title in pending tasks before creation.
+- [ ] 30.8 Implement `src/brain/capture/handlers/fact.py` — writes personal-scope memory entry via Section 28 consolidator. Cosine dedup against existing memories.
+- [ ] 30.9 Implement `src/brain/capture/handlers/preference.py` — updates agent preference config file in workspace.
+
+### 30.5 Integration
+- [ ] 30.10 Add optional `capture_router` config block to agent model in `src/shared/config.py` (enabled: bool, schemas: list, min_message_length: int). Default: enabled=false.
+- [ ] 30.11 Register `capture_router_hook` as PreToolUse hook in `src/brain/hooks/__init__.py` — only active when `capture_router.enabled = true`. Appends `[CAPTURED]` summary to system prompt.
+- [ ] 30.12 Add optional `capture_schemas` field to SKILL.md frontmatter spec for skill-provided schemas
+
+### 30.6 Tests
+- [ ] 30.13 Write unit test: compound message extracts contact + task fragments
+- [ ] 30.14 Write unit test: short message skipped — no extraction call
+- [ ] 30.15 Write unit test: invalid fragment discarded, valid sibling dispatched
+- [ ] 30.16 Write unit test: duplicate contact merged, not overwritten
+- [ ] 30.17 Write integration test: user message "Met Sarah from Acme, remind me Thursday" → contact file created + task in queue
+
+## 31. Adaptive Classification
+
+> Spec: `specs/adaptive-classification/spec.md`
+>
+> Self-calibrating model router: tracks routing outcome quality, adjusts classifier thresholds
+> based on accuracy data, A/B-style feedback loop. Learned from OB1's adaptive-capture-classification.
+
+### 31.1 Database migration
+- [ ] 31.1 Write migration: create `routing_outcomes` table (id, agent_id, classification, model_tier, model_used, outcome_score, retry_occurred, token_count, cost_usd, created_at; index on agent_id+classification+created_at)
+
+### 31.2 Outcome scoring
+- [ ] 31.2 Implement `record_routing_outcome()` in `src/brain/routing/router.py` — records outcome score based on retry, clarification, acceptance, task completion signals
+- [ ] 31.3 Wire outcome recording into `src/brain/graph.py` — call `record_routing_outcome()` after each LLM response evaluation. Purely additive, no restructuring.
+
+### 31.3 Accuracy tracking
+- [ ] 31.4 Implement `src/brain/routing/accuracy.py` — `compute_accuracy()` returns rolling 7-day average outcome score per (agent, classification, model_tier). `suggest_threshold_adjustment()` returns new thresholds when accuracy < floor.
+
+### 31.4 Classifier refactor (backward-compatible)
+- [ ] 31.5 Refactor `src/brain/routing/classifier.py` — extract hardcoded thresholds into `ClassifierConfig` dataclass with defaults matching current values. `classify()` gains optional `config: ClassifierConfig` param. **When omitted, behaviour is identical to today. Run existing classifier tests to confirm.**
+- [ ] 31.6 Add optional `adaptive: bool` (default false), `accuracy_floor: float` (default 0.65), `adjustment_interval_days: int` (default 3) to routing config in `src/shared/config.py`
+
+### 31.5 Adaptive threshold adjustment
+- [ ] 31.7 When `adaptive: true`, load adaptive thresholds from DB before `classify()` in `src/brain/graph.py`. When false, use static defaults.
+- [ ] 31.8 Register daily `routing_threshold_calibration` cron in `src/brain/cron.py` — only runs when any agent has `adaptive: true`. Calls `suggest_threshold_adjustment()` and persists new thresholds.
+
+### 31.6 API & dashboard
+- [ ] 31.9 Implement `GET /api/v1/routing/analytics` — per-classification accuracy, misroute rates, threshold values
+- [ ] 31.10 Build dashboard routing analytics page with accuracy charts and threshold visualisation
+
+### 31.7 Tests
+- [ ] 31.11 Write unit test: `ClassifierConfig` with default values produces identical results to current `classify()`
+- [ ] 31.12 Write unit test: `record_routing_outcome()` writes correct score for success/retry/failure cases
+- [ ] 31.13 Write unit test: `compute_accuracy()` returns correct 7-day rolling average
+- [ ] 31.14 Write unit test: `suggest_threshold_adjustment()` tightens threshold when accuracy < floor
+- [ ] 31.15 Write integration test: 3 days of low accuracy → adaptive mode adjusts threshold → more messages routed to primary
+
+## 32. Content Fingerprint Deduplication
+
+> Spec: `specs/content-fingerprint/spec.md`
+>
+> Cheap deterministic dedup layer via normalised-text SHA-256 fingerprints. Covers memory
+> consolidation, event bus, and capture router. Learned from OB1's content fingerprinting.
+
+### 32.1 Fingerprint utility
+- [ ] 32.1 Implement `src/brain/utils/fingerprint.py` — `content_fingerprint(text: str) -> str`: normalise whitespace, lowercase, SHA-256, return first 16 hex chars. Pure function, no side effects.
+
+### 32.2 Memory dedup
+- [ ] 32.2 Write migration: add `content_hash TEXT` column to `memories` table with unique index on `(scope, owner_id, content_hash)`
+- [ ] 32.3 Extend `src/brain/memory/consolidator.py` — after `_fast_extract()`, compute fingerprint per fact, check for existing `content_hash` in same scope+owner before writing. Skip duplicate (no embedding call). **Existing cosine dedup in promoter.py remains unchanged — fingerprint catches cheap exact dupes first.**
+
+### 32.3 Event dedup
+- [ ] 32.4 Extend `src/brain/events.py` — in `publish()`, compute fingerprint from `(lane, agent_id, json.dumps(payload, sort_keys=True))`, check for matching fingerprint in last 60 seconds before insert. Silently skip duplicates with debug log.
+
+### 32.4 Capture router dedup (depends on Section 30)
+- [ ] 32.5 If Section 30 is implemented: extend `src/brain/capture/router.py` to fingerprint each fragment before dispatch, skip if matching fingerprint within last 5 minutes.
+
+### 32.5 Tests
+- [ ] 32.6 Write unit test: identical texts with different whitespace produce same fingerprint
+- [ ] 32.7 Write unit test: different texts produce different fingerprints
+- [ ] 32.8 Write unit test: consolidator skips fact when content_hash already exists in scope+owner
+- [ ] 32.9 Write unit test: event bus skips duplicate event within 60s, allows after 61s
+- [ ] 32.10 Write integration test: same thread consolidated twice → no duplicate memories created
+
+## 33. Skill & Plugin Validation Gate
+
+> Spec: `specs/contribution-ci-gate/spec.md`
+>
+> Schema validation for SKILL.md frontmatter, tool reference checking, plugin metadata
+> validation. Invalid skills are skipped with diagnostics instead of silently breaking.
+> Learned from OB1's metadata.json CI gate.
+
+### 33.1 Skill validator
+- [ ] 33.1 Implement `src/brain/skills/validator.py` — `validate_skill(skill_dir: Path) -> ValidationResult`. Checks required frontmatter fields (name, description), validates tool references point to existing scripts, estimates token cost.
+- [ ] 33.2 Define `ValidationResult` with `valid: bool`, `errors: list[str]`, `warnings: list[str]`, `token_estimate: int`
+
+### 33.2 Validation on load
+- [ ] 33.3 Extend `src/brain/workspace/__init__.py` — in `load_skill_files()` / `load_skill_metas()`, call `validate_skill()` before including skill. Invalid skills are skipped. **Wrapped in try/except so validator crash still loads the skill (fail-open). Existing valid skills load identically.**
+- [ ] 33.4 Emit `skill.validation_failed` event to event bus when a skill fails validation
+
+### 33.3 Plugin metadata
+- [ ] 33.5 Implement `src/brain/plugins/metadata.py` — `validate_plugin_metadata(package_path: Path) -> ValidationResult`. Checks optional `nuvex-plugin.json` for name, version, min_nuvex_version, provides, tier_required.
+- [ ] 33.6 Plugins without `nuvex-plugin.json` still load (backward compatible) with a warning. Plugins with version mismatch are blocked with error event.
+
+### 33.4 API & dashboard
+- [ ] 33.7 Implement `GET /api/v1/agents/{id}/skills` — return loaded skills with validation status, token estimates
+- [ ] 33.8 Build dashboard skills panel on agent detail page
+
+### 33.5 Tests
+- [ ] 33.9 Write unit test: valid SKILL.md with all fields passes validation
+- [ ] 33.10 Write unit test: missing `name` field fails validation
+- [ ] 33.11 Write unit test: tool reference to nonexistent script produces warning (not error)
+- [ ] 33.12 Write unit test: invalid skill skipped during workspace assembly, valid siblings still loaded
+- [ ] 33.13 Write unit test: plugin with version mismatch blocked; plugin without metadata loads with warning
+
+## 34. Local Embedding Fallback
+
+> Spec: `specs/local-embeddings/spec.md`
+>
+> Provider-abstracted embedding with Ollama fallback. Eliminates single-point-of-failure on
+> external embedding APIs. Learned from OB1's local-ollama-embeddings recipe.
+
+### 34.1 Embedder abstraction
+- [ ] 34.1 Implement `src/brain/memory/embedder.py` — `Embedder` protocol with `embed()` and `embed_single()`. Implementations: `OpenAIEmbedder` (extracts current inline logic from retriever/consolidator/segmenter), `OllamaEmbedder` (calls `/api/embeddings`).
+- [ ] 34.2 Implement `get_embedder()` factory — reads `embedding` config block, returns primary embedder with optional fallback wrapper. Defaults to OpenAI when no config block present.
+
+### 34.2 Migrate existing embedding calls (backward-compatible refactor)
+- [ ] 34.3 Refactor `src/brain/memory/retriever.py` — replace inline `_embed()` with `get_embedder().embed_single()`. **Existing behaviour identical. Mock target changes from `retriever._embed` to `embedder.get_embedder` in tests.**
+- [ ] 34.4 Refactor `src/brain/memory/consolidator.py` — same pattern: replace `_embed()` with `get_embedder().embed_single()`.
+- [ ] 34.5 Refactor `src/brain/memory/segmenter.py` — same pattern: replace inline embedding with `get_embedder()`.
+
+### 34.3 Configuration
+- [ ] 34.6 Add optional `embedding` config block to `src/shared/config.py` — provider, model, fallback (provider, model, base_url), dimension. Defaults: provider="openai", model="text-embedding-3-small", dimension=1536, no fallback.
+- [ ] 34.7 Implement dimension validation at startup — if configured dimension doesn't match pgvector column, log CRITICAL and disable memory system.
+
+### 34.4 Fallback & health integration
+- [ ] 34.8 Implement fallback logic in embedder: when primary raises exception or times out (5s), try fallback. Emit `embedding.fallback_activated` event. If fallback dimension doesn't match primary, disable fallback at startup with warning.
+- [ ] 34.9 Extend `src/brain/health.py` — register embedding provider as `embedding/<provider>` in ServiceHealthMonitor. Embedding errors feed into health state transitions.
+
+### 34.5 Docker integration
+- [ ] 34.10 Add optional Ollama service to `docker-compose.local.yml` under `local-embeddings` profile. Volume for model storage. Bound to `127.0.0.1:11434`.
+
+### 34.6 Tests
+- [ ] 34.11 Write unit test: `OpenAIEmbedder` produces same results as the previous inline `_embed()` function
+- [ ] 34.12 Write unit test: `OllamaEmbedder` calls correct endpoint with correct payload
+- [ ] 34.13 Write unit test: fallback activates when primary raises; fallback disabled on dimension mismatch
+- [ ] 34.14 Write unit test: `get_embedder()` with no config returns OpenAI embedder (backward compatible)
+- [ ] 34.15 Write unit test: retriever/consolidator/segmenter work identically after refactor (mock at new location)
+- [ ] 34.16 Write integration test: primary provider fails → fallback used → memory retrieval succeeds

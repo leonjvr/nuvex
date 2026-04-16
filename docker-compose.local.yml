@@ -40,6 +40,8 @@ services:
       GROQ_API_KEY: "${GROQ_API_KEY:-}"
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
       MINIMAX_API_KEY: "${MINIMAX_API_KEY:-}"
+      # Encryption key for plugin configs (generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+      NUVEX_SECRET_KEY: "X5unRhZyKxx_-DQiTHSzj6p0UgBFbcCiXXvEEgYIwyE="
       # Dev-server skill credentials
       HETZNER_DEV_PROJECT_API: "${HETZNER_DEV_PROJECT_API:-}"
     volumes:
