@@ -61,6 +61,7 @@ _brain_logs.txt
 
 # Rust build artifacts
 src/nuvex-desktop/target/
+legacy-ts/src/nuvex-desktop/target/
 src/nuvex-desktop/_build*.txt
 .playwright-mcp/
 
