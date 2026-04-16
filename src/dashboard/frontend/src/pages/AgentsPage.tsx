@@ -547,6 +547,27 @@ const LIFECYCLE_COLORS: Record<string, string> = {
   terminated:       "bg-gray-800 text-gray-500",
 };
 
+const LIFECYCLE_LABELS: Record<string, string> = {
+  idle: "ready",
+  active: "working",
+  running: "working",
+  starting: "starting",
+  spawning: "starting",
+  ready_for_prompt: "ready",
+  trust_required: "needs trust",
+  finished: "ready",
+  failed: "needs attention",
+  error: "needs attention",
+  suspended: "paused",
+  stopping: "stopping",
+  stopped: "stopped",
+  terminated: "terminated",
+};
+
+function lifecycleLabel(state: string): string {
+  return LIFECYCLE_LABELS[state] ?? state;
+}
+
 const AGENT_AVATAR_COLORS = [
   "bg-indigo-600", "bg-purple-600", "bg-rose-600", "bg-teal-600",
   "bg-orange-600", "bg-cyan-600", "bg-pink-600",
@@ -781,7 +802,14 @@ function CreateAgentModal({ onClose }: { onClose: () => void }) {
 
 export default function AgentsPage() {
   const { activeOrg } = useOrg();
-  const { data, isLoading, error } = useQuery({ queryKey: ["agents", activeOrg], queryFn: () => fetchAgents(activeOrg) });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["agents", activeOrg],
+    queryFn: () => fetchAgents(activeOrg),
+    // Keep lifecycle state fresh so users see current readiness/working state.
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+  });
   const [invokingAgent, setInvokingAgent] = useState<any | null>(null);
   const [chatAgent, setChatAgent] = useState<any | null>(null);
   const [settingsAgent, setSettingsAgent] = useState<any | null>(null);
@@ -832,10 +860,10 @@ export default function AgentsPage() {
                         className={`text-xs px-2 py-0.5 rounded-full ${badgeClass} hover:opacity-80 transition-opacity underline-offset-2 hover:underline cursor-pointer`}
                         title="Click to view diagnostics"
                       >
-                        {state} ↗
+                        {lifecycleLabel(state)} ↗
                       </button>
                     ) : (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${badgeClass}`}>{state}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${badgeClass}`}>{lifecycleLabel(state)}</span>
                     )}
                   </div>
                   <button
@@ -923,7 +951,7 @@ export default function AgentsPage() {
                         <p className="font-medium truncate">{agent.name || agent.id}</p>
                         <span title="System agent"><Shield size={10} className="text-gray-500 flex-none" /></span>
                       </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${badgeClass}`}>{state}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${badgeClass}`}>{lifecycleLabel(state)}</span>
                     </div>
                     <button
                       onClick={() => setSettingsAgent(agent)}
