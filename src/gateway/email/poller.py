@@ -5,6 +5,7 @@ import asyncio
 import email as email_lib
 import logging
 import os
+from dataclasses import dataclass
 from email.header import decode_header
 from email.mime.text import MIMEText
 
@@ -14,15 +15,43 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-BRAIN_URL = os.environ.get("BRAIN_URL", "http://brain:8100")
-AGENT_ID = os.environ.get("NUVEX_AGENT_ID", "maya")
-IMAP_HOST = os.environ["IMAP_HOST"]
-IMAP_PORT = int(os.environ.get("IMAP_PORT", "993"))
-SMTP_HOST = os.environ["SMTP_HOST"]
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-EMAIL_USER = os.environ["EMAIL_USER"]
-EMAIL_PASS = os.environ["EMAIL_PASS"]
-POLL_INTERVAL = int(os.environ.get("IMAP_POLL_INTERVAL", "30"))
+
+@dataclass(frozen=True)
+class EmailGatewayConfig:
+    brain_url: str
+    agent_id: str
+    imap_host: str
+    imap_port: int
+    smtp_host: str
+    smtp_port: int
+    email_user: str
+    email_pass: str
+    poll_interval: int
+
+
+def load_gateway_config() -> EmailGatewayConfig:
+    """Load and validate required gateway settings from environment."""
+    required = ["IMAP_HOST", "SMTP_HOST", "EMAIL_USER", "EMAIL_PASS"]
+    missing = [k for k in required if not os.environ.get(k)]
+    if missing:
+        msg = (
+            "Missing required email gateway env vars: "
+            + ", ".join(missing)
+            + ". Add them to config/channels.env and restart gateway-email."
+        )
+        raise RuntimeError(msg)
+
+    return EmailGatewayConfig(
+        brain_url=os.environ.get("BRAIN_URL", "http://brain:8100"),
+        agent_id=os.environ.get("NUVEX_AGENT_ID", "maya"),
+        imap_host=os.environ["IMAP_HOST"],
+        imap_port=int(os.environ.get("IMAP_PORT", "993")),
+        smtp_host=os.environ["SMTP_HOST"],
+        smtp_port=int(os.environ.get("SMTP_PORT", "587")),
+        email_user=os.environ["EMAIL_USER"],
+        email_pass=os.environ["EMAIL_PASS"],
+        poll_interval=int(os.environ.get("IMAP_POLL_INTERVAL", "30")),
+    )
 
 
 def _decode_header_value(val: str | bytes) -> str:
@@ -33,13 +62,13 @@ def _decode_header_value(val: str | bytes) -> str:
     )
 
 
-async def _invoke(message: str, from_addr: str, subject: str) -> str:
-    thread_id = f"{AGENT_ID}:email:{from_addr}"
+async def _invoke(cfg: EmailGatewayConfig, message: str, from_addr: str, subject: str) -> str:
+    thread_id = f"{cfg.agent_id}:email:{from_addr}"
     async with httpx.AsyncClient(timeout=120) as client:
         r = await client.post(
-            f"{BRAIN_URL}/invoke",
+            f"{cfg.brain_url}/invoke",
             json={
-                "agent_id": AGENT_ID,
+                "agent_id": cfg.agent_id,
                 "message": f"Subject: {subject}\n\n{message}",
                 "thread_id": thread_id,
                 "metadata": {"channel": "email", "sender": from_addr},
@@ -50,22 +79,22 @@ async def _invoke(message: str, from_addr: str, subject: str) -> str:
         return data.get("reply", "")
 
 
-async def _send_reply(to_addr: str, subject: str, body: str) -> None:
+async def _send_reply(cfg: EmailGatewayConfig, to_addr: str, subject: str, body: str) -> None:
     msg = MIMEText(body, "plain")
-    msg["From"] = EMAIL_USER
+    msg["From"] = cfg.email_user
     msg["To"] = to_addr
     msg["Subject"] = f"Re: {subject}"
-    async with aiosmtplib.SMTP(hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False) as smtp:
+    async with aiosmtplib.SMTP(hostname=cfg.smtp_host, port=cfg.smtp_port, use_tls=False) as smtp:
         await smtp.starttls()
-        await smtp.login(EMAIL_USER, EMAIL_PASS)
+        await smtp.login(cfg.email_user, cfg.email_pass)
         await smtp.send_message(msg)
 
 
-async def poll_imap() -> None:
+async def poll_imap(cfg: EmailGatewayConfig) -> None:
     """Poll IMAP for unseen messages and process them."""
-    client = aioimaplib.IMAP4_SSL(host=IMAP_HOST, port=IMAP_PORT)
+    client = aioimaplib.IMAP4_SSL(host=cfg.imap_host, port=cfg.imap_port)
     await client.wait_hello_from_server()
-    await client.login(EMAIL_USER, EMAIL_PASS)
+    await client.login(cfg.email_user, cfg.email_pass)
     await client.select("INBOX")
 
     _, data = await client.search("UNSEEN")
@@ -90,9 +119,9 @@ async def poll_imap() -> None:
                 body = msg.get_payload(decode=True).decode(errors="replace")
 
             log.info("Processing email from=%s subject=%s", from_addr, subject)
-            reply = await _invoke(body.strip(), from_addr, subject)
+            reply = await _invoke(cfg, body.strip(), from_addr, subject)
             if reply:
-                await _send_reply(from_addr, subject, reply)
+                await _send_reply(cfg, from_addr, subject, reply)
 
             await client.store(uid, "+FLAGS", "\\Seen")
         except Exception as exc:
@@ -102,10 +131,11 @@ async def poll_imap() -> None:
 
 
 async def run_poller() -> None:
-    log.info("Email gateway: starting IMAP poller (interval=%ds)", POLL_INTERVAL)
+    cfg = load_gateway_config()
+    log.info("Email gateway: starting IMAP poller (interval=%ds)", cfg.poll_interval)
     while True:
         try:
-            await poll_imap()
+            await poll_imap(cfg)
         except Exception as exc:
             log.error("IMAP poll error: %s", exc)
-        await asyncio.sleep(POLL_INTERVAL)
+        await asyncio.sleep(cfg.poll_interval)

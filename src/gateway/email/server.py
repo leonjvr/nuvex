@@ -28,6 +28,15 @@ def _run_health():
 
 async def main():
     global _running
+    required = ["IMAP_HOST", "SMTP_HOST", "EMAIL_USER", "EMAIL_PASS"]
+    missing = [k for k in required if not os.environ.get(k)]
+    if missing:
+        raise RuntimeError(
+            "Missing required email gateway env vars: "
+            + ", ".join(missing)
+            + ". Add them to config/channels.env and restart gateway-email."
+        )
+
     t = threading.Thread(target=_run_health, daemon=True)
     t.start()
     _running = True

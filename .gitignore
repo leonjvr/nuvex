@@ -66,3 +66,9 @@ data/agents/*/workspace/ssh/
 # WhatsApp credentials / session keys — NEVER commit
 data/wa-creds/
 data/wa-qr.json
+config/channels.env
+
+# Local secret restore artifacts
+nuvex-db-latest.sql
+nuvex-db-*.sql
+.secrets-backup-*/

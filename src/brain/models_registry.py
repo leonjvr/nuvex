@@ -4,8 +4,10 @@ from __future__ import annotations
 import logging
 import os
 from functools import lru_cache
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
+from langchain_core.tools import StructuredTool
 
 from .state import AgentState
 
@@ -121,3 +123,47 @@ def get_active_model_name(state: AgentState) -> str:
 def get_llm(model_name: str) -> BaseChatModel:
     """Public helper — return a cached LangChain model by provider/name string."""
     return _build_model(model_name)
+
+
+def is_claude_model(model_name: str) -> bool:
+    """Return True when model name routes to Anthropic Claude."""
+    lowered = (model_name or "").lower()
+    return "claude" in lowered or lowered.startswith("anthropic/")
+
+
+def _build_claude_with_advisor(model_name: str) -> BaseChatModel:
+    """Build Claude model for advisor flow.
+
+    The current runtime does not require a separate constructor path,
+    so we reuse the standard model builder.
+    """
+    return _build_model(model_name)
+
+
+def get_advisor_enabled(agent_id: str) -> bool:
+    """Read per-agent advisor toggle from config; default enabled."""
+    try:
+        from ..shared.config import get_cached_config
+
+        cfg = get_cached_config()
+        agent_def = cfg.agents.get(agent_id)
+        if agent_def is None:
+            return True
+        model_cfg: Any = getattr(agent_def, "model", None)
+        advisor = getattr(model_cfg, "advisor", True)
+        return bool(advisor)
+    except Exception:
+        return True
+
+
+def make_advisor_tool() -> StructuredTool:
+    """Create a lightweight advisor tool compatible with tool binding."""
+
+    def _advisor(query: str) -> str:
+        return f"Advisor note: focus on risk, policy, and fallback options for: {query}"
+
+    return StructuredTool.from_function(
+        func=_advisor,
+        name="advisor",
+        description="Provide a short advisory note for complex or risky requests.",
+    )
