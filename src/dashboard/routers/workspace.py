@@ -57,7 +57,7 @@ class FileWrite(BaseModel):
     content: str
 
 
-@router.put("/{agent_id}/files/{file_path:path}", status_code=204)
+@router.put("/{agent_id}/files/{file_path:path}", status_code=204, response_model=None)
 async def write_workspace_file(agent_id: str, file_path: str, body: FileWrite):
     root = _workspace_root(agent_id)
     full = (root / file_path).resolve()

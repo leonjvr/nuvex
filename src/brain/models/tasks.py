@@ -18,6 +18,7 @@ class Task(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     parent_task_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, server_default="default", index=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     assigned_agent: Mapped[str] = mapped_column(String(100), nullable=False, index=True)

@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
+import { useOrg } from "../OrgContext";
 
-async function fetchCron() {
-  const res = await fetch("/api/cron");
+async function fetchCron(orgId?: string) {
+  const url = orgId ? `/api/cron?org_id=${encodeURIComponent(orgId)}` : "/api/cron";
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -16,7 +18,8 @@ async function fetchAgents() {
 
 export default function CronPage() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ["cron"], queryFn: fetchCron });
+  const { activeOrg } = useOrg();
+  const { data, isLoading } = useQuery({ queryKey: ["cron", activeOrg], queryFn: () => fetchCron(activeOrg) });
   const { data: agents } = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
   const [form, setForm] = useState({ name: "", agent_id: "", schedule: "" });
 

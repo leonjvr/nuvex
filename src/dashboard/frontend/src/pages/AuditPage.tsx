@@ -1,25 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-
-async function fetchAudit(params: string) {
-  const res = await fetch(`/api/audit?${params}`);
-  if (!res.ok) throw new Error("Failed to fetch audit");
-  return res.json();
-}
+import { useOrg } from "../OrgContext";
 
 const DECISIONS = ["", "approved", "denied", "flagged", "allowed"];
 
 export default function AuditPage() {
+  const { activeOrg } = useOrg();
   const [decision, setDecision] = useState("");
   const [page, setPage] = useState(0);
   const limit = 50;
 
   const params = new URLSearchParams({ limit: String(limit), offset: String(page * limit) });
   if (decision) params.set("decision", decision);
+  if (activeOrg) params.set("org_id", activeOrg);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["audit", decision, page],
-    queryFn: () => fetchAudit(params.toString()),
+    queryKey: ["audit", decision, page, activeOrg],
+    queryFn: () => fetch(`/api/audit?${params}`).then(r => { if (!r.ok) throw new Error("Failed to fetch audit"); return r.json(); }),
   });
 
   return (

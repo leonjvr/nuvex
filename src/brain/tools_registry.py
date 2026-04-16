@@ -11,13 +11,14 @@ from .tools.mcp_loader import load_mcp_tools_for_agent
 from .tools.shell_tool import ShellTool
 from .tools.builtin import ReadFileTool, SendMessageTool, WebFetchTool, WriteFileTool
 from .tools.delegate_tool import DelegateToAgentTool
+from .tools.read_tool_result import ReadToolResultTool
 
 # Tier-to-allowed-tools mapping — lower tier means more restricted
 _TIER_ALLOWED: dict[str, set[str]] = {
-    "T1": {"shell", "read_file", "write_file", "web_fetch", "send_message", "delegate_to_agent", "create_task", "complete_task"},
-    "T2": {"read_file", "write_file", "web_fetch", "send_message", "create_task", "complete_task"},
-    "T3": {"read_file", "web_fetch", "send_message"},
-    "T4": {"web_fetch"},
+    "T1": {"shell", "read_file", "write_file", "web_fetch", "send_message", "delegate_to_agent", "create_task", "complete_task", "read_tool_result"},
+    "T2": {"read_file", "write_file", "web_fetch", "send_message", "create_task", "complete_task", "read_tool_result"},
+    "T3": {"read_file", "web_fetch", "send_message", "read_tool_result"},
+    "T4": {"web_fetch", "read_tool_result"},
 }
 
 _BUILTIN_TOOLS: list[BaseTool] = [
@@ -27,6 +28,7 @@ _BUILTIN_TOOLS: list[BaseTool] = [
     WebFetchTool(),
     SendMessageTool(),
     DelegateToAgentTool(),
+    ReadToolResultTool(),
 ]
 
 
@@ -70,11 +72,14 @@ async def get_tools_for_agent(agent_id: str) -> list[BaseTool]:
         mcp_servers = getattr(agent_def, "mcp_servers", {}) if agent_def else {}
         skills = getattr(agent_def, "skills", []) if agent_def else []
         workspace = getattr(agent_def, "workspace", None) if agent_def else None
+        plugins = getattr(agent_def, "plugins", {}) if agent_def else {}
     except Exception:
+        agent_def = None
         tier = "T2"
         mcp_servers = {}
         skills = []
         workspace = None
+        plugins = {}
 
     allowed = set(_TIER_ALLOWED.get(tier, _TIER_ALLOWED["T2"]))
 
@@ -105,4 +110,77 @@ async def get_tools_for_agent(agent_id: str) -> list[BaseTool]:
         mcp_tools = await load_mcp_tools_for_agent(mcp_servers)
         all_tools = all_tools + mcp_tools
 
+    # Plugin tools — collect from enabled plugins for this agent
+    plugin_tools = _get_plugin_tools(agent_id, plugins)
+    all_tools = all_tools + plugin_tools
+
+    # §desktop — attach DesktopToolCallTool if agent has an assigned + connected device
+    if tier in ("T1", "T2"):
+        desktop_tools = await _get_desktop_tools(agent_id, agent_def, tier)
+        all_tools = all_tools + desktop_tools
+
     return all_tools
+
+
+def _get_plugin_tools(agent_id: str, plugins: dict) -> list[BaseTool]:
+    """Collect BaseTool instances from enabled plugins for the agent."""
+    try:
+        from .plugins import get_loaded_plugins, get_tools_for_plugin
+    except Exception:
+        return []
+
+    tools: list[BaseTool] = []
+    loaded = get_loaded_plugins()
+
+    for plugin_id, plugin_cfg in plugins.items():
+        enabled = getattr(plugin_cfg, "enabled", True)
+        if not enabled:
+            continue
+        if plugin_id not in loaded:
+            continue
+        plugin_tools = get_tools_for_plugin(plugin_id)
+        # Filter: only include optional tools if explicitly enabled
+        for tool in plugin_tools:
+            optional = getattr(tool, "_optional", False)
+            if optional and not enabled:
+                continue
+            tools.append(tool)
+
+    return tools
+
+
+async def _get_desktop_tools(agent_id: str, agent_def, tier: str = "T2") -> list[BaseTool]:
+    """Return DesktopToolCallTool if agent has a desktop device assignment."""
+    try:
+        from sqlalchemy import select
+        from .db import get_session
+        from .devices.models import DesktopAgentAssignment
+        from .devices.registry import get_registry
+        from .devices.tool import DesktopToolCallTool
+
+        # Prefer DB assignment; fall back to config field
+        async with get_session() as session:
+            row = (await session.execute(
+                select(DesktopAgentAssignment).where(
+                    DesktopAgentAssignment.agent_id == agent_id,
+                    DesktopAgentAssignment.enabled.is_(True),
+                )
+            )).scalar_one_or_none()
+
+        device_id: str | None = None
+        if row is not None:
+            device_id = row.device_id
+        elif agent_def and getattr(agent_def, "desktop_device", None):
+            device_id = agent_def.desktop_device
+
+        if device_id is None:
+            return []
+
+        registry = get_registry()
+        tool = DesktopToolCallTool()
+        tool.device_id = device_id
+        tool.agent_id = agent_id
+        tool.agent_tier = tier
+        return [tool]
+    except Exception:
+        return []

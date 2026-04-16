@@ -21,6 +21,15 @@ _MODEL_PRICES: dict[str, tuple[float, float]] = {
     "gpt-4-turbo": (10.00, 30.00),
     "gemini-2.0-flash": (0.10, 0.40),
     "gemini-1.5-pro": (1.25, 5.00),
+    # Groq-hosted models (per-1M as of early 2026)
+    "llama-3.3-70b": (0.59, 0.79),
+    "llama-3.1-70b": (0.59, 0.79),
+    "llama-3.1-8b": (0.05, 0.08),
+    "llama-3-70b": (0.59, 0.79),
+    "llama-3-8b": (0.05, 0.08),
+    "mixtral-8x7b": (0.24, 0.24),
+    "gemma2-9b": (0.20, 0.20),
+    "gemma-7b": (0.10, 0.10),
 }
 
 
@@ -52,6 +61,7 @@ async def record_llm_cost(
     primary_cost_usd: float | None = None,
     session: AsyncSession | None = None,
     division: str = "",
+    org_id: str = "",
 ) -> None:
     """Insert a BudgetLedger row for a completed LLM call.
 
@@ -63,6 +73,7 @@ async def record_llm_cost(
     row = BudgetLedger(
         id=uuid.uuid4(),
         agent_id=agent_id,
+        org_id=org_id,
         division=division,
         model=model,
         provider=provider,

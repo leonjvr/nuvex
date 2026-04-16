@@ -20,6 +20,7 @@ class InvokePayload(BaseModel):
     message: str
     thread_id: str | None = None
     channel: str = "dashboard"
+    org_id: str = "default"
 
 
 @router.post("")
@@ -34,6 +35,7 @@ async def invoke_agent(payload: InvokePayload) -> dict:
                     "message": payload.message,
                     "thread_id": payload.thread_id,
                     "channel": payload.channel,
+                    "org_id": payload.org_id,
                     "metadata": {"sender": "dashboard", "channel": payload.channel},
                 },
             )

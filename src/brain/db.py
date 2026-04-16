@@ -65,6 +65,18 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency — yields an AsyncSession with commit/rollback."""
+    factory = get_session_factory()
+    async with factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+
 async def check_connection() -> bool:
     from sqlalchemy import text
     try:

@@ -337,3 +337,110 @@ class TestSnipSelectorTokenCap:
                 max_tokens=9999,
             )
         assert len(selected) <= 2
+
+
+class TestSnipModeIntegration:
+    """§31.8 Integration: compact → follow-up turn injects relevant snip; irrelevant snip not injected."""
+
+    def _make_session_returning(self, snips):
+        session = AsyncMock()
+        exec_result = MagicMock()
+        exec_result.scalars.return_value.all.return_value = snips
+        session.execute = AsyncMock(return_value=exec_result)
+        session.add = MagicMock()
+        session.commit = AsyncMock()
+        session.__aenter__ = AsyncMock(return_value=session)
+        session.__aexit__ = AsyncMock(return_value=False)
+        return session
+
+    @pytest.mark.asyncio
+    async def test_relevant_snip_is_injected_into_historical_block(self):
+        """After compaction, a follow-up message about a snipped topic causes that snip to appear
+        in the historical context block; an unrelated snip does not appear."""
+        from src.brain.compaction import SnipCompactor
+        from src.brain.workspace import build_historical_context_block
+
+        # Snips in DB after compaction: one about "Python", one about "pizza"
+        python_snip = MagicMock(
+            turn_index=0,
+            role="user",
+            content="What is the best Python web framework?",
+            token_count=10,
+        )
+        pizza_snip = MagicMock(
+            turn_index=1,
+            role="assistant",
+            content="I highly recommend ordering margherita pizza.",
+            token_count=10,
+        )
+
+        # The selector model is bypassed (fast_model=None → recency fallback, returns last max_replay snips)
+        # We simulate the model returning only the python_snip index by patching _build_model
+        # so that it returns a response containing [0] only.
+        mock_model = AsyncMock()
+        mock_model.ainvoke = AsyncMock(
+            return_value=MagicMock(content="[0]")  # Select turn_index 0 = python_snip only
+        )
+
+        session = self._make_session_returning([python_snip, pizza_snip])
+
+        with patch("src.brain.compaction.get_session", return_value=session):
+            with patch("src.brain.models_registry._build_model", return_value=mock_model):
+                compactor = SnipCompactor(
+                    thread_id="thread-integration-1",
+                    agent_id="agent-1",
+                    preserve_recent=3,
+                )
+                selected = await compactor.select_relevant_snips(
+                    current_message="Tell me more about Python web frameworks",
+                    fast_model="some-fast-model",
+                    max_replay=2,
+                    max_tokens=9999,
+                )
+
+        # Only the python snip should be returned
+        assert len(selected) == 1
+        assert "Python" in selected[0]["content"]
+
+        # Build the historical context block and verify injection
+        block = build_historical_context_block(selected)
+        assert "[HISTORICAL CONTEXT]" in block
+        assert "Python" in block
+        # Irrelevant snip (pizza) must NOT appear
+        assert "pizza" not in block.lower()
+
+    @pytest.mark.asyncio
+    async def test_irrelevant_snips_not_injected_when_none_selected(self):
+        """When the model returns an empty selection, no historical block is injected."""
+        from src.brain.compaction import SnipCompactor
+        from src.brain.workspace import build_historical_context_block
+
+        snip = MagicMock(
+            turn_index=0,
+            role="user",
+            content="Some archived content",
+            token_count=10,
+        )
+        # Model returns empty array — nothing relevant
+        mock_model = AsyncMock()
+        mock_model.ainvoke = AsyncMock(return_value=MagicMock(content="[]"))
+
+        session = self._make_session_returning([snip])
+
+        with patch("src.brain.compaction.get_session", return_value=session):
+            with patch("src.brain.models_registry._build_model", return_value=mock_model):
+                compactor = SnipCompactor(
+                    thread_id="thread-integration-2",
+                    agent_id="agent-1",
+                    preserve_recent=3,
+                )
+                selected = await compactor.select_relevant_snips(
+                    current_message="Completely unrelated new topic",
+                    fast_model="some-fast-model",
+                    max_replay=3,
+                    max_tokens=9999,
+                )
+
+        assert selected == []
+        block = build_historical_context_block(selected)
+        assert block == ""

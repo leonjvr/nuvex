@@ -194,6 +194,8 @@ async def save_agent_channel(
 
 _BRAIN_URL = os.environ.get("BRAIN_URL", "http://brain:8100")
 _GATEWAY_WA_URL = os.environ.get("GATEWAY_WA_URL", "http://gateway-wa:8101")
+_GATEWAY_TG_URL = os.environ.get("GATEWAY_TG_URL", "http://gateway-telegram:8102")
+_GATEWAY_MAIL_URL = os.environ.get("GATEWAY_MAIL_URL", "http://gateway-email:8103")
 
 
 @router.get("/whatsapp/groups")
@@ -250,3 +252,33 @@ async def save_group_bindings(payload: GroupBindingsPayload) -> JSONResponse:
     _write_yaml(raw)
     get_cached_config.cache_clear()
     return JSONResponse(raw["whatsapp"]["group_bindings"])
+
+
+# ── Telegram / Email gateway health ──────────────────────────────────────────
+
+@router.get("/telegram/gateway")
+async def get_telegram_gateway_status() -> JSONResponse:
+    try:
+        async with httpx.AsyncClient(timeout=3) as client:
+            r = await client.get(f"{_GATEWAY_TG_URL}/health")
+            data = r.json()
+            return JSONResponse({
+                "connected": data.get("connected", False),
+                "state": data.get("bot", "unknown"),
+            })
+    except Exception:
+        return JSONResponse({"connected": False, "state": "offline"})
+
+
+@router.get("/email/gateway")
+async def get_email_gateway_status() -> JSONResponse:
+    try:
+        async with httpx.AsyncClient(timeout=3) as client:
+            r = await client.get(f"{_GATEWAY_MAIL_URL}/health")
+            data = r.json()
+            return JSONResponse({
+                "connected": data.get("connected", False),
+                "state": data.get("imap", "unknown"),
+            })
+    except Exception:
+        return JSONResponse({"connected": False, "state": "offline"})

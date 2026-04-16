@@ -1,0 +1,36 @@
+    Blocking waiting for file lock on artifact directory
+warning: unused import: `anyhow::Result`
+ --> src\dispatcher.rs:2:5
+  |
+2 | use anyhow::Result;
+  |     ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `log_path` is never used
+  --> src\config.rs:21:12
+   |
+14 | impl Config {
+   | ----------- associated function in this implementation
+...
+21 |     pub fn log_path() -> Result<PathBuf> {
+   |            ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `0` is never read
+  --> src\tray.rs:17:19
+   |
+17 |     TrayIconEvent(TrayIconEvent),
+   |     ------------- ^^^^^^^^^^^^^
+   |     |
+   |     field in this variant
+   |
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+17 -     TrayIconEvent(TrayIconEvent),
+17 +     TrayIconEvent(()),
+   |
+
+warning: `nuvex-desktop` (bin "nuvex-desktop") generated 3 warnings (run `cargo fix --bin "nuvex-desktop" -p nuvex-desktop` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 1m 33s

@@ -119,6 +119,17 @@ export async function fetchGatewayStatus(): Promise<GatewayStatus> {
   return res.json();
 }
 
+export interface ChannelGatewayStatus {
+  connected: boolean;
+  state: string; // "starting" | "connecting" | "connected" | "reconnecting" | "error: ..." | "offline"
+}
+
+export async function fetchChannelGatewayStatus(channel: string): Promise<ChannelGatewayStatus> {
+  const res = await fetch(`/api/channels/${channel}/gateway`);
+  if (!res.ok) return { connected: false, state: "offline" };
+  return res.json();
+}
+
 export async function startGateway(): Promise<GatewayStatus> {
   const res = await fetch("/api/channels/whatsapp/gateway/start", { method: "POST" });
   if (!res.ok) throw new Error(await res.text());

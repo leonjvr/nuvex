@@ -1,0 +1,42 @@
+# NUVEX — Desktop Tool Tier Classifications
+# Governs which desktop tools are accessible at each agent tier.
+# Enforced by DesktopToolCallTool._arun() at call time.
+#
+# Tiers: T1 (highest privilege) → T4 (lowest privilege)
+# Desktop tools are FORBIDDEN for T3 and T4 (excluded from tool list entirely).
+# Only T1 and T2 agents can have desktop device assignments.
+
+desktop_tools:
+  # Default minimum tier per tool (agents BELOW this tier cannot call it)
+  tier_classifications:
+
+    # Automation / UIA / input → T2 minimum (auto-approved)
+    desktop_screenshot:          T2
+    desktop_list_windows:        T2
+    desktop_find_control:        T2
+    desktop_click_control:       T2
+    desktop_get_control_text:    T2
+    desktop_type_text:           T2
+    desktop_hotkey:              T2
+    desktop_mouse_click:         T2
+
+    # Clipboard → T2 minimum (auto-approved)
+    desktop_get_clipboard:       T2
+    desktop_set_clipboard:       T2
+
+    # Outlook — reading auto-approved, sending/replying needs approval for T2
+    desktop_outlook_get_emails:  T2
+    desktop_outlook_send_email:  T2
+    desktop_outlook_reply_email: T2
+    desktop_outlook_move_email:  T2
+
+    # Shell execution → T1 only
+    desktop_run_app:             T1
+    desktop_shell_exec:          T1
+
+  # Tier numeric order (lower number = higher privilege)
+  tier_rank:
+    T1: 1
+    T2: 2
+    T3: 3
+    T4: 4

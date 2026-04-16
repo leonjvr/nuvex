@@ -15,6 +15,7 @@ async def list_events(
     lane: str | None = Query(None),
     status: str | None = Query(None),
     agent_id: str | None = Query(None),
+    org_id: str | None = Query(None),
     limit: int = Query(100, le=500),
     offset: int = Query(0),
 ):
@@ -26,6 +27,8 @@ async def list_events(
             q = q.where(Event.status == status)
         if agent_id:
             q = q.where(Event.agent_id == agent_id)
+        if org_id:
+            q = q.where(Event.org_id == org_id)
         result = await session.execute(q)
         rows = result.scalars().all()
     return [

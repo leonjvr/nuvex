@@ -167,14 +167,8 @@ async def _call_reflection_llm(prompt: str) -> str:
     """Call the configured fast model for reflection."""
     import os
     try:
-        from ...shared.config import get_cached_config
-        cfg = get_cached_config()
-        # Use first available agent's fast model
-        fast_model = "gpt-4o-mini"
-        for agent in cfg.agents.values():
-            if agent.model and agent.model.fast:
-                fast_model = agent.model.fast
-                break
+        from ...brain.nodes.call_llm import get_auxiliary_model_name
+        fast_model = get_auxiliary_model_name("")
     except Exception:
         fast_model = "gpt-4o-mini"
 

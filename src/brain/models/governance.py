@@ -14,6 +14,7 @@ class GovernanceAudit(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, server_default="default", index=True)
     invocation_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     thread_id: Mapped[str] = mapped_column(String(200), nullable=False)
     action: Mapped[str] = mapped_column(Text, nullable=False)

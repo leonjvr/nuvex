@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import select, text
 
@@ -150,12 +151,16 @@ async def record_routing_outcome(
     succeeded: bool,
     cost_usd: float,
     duration_s: float,
+    invocation_id: str | None = None,
+    route_metadata: dict[str, Any] | None = None,
 ) -> None:
     """Write a routing_outcomes row for tracking per-model success rates."""
     row = RoutingOutcome(
         agent_id=agent_id,
+        invocation_id=invocation_id,
         task_type=task_type,
         model_name=model_name,
+        route_metadata=route_metadata or {},
         succeeded=succeeded,
         cost_usd=cost_usd,
         duration_s=duration_s,

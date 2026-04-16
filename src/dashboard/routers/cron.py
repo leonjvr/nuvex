@@ -1,7 +1,7 @@
 """Dashboard cron router — manage scheduled jobs."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 
@@ -26,9 +26,12 @@ class CronUpdate(BaseModel):
 
 
 @router.get("")
-async def list_cron_jobs():
+async def list_cron_jobs(org_id: str | None = Query(None)):
     async with get_session() as session:
-        result = await session.execute(select(CronEntry).order_by(CronEntry.name))
+        q = select(CronEntry).order_by(CronEntry.name)
+        if org_id:
+            q = q.where(CronEntry.org_id == org_id)
+        result = await session.execute(q)
         rows = result.scalars().all()
     return [_serialize(r) for r in rows]
 
@@ -67,7 +70,7 @@ async def update_cron_job(name: str, body: CronUpdate):
     return _serialize(entry)
 
 
-@router.delete("/{name}", status_code=204)
+@router.delete("/{name}", status_code=204, response_model=None)
 async def delete_cron_job(name: str):
     async with get_session() as session:
         await session.execute(delete(CronEntry).where(CronEntry.name == name))

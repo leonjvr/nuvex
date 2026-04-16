@@ -5,13 +5,14 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ...shared.config import get_cached_config
 from ..state import AgentState
 from ..db import get_session
 from ..models.budget import Budget
 from ..models.denied_action import DeniedAction
+from ..costs import get_period_spend
 
 log = logging.getLogger(__name__)
 
@@ -50,7 +51,6 @@ async def enforce_budget(state: AgentState) -> dict[str, Any]:
         # Soft-cap via warn_at_pct using period spend from ledger (§38.3)
         warn_decision: str | None = None
         try:
-            from ..costs import get_period_spend
             period_spend = await get_period_spend(state.agent_id, session)
             warn_at_pct = float(getattr(budget_cfg, "warn_at_pct", 80.0))
             monthly_limit = budget_cfg.monthly_usd
@@ -78,6 +78,35 @@ async def enforce_budget(state: AgentState) -> dict[str, Any]:
             log.warning("Budget monthly limit hit for agent=%s", state.agent_id)
 
         await session.commit()
+
+    # §7.4-7.5 — check org-level daily budget cap
+    if not exceeded:
+        try:
+            from ..models.organisation import Organisation
+            async with get_session() as session:
+                org = await session.get(Organisation, state.org_id)
+                if org and org.policies:
+                    org_daily_cap = org.policies.get("budgets", {}).get("daily_usd")
+                    if org_daily_cap:
+                        # Aggregate daily spend across all agents in this org
+                        from datetime import date
+                        today_start = datetime.combine(date.today(), datetime.min.time()).replace(
+                            tzinfo=timezone.utc
+                        )
+                        spend_result = await session.execute(
+                            select(func.coalesce(func.sum(Budget.daily_usd_used), 0.0))
+                            .where(Budget.org_id == state.org_id)
+                        )
+                        org_daily_spend = spend_result.scalar() or 0.0
+                        if org_daily_spend + state.cost_usd >= org_daily_cap:
+                            exceeded = True
+                            denial_reason = f"Org daily budget cap of ${org_daily_cap:.2f} exceeded"
+                            log.warning(
+                                "Org budget daily cap hit for org=%s spend=%.4f",
+                                state.org_id, org_daily_spend,
+                            )
+        except Exception as exc:
+            log.debug("org budget check skipped (non-fatal): %s", exc)
 
     if exceeded and denial_reason:
         denial = DeniedAction(

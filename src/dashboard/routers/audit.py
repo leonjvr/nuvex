@@ -15,6 +15,7 @@ async def list_audit(
     agent_id: str | None = Query(None),
     decision: str | None = Query(None),
     thread_id: str | None = Query(None),
+    org_id: str | None = Query(None),
     limit: int = Query(50, le=500),
     offset: int = Query(0),
 ):
@@ -26,6 +27,8 @@ async def list_audit(
             q = q.where(GovernanceAudit.decision == decision)
         if thread_id:
             q = q.where(GovernanceAudit.thread_id == thread_id)
+        if org_id:
+            q = q.where(GovernanceAudit.org_id == org_id)
         q = q.offset(offset).limit(limit)
         result = await session.execute(q)
         rows = result.scalars().all()

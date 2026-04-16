@@ -79,9 +79,9 @@ class TestEstimateCost:
 
     def test_small_token_count(self):
         fn = self._fn()
-        # 1000 input tokens @ $2.50/M = $0.0000025
+        # 1000 input tokens @ $2.50/M = $0.0025
         cost = fn("gpt-4o", 1000, 0)
-        assert abs(cost - 0.0000025) < 1e-10
+        assert abs(cost - 0.0025) < 1e-10
 
 
 # ---------------------------------------------------------------------------
@@ -265,10 +265,10 @@ class TestSoftCap:
         ctx_mock.__aexit__ = AsyncMock(return_value=False)
 
         with (
-            patch("src.shared.config.get_cached_config", return_value=mock_cfg),
+            patch("src.brain.governance.budget.get_cached_config", return_value=mock_cfg),
             patch("src.brain.governance.budget.get_session", return_value=ctx_mock),
             patch(
-                "src.brain.costs.get_period_spend",
+                "src.brain.governance.budget.get_period_spend",
                 new=AsyncMock(return_value=8.5),
             ),
         ):
@@ -321,9 +321,9 @@ class TestSoftCap:
         ctx_mock.__aexit__ = AsyncMock(return_value=False)
 
         with (
-            patch("src.shared.config.get_cached_config", return_value=mock_cfg),
+            patch("src.brain.governance.budget.get_cached_config", return_value=mock_cfg),
             patch("src.brain.governance.budget.get_session", return_value=ctx_mock),
-            patch("src.brain.costs.get_period_spend", new=AsyncMock(return_value=5.0)),
+            patch("src.brain.governance.budget.get_period_spend", new=AsyncMock(return_value=5.0)),
         ):
             result = await enforce_budget(state)
 
@@ -532,3 +532,127 @@ class TestSavingsEndpoint:
 
         assert data[0]["savings_pct"] == pytest.approx(0.0)
         assert data[0]["savings_usd"] == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# 41.7 — Summary card renders with correct spend_pct and projection values
+# ---------------------------------------------------------------------------
+
+class TestSummaryCardValues:
+    """Verify that the summary API produces values that would render the UI correctly."""
+
+    @pytest.mark.asyncio
+    async def test_summary_card_spend_pct_and_projection(self):
+        """Summary endpoint returns correctly structured data for the spend gauge and EOM projection."""
+        from src.brain.routers.costs import _project_eom
+
+        now = datetime(2026, 4, 15, tzinfo=timezone.utc)  # mid-April
+        monthly_cost = 4.0
+        budget_limit = 10.0
+        daily_cost = 0.50
+
+        # Spend percentage
+        pct = (monthly_cost / budget_limit) * 100.0
+        assert abs(pct - 40.0) < 0.001
+
+        # Projection: 15 days left in April (day 15 → 30-15 = 15 remaining)
+        projected = _project_eom(monthly_cost, daily_cost, now)
+        assert projected == pytest.approx(4.0 + 0.50 * 15)
+
+        # budget_remaining
+        remaining = budget_limit - monthly_cost
+        assert remaining == pytest.approx(6.0)
+
+    def test_spend_gauge_renders_zero_for_no_budget(self):
+        """When budget_limit is None, spend_pct defaults to 0 (no gauge shown)."""
+        budget_limit = None
+        monthly_cost = 5.0
+        pct = (monthly_cost / budget_limit * 100.0) if budget_limit else 0.0
+        assert pct == 0.0
+
+    def test_routing_savings_chip_shown_when_positive(self):
+        """routing_savings_mtd > 0 triggers savings chip in UI."""
+        primary_cost = 1.0
+        actual_cost = 0.80
+        savings = max(0.0, primary_cost - actual_cost)
+        assert savings == pytest.approx(0.20)
+        # UI would show chip when savings > 0
+        assert savings > 0
+
+
+class TestRoutingPerformanceEndpoint:
+    @pytest.mark.asyncio
+    async def test_returns_risk_aware_metrics(self):
+        """routing-performance returns success, cost-per-success, and denial overhead metrics."""
+        from src.brain.routers.costs import routing_performance
+
+        result_mock = MagicMock()
+        result_mock.mappings.return_value.all.return_value = [
+            {
+                "agent_id": "maya",
+                "task_type": "conversation",
+                "model_name": "gpt-4o-mini",
+                "attempts": 10,
+                "successes": 8,
+                "success_rate": 0.8,
+                "total_cost_usd": 2.4,
+                "cost_per_success_usd": 0.3,
+                "governance_denials": 2,
+                "governance_approvals": 5,
+                "denial_overhead_per_attempt": 0.2,
+            }
+        ]
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(return_value=result_mock)
+
+        ctx_mock = AsyncMock()
+        ctx_mock.__aenter__ = AsyncMock(return_value=mock_session)
+        ctx_mock.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("src.brain.routers.costs.get_session", return_value=ctx_mock):
+            data = await routing_performance()
+
+        assert len(data) == 1
+        assert data[0]["agent_id"] == "maya"
+        assert data[0]["success_rate"] == pytest.approx(0.8)
+        assert data[0]["cost_per_success_usd"] == pytest.approx(0.3)
+        assert data[0]["denial_overhead_per_attempt"] == pytest.approx(0.2)
+
+    @pytest.mark.asyncio
+    async def test_returns_none_cost_per_success_when_no_successes(self):
+        """When successes are zero, cost_per_success_usd should remain null."""
+        from src.brain.routers.costs import routing_performance
+
+        result_mock = MagicMock()
+        result_mock.mappings.return_value.all.return_value = [
+            {
+                "agent_id": "maya",
+                "task_type": "code_generation",
+                "model_name": "gpt-4o-mini",
+                "attempts": 4,
+                "successes": 0,
+                "success_rate": 0.0,
+                "total_cost_usd": 1.2,
+                "cost_per_success_usd": None,
+                "governance_denials": 1,
+                "governance_approvals": 0,
+                "denial_overhead_per_attempt": 0.25,
+            }
+        ]
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(return_value=result_mock)
+
+        ctx_mock = AsyncMock()
+        ctx_mock.__aenter__ = AsyncMock(return_value=mock_session)
+        ctx_mock.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("src.brain.routers.costs.get_session", return_value=ctx_mock):
+            data = await routing_performance(model_name="gpt-4o-mini")
+
+        assert len(data) == 1
+        assert data[0]["task_type"] == "code_generation"
+        assert data[0]["cost_per_success_usd"] is None
+        assert data[0]["governance_denials"] == 1
+

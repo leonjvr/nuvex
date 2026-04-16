@@ -97,3 +97,69 @@ class TestScratchCleanup:
             mock_gsd.return_value = Path("/nonexistent/scratch/that/does/not/exist")
             # Should not raise
             cleanup_scratch_dir("thread-x")
+
+
+class TestScratchCoordinatorIntegration:
+    """§35.8 Integration: coordinator writes file; worker subprocess reads via NUVEX_SCRATCH_DIR."""
+
+    def test_coordinator_writes_file_worker_reads_via_env(self):
+        """Writes a file into the scratch dir and then launches a subprocess that reads it
+        via NUVEX_SCRATCH_DIR — verifies the env var is injected and the file is accessible."""
+        import subprocess
+        import sys
+        from src.brain.tools.executor import ensure_scratch_dir
+
+        with patch("src.brain.tools.executor.get_scratch_dir") as mock_gsd:
+            with tempfile.TemporaryDirectory() as tmp:
+                scratch = Path(tmp) / "scratch"
+                mock_gsd.return_value = scratch
+
+                # Step 1: coordinator creates scratch dir and writes a file
+                returned = ensure_scratch_dir("thread-coord")
+                assert returned.exists()
+
+                sentinel = returned / "coord-output.txt"
+                sentinel.write_text("hello-from-coordinator")
+
+                # Step 2: "worker subprocess" is a Python one-liner that reads the file
+                # via NUVEX_SCRATCH_DIR and prints its content
+                worker_env = {**os.environ, "NUVEX_SCRATCH_DIR": str(returned)}
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-c",
+                        (
+                            "import os, pathlib; "
+                            "d = pathlib.Path(os.environ['NUVEX_SCRATCH_DIR']); "
+                            "print((d / 'coord-output.txt').read_text())"
+                        ),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    env=worker_env,
+                )
+
+                assert result.returncode == 0, f"subprocess stderr: {result.stderr}"
+                assert result.stdout.strip() == "hello-from-coordinator"
+
+    def test_second_tool_in_same_thread_sees_file_from_first_tool(self):
+        """Two sequential 'tools' in the same thread share the same scratch dir;
+        a file written by the first tool is visible to the second."""
+        from src.brain.tools.executor import ensure_scratch_dir
+
+        with patch("src.brain.tools.executor.get_scratch_dir") as mock_gsd:
+            with tempfile.TemporaryDirectory() as tmp:
+                scratch = Path(tmp) / "scratch"
+                mock_gsd.return_value = scratch
+
+                # First tool call: creates dir and writes artifact
+                dir1 = ensure_scratch_dir("thread-shared")
+                (dir1 / "artifact.json").write_text('{"key": "value"}')
+
+                # Second tool call in same thread: same path returned
+                dir2 = ensure_scratch_dir("thread-shared")
+                assert dir1 == dir2
+
+                # Artifact written by first tool is visible to second tool
+                artifact = (dir2 / "artifact.json").read_text()
+                assert "value" in artifact

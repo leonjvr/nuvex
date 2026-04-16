@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
+from sqlalchemy import text
 
 from ..db import get_session
 from ..models.budget import Budget
@@ -99,6 +100,7 @@ async def cost_ledger(
     from_: datetime | None = Query(None, alias="from"),
     to: datetime | None = Query(None),
     model: str | None = Query(None),
+    org_id: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
 ) -> dict[str, Any]:
@@ -107,6 +109,8 @@ async def cost_ledger(
         q = select(BudgetLedger)
         if agent_id:
             q = q.where(BudgetLedger.agent_id == agent_id)
+        if org_id:
+            q = q.where(BudgetLedger.org_id == org_id)
         if from_:
             q = q.where(BudgetLedger.timestamp >= from_)
         if to:
@@ -130,6 +134,7 @@ async def cost_ledger(
             {
                 "id": str(r.id),
                 "agent_id": r.agent_id,
+                "org_id": r.org_id,
                 "division": r.division,
                 "model": r.model,
                 "provider": r.provider,
@@ -148,7 +153,7 @@ async def cost_ledger(
 
 @router.get("/breakdown")
 async def cost_breakdown(
-    group_by: str = Query("model", regex="^(model|division)$"),
+    group_by: str = Query("model", pattern="^(model|division)$"),
     from_: datetime | None = Query(None, alias="from"),
     to: datetime | None = Query(None),
 ) -> list[dict[str, Any]]:
@@ -235,6 +240,98 @@ async def cost_savings(
     return out
 
 
+@router.get("/routing-performance")
+async def routing_performance(
+    from_: datetime | None = Query(None, alias="from"),
+    to: datetime | None = Query(None),
+    agent_id: str | None = Query(None),
+    task_type: str | None = Query(None),
+    model_name: str | None = Query(None),
+    limit: int = Query(200, ge=1, le=2000),
+) -> list[dict[str, Any]]:
+    """Risk-aware routing economics by (agent, task_type, model)."""
+    clauses = ["1=1"]
+    params: dict[str, Any] = {"lim": limit}
+
+    if from_:
+        clauses.append("ro.created_at >= :from_ts")
+        params["from_ts"] = from_
+    if to:
+        clauses.append("ro.created_at <= :to_ts")
+        params["to_ts"] = to
+    if agent_id:
+        clauses.append("ro.agent_id = :agent_id")
+        params["agent_id"] = agent_id
+    if task_type:
+        clauses.append("ro.task_type = :task_type")
+        params["task_type"] = task_type
+    if model_name:
+        clauses.append("ro.model_name = :model_name")
+        params["model_name"] = model_name
+
+    where_sql = " AND ".join(clauses)
+
+    query = text(
+        f"""
+        WITH gov AS (
+            SELECT
+                invocation_id,
+                SUM(CASE WHEN decision = 'denied' THEN 1 ELSE 0 END) AS denials,
+                SUM(CASE WHEN decision = 'approved' THEN 1 ELSE 0 END) AS approvals
+            FROM governance_audit
+            GROUP BY invocation_id
+        )
+        SELECT
+            ro.agent_id,
+            ro.task_type,
+            ro.model_name,
+            COUNT(*) AS attempts,
+            SUM(CASE WHEN ro.succeeded THEN 1 ELSE 0 END) AS successes,
+            AVG(CASE WHEN ro.succeeded THEN 1.0 ELSE 0.0 END) AS success_rate,
+            SUM(ro.cost_usd) AS total_cost_usd,
+            CASE
+                WHEN SUM(CASE WHEN ro.succeeded THEN 1 ELSE 0 END) = 0 THEN NULL
+                ELSE SUM(ro.cost_usd) / SUM(CASE WHEN ro.succeeded THEN 1 ELSE 0 END)
+            END AS cost_per_success_usd,
+            SUM(COALESCE(g.denials, 0)) AS governance_denials,
+            SUM(COALESCE(g.approvals, 0)) AS governance_approvals,
+            SUM(COALESCE(g.denials, 0))::float / NULLIF(COUNT(*), 0) AS denial_overhead_per_attempt
+        FROM routing_outcomes ro
+        LEFT JOIN gov g ON g.invocation_id = ro.invocation_id
+        WHERE {where_sql}
+        GROUP BY ro.agent_id, ro.task_type, ro.model_name
+        ORDER BY success_rate DESC, cost_per_success_usd ASC NULLS LAST
+        LIMIT :lim
+        """
+    )
+
+    async with get_session() as session:
+        result = await session.execute(query, params)
+        rows = result.mappings().all()
+
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        out.append(
+            {
+                "agent_id": row["agent_id"],
+                "task_type": row["task_type"],
+                "model_name": row["model_name"],
+                "attempts": int(row["attempts"] or 0),
+                "successes": int(row["successes"] or 0),
+                "success_rate": float(row["success_rate"] or 0.0),
+                "total_cost_usd": float(row["total_cost_usd"] or 0.0),
+                "cost_per_success_usd": (
+                    float(row["cost_per_success_usd"]) if row["cost_per_success_usd"] is not None else None
+                ),
+                "governance_denials": int(row["governance_denials"] or 0),
+                "governance_approvals": int(row["governance_approvals"] or 0),
+                "denial_overhead_per_attempt": float(row["denial_overhead_per_attempt"] or 0.0),
+            }
+        )
+
+    return out
+
+
 # Alert CRUD — brain-side endpoints (§40)
 
 @router.get("/alerts")
@@ -273,7 +370,7 @@ async def create_alert(body: dict[str, Any]) -> dict[str, Any]:
         return {"id": str(alert.id)}
 
 
-@router.delete("/alerts/{alert_id}", status_code=204)
+@router.delete("/alerts/{alert_id}", status_code=204, response_model=None)
 async def delete_alert(alert_id: str) -> None:
     async with get_session() as session:
         try:

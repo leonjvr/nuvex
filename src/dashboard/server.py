@@ -11,14 +11,18 @@ from .routers import (
     approvals,
     audit,
     channels,
+    contacts,
     cron,
     costs,
     events,
     health_services,
     invoke,
     memory,
+    orgs,
     outcomes,
+    plugins,
     policy_candidates,
+    principals,
     providers,
     skill_config,
     skill_importer,
@@ -27,6 +31,9 @@ from .routers import (
     threads,
     workspace,
 )
+from .routers.downloads import router as downloads_router
+from .routers.device_tokens import router as device_tokens_router
+from .routers.device_assignments import router as device_assignments_router
 
 
 def create_app() -> FastAPI:
@@ -34,7 +41,9 @@ def create_app() -> FastAPI:
 
     app.include_router(agents.router)
     app.include_router(audit.router)
+    app.include_router(orgs.router)
     app.include_router(channels.router)
+    app.include_router(contacts.router)
     app.include_router(cron.router)
     app.include_router(costs.router)
     app.include_router(events.router)
@@ -51,6 +60,11 @@ def create_app() -> FastAPI:
     app.include_router(outcomes.router)
     app.include_router(policy_candidates.router)
     app.include_router(approvals.router)
+    app.include_router(principals.router)
+    app.include_router(plugins.router)
+    app.include_router(downloads_router)
+    app.include_router(device_tokens_router)
+    app.include_router(device_assignments_router)
 
     @app.get("/api/health")
     async def health():
@@ -68,6 +82,9 @@ def create_app() -> FastAPI:
             file = frontend_dist / full_path
             if full_path and file.is_file():
                 return FileResponse(str(file))
-            return FileResponse(str(frontend_dist / "index.html"))
+            return FileResponse(
+                str(frontend_dist / "index.html"),
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+            )
 
     return app

@@ -1,12 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-
-async function fetchEvents(params: string) {
-  const res = await fetch(`/api/events?${params}`);
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
+import { useOrg } from "../OrgContext";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "text-gray-400",
@@ -61,8 +56,9 @@ function LaneGroup({ lane, events }: { lane: string; events: any[] }) {
                 {e.status}
               </span>
               <span className="text-gray-500 shrink-0">{e.agent_id || ""}</span>
+              <span className="text-gray-400 truncate flex-1">{e.lane || ""}</span>
               {e.failure_class && (
-                <span className={`ml-auto ${FAILURE_CLASS_COLORS[e.failure_class] ?? "text-red-400"}`}>
+                <span className={`ml-auto shrink-0 ${FAILURE_CLASS_COLORS[e.failure_class] ?? "text-red-400"}`}>
                   {e.failure_class}
                 </span>
               )}
@@ -75,15 +71,17 @@ function LaneGroup({ lane, events }: { lane: string; events: any[] }) {
 }
 
 export default function EventsPage() {
+  const { activeOrg } = useOrg();
   const [laneFilter, setLaneFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   const params = new URLSearchParams({ limit: "200" });
   if (statusFilter) params.set("status", statusFilter);
+  if (activeOrg) params.set("org_id", activeOrg);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["events", statusFilter],
-    queryFn: () => fetchEvents(params.toString()),
+    queryKey: ["events", statusFilter, activeOrg],
+    queryFn: () => fetch(`/api/events?${params}`).then(r => { if (!r.ok) throw new Error("Failed"); return r.json(); }),
     refetchInterval: 5000,
   });
 

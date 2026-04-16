@@ -7,11 +7,60 @@ from functools import lru_cache
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.tools import StructuredTool
+from langchain_core.tools import BaseTool
 
 from .state import AgentState
 
 log = logging.getLogger(__name__)
+
+# Advisor tool constants (Anthropic beta — advisor-tool-2026-03-01)
+_ADVISOR_BETA = "advisor-tool-2026-03-01"
+_ADVISOR_MODEL = "claude-opus-4-6"
+
+
+def is_claude_model(model_name: str) -> bool:
+    """Return True when *model_name* resolves to an Anthropic Claude model."""
+    return "claude" in model_name.lower() or model_name.startswith("anthropic/")
+
+
+def get_advisor_enabled(agent_id: str) -> bool:
+    """Return True when the advisor tool is enabled for *agent_id*.
+
+    Defaults to True for all agents; set ``model.advisor: false`` in
+    divisions.yaml to disable per agent.
+    """
+    try:
+        from ..shared.config import get_cached_config
+        cfg = get_cached_config()
+        agent_def = cfg.agents.get(agent_id)
+        if agent_def is not None:
+            return agent_def.model.advisor
+    except Exception:
+        pass
+    return True
+
+
+def make_advisor_tool() -> BaseTool:
+    """Return a LangChain BaseTool that passes the Anthropic advisor server-tool
+    definition through to the API unchanged (via the provider_tool_definition
+    pass-through in langchain_anthropic 1.4+).
+    """
+
+    class _AdvisorServerTool(BaseTool):
+        name: str = "advisor"
+        description: str = "Anthropic advisor server tool"
+        extras: dict[str, Any] = {
+            "provider_tool_definition": {
+                "type": "advisor_20260301",
+                "name": "advisor",
+                "model": _ADVISOR_MODEL,
+            }
+        }
+
+        def _run(self, *args: Any, **kwargs: Any) -> str:  # pragma: no cover
+            return ""  # server-side tool; never called locally
+
+    return _AdvisorServerTool()
 
 
 @lru_cache(maxsize=32)
@@ -58,6 +107,24 @@ def _build_model(model_name: str) -> BaseChatModel:
     return ChatOpenAI(
         model=model_name.split("/")[-1],
         api_key=api_key or "placeholder",  # type: ignore[arg-type]
+    )
+
+
+@lru_cache(maxsize=32)
+def _build_claude_with_advisor(model_name: str) -> BaseChatModel:
+    """Build a ChatAnthropic client that carries the advisor-tool beta header.
+
+    The beta activates Anthropic's server-side advisor sub-inference.  The
+    caller is responsible for adding the advisor tool definition to the
+    ``tools`` list before invoking the model.
+    """
+    from langchain_anthropic import ChatAnthropic
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    return ChatAnthropic(
+        model=model_name.split("/")[-1],
+        api_key=api_key or "placeholder",  # type: ignore[arg-type]
+        betas=[_ADVISOR_BETA],
     )
 
 
@@ -123,47 +190,3 @@ def get_active_model_name(state: AgentState) -> str:
 def get_llm(model_name: str) -> BaseChatModel:
     """Public helper — return a cached LangChain model by provider/name string."""
     return _build_model(model_name)
-
-
-def is_claude_model(model_name: str) -> bool:
-    """Return True when model name routes to Anthropic Claude."""
-    lowered = (model_name or "").lower()
-    return "claude" in lowered or lowered.startswith("anthropic/")
-
-
-def _build_claude_with_advisor(model_name: str) -> BaseChatModel:
-    """Build Claude model for advisor flow.
-
-    The current runtime does not require a separate constructor path,
-    so we reuse the standard model builder.
-    """
-    return _build_model(model_name)
-
-
-def get_advisor_enabled(agent_id: str) -> bool:
-    """Read per-agent advisor toggle from config; default enabled."""
-    try:
-        from ..shared.config import get_cached_config
-
-        cfg = get_cached_config()
-        agent_def = cfg.agents.get(agent_id)
-        if agent_def is None:
-            return True
-        model_cfg: Any = getattr(agent_def, "model", None)
-        advisor = getattr(model_cfg, "advisor", True)
-        return bool(advisor)
-    except Exception:
-        return True
-
-
-def make_advisor_tool() -> StructuredTool:
-    """Create a lightweight advisor tool compatible with tool binding."""
-
-    def _advisor(query: str) -> str:
-        return f"Advisor note: focus on risk, policy, and fallback options for: {query}"
-
-    return StructuredTool.from_function(
-        func=_advisor,
-        name="advisor",
-        description="Provide a short advisory note for complex or risky requests.",
-    )

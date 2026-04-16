@@ -155,3 +155,53 @@ ALL_TOOLS = [ShellTool(), ReadFileTool(), WriteFileTool(), WebFetchTool(), SendM
 
 def get_tool(name: str) -> BaseTool | None:
     return next((t for t in ALL_TOOLS if t.name == name), None)
+
+
+# ── send_work_packet ──────────────────────────────────────────────────────────
+
+class _SendWorkPacketInput(BaseModel):
+    target_org: str = Field(description="Target organisation ID")
+    packet_type: str = Field(description="Packet type identifier")
+    payload: dict = Field(default_factory=dict, description="Packet payload data")
+    mode: str = Field(default="async", description="Dispatch mode: sync | async")
+    source_org: str = Field(default="default", description="Source org ID (auto-filled)")
+
+
+class SendWorkPacketTool(BaseTool):
+    name: str = "send_work_packet"
+    description: str = (
+        "Send a typed work packet to another organisation. "
+        "Requires a declared communication_link in your org config. "
+        "Use mode=sync to wait for result; mode=async to fire-and-forget."
+    )
+    args_schema: type[BaseModel] = _SendWorkPacketInput
+
+    async def _arun(  # type: ignore[override]
+        self,
+        target_org: str,
+        packet_type: str,
+        payload: dict,
+        mode: str = "async",
+        source_org: str = "default",
+    ) -> str:
+        try:
+            from ..work_packets import dispatch_work_packet
+            result = await dispatch_work_packet(
+                source_org_id=source_org,
+                target_org_id=target_org,
+                packet_type=packet_type,
+                payload=payload,
+                mode=mode,
+            )
+            return f"[ok] packet_id={result.get('packet_id')} status={result.get('status')}"
+        except Exception as exc:
+            return f"[error] send_work_packet: {exc}"
+
+    def _run(  # type: ignore[override]
+        self, target_org: str, packet_type: str, payload: dict, mode: str = "async", source_org: str = "default"
+    ) -> str:
+        import asyncio
+        return asyncio.run(self._arun(target_org, packet_type, payload, mode, source_org))
+
+
+ALL_TOOLS_WITH_PACKETS = ALL_TOOLS + [SendWorkPacketTool()]

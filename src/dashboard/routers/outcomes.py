@@ -72,7 +72,7 @@ async def routing_outcomes(limit: int = 200):
     async with get_session() as session:
         result = await session.execute(
             text(
-                "SELECT agent_id, task_type, model_name, succeeded, "
+                "SELECT agent_id, invocation_id, task_type, model_name, route_metadata, succeeded, "
                 "cost_usd, duration_s, created_at "
                 "FROM routing_outcomes "
                 "ORDER BY created_at DESC "

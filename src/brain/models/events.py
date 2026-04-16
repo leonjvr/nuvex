@@ -23,6 +23,7 @@ class Event(Base):
     )  # pending | delivered | failed | dead-lettered
     failure_class: Mapped[str | None] = mapped_column(String(50), nullable=True)
     agent_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    org_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     invocation_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)

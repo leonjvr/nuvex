@@ -42,7 +42,7 @@
 - [x] 31.5 Add `mode: "snip"` branch to compaction config handling in `src/brain/compaction.py`; add snip config fields (`snip_max_replay`, `snip_max_tokens`, `snip_relevance_threshold`) to `AgentDefinition` compaction schema
 - [x] 31.6 Write unit test: snip mode archives correct messages to DB and retains `preserve_recent` verbatim
 - [x] 31.7 Write unit test: snip selector enforces token cap — drops snips until within budget
-- [ ] 31.8 Write integration test: thread compacts in snip mode; follow-up turn injects relevant historical snip; irrelevant snip not injected
+- [x] 31.8 Write integration test: thread compacts in snip mode; follow-up turn injects relevant historical snip; irrelevant snip not injected
 
 ## 32. Permission Denial Learning
 
@@ -103,4 +103,4 @@
 - [x] 35.5 If the scratch dir is missing when a subsequent tool call runs (e.g., manual deletion), recreate it silently before subprocess launch
 - [x] 35.6 Write unit test: first tool call creates scratch dir; second call in same thread reuses same dir; different thread_id → different dir
 - [x] 35.7 Write unit test: quota exceeded → returns error, does not launch subprocess; under quota → launches normally
-- [ ] 35.8 Write integration test: coordinator writes file to scratch dir; worker subprocess reads it via `$NUVEX_SCRATCH_DIR`
+- [x] 35.8 Write integration test: coordinator writes file to scratch dir; worker subprocess reads it via `$NUVEX_SCRATCH_DIR`

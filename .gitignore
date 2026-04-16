@@ -58,6 +58,11 @@ _tmp_*.sh
 _tmp_*.sql
 _tmp_*.ts
 _brain_logs.txt
+
+# Rust build artifacts
+src/nuvex-desktop/target/
+legacy-ts/src/nuvex-desktop/target/
+src/nuvex-desktop/_build*.txt
 .playwright-mcp/
 
 # Agent SSH keys — NEVER commit

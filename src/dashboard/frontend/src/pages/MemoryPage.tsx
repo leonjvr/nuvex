@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Brain, CheckCircle, Clock, Hash, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import MemoryGraph from "./MemoryGraph";
 
 async function fetchAgents() {
   const res = await fetch("/api/agents");
@@ -326,44 +327,126 @@ function MemoryBrowser() {
   );
 }
 
+// ── Dream Log ────────────────────────────────────────────────────────────────
+
+async function fetchDreamLog() {
+  const res = await fetch("/api/memory/dream-log");
+  if (!res.ok) throw new Error("Failed to fetch dream log");
+  return res.json() as Promise<{
+    agent_id: string; last_dream_at: string | null;
+    threads_since_dream: number; dream_count: number;
+  }[]>;
+}
+
+function DreamLogPanel() {
+  const { data: log, isLoading } = useQuery({
+    queryKey: ["memory-dream-log"],
+    queryFn: fetchDreamLog,
+    refetchInterval: 60_000,
+  });
+
+  return (
+    <div className="bg-gray-800 rounded-xl p-4">
+      <h3 className="text-sm font-medium text-gray-300 mb-3">Dream State</h3>
+      {isLoading && <p className="text-xs text-gray-500">Loading…</p>}
+      {!isLoading && (!log || log.length === 0) && (
+        <p className="text-xs text-gray-500">No dream records yet. Dreaming triggers after 5 threads + 24 h gap.</p>
+      )}
+      <div className="space-y-2">
+        {log?.map(entry => (
+          <div key={entry.agent_id} className="bg-gray-700 rounded-lg p-3 text-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-gray-200">{entry.agent_id}</span>
+              <span className="text-gray-400">{entry.dream_count} dream{entry.dream_count !== 1 ? "s" : ""} total</span>
+            </div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-gray-500">Threads since last dream:</span>
+              <span className="text-gray-300">{entry.threads_since_dream} / 5</span>
+            </div>
+            <div className="w-full bg-gray-600 rounded-full h-1.5 mb-2">
+              <div
+                className="bg-indigo-500 h-1.5 rounded-full"
+                style={{ width: `${Math.min(100, (entry.threads_since_dream / 5) * 100)}%` }}
+              />
+            </div>
+            <div className="text-gray-500">
+              Last dream: {entry.last_dream_at ? new Date(entry.last_dream_at).toLocaleString() : "never"}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function MemoryPage() {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   return (
-    <div className="p-6 max-w-5xl">
+    <div className="p-6">
       <div className="flex items-center gap-3 mb-6">
         <Brain size={22} className="text-indigo-400" />
         <h1 className="text-2xl font-semibold">Memory</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Counts by scope per agent */}
-        <section>
-          <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
-            Counts by Agent
-          </h2>
-          <StatsPanel />
-        </section>
-
-        {/* Pending org approvals */}
-        <section>
-          <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
-            Pending Org Approvals
-          </h2>
-          <PendingApprovals />
-        </section>
-      </div>
-
-      {/* Recent consolidations */}
+      {/* Memory graph — top of page */}
       <section className="mb-6">
-        <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
-          Recent Consolidations
-        </h2>
-        <RecentConsolidations />
+        <MemoryGraph />
       </section>
+
+      {/* Collapsible detail sections */}
+      <div className="border border-gray-800 rounded-lg overflow-hidden mb-6">
+        <button
+          onClick={() => setDetailsOpen(v => !v)}
+          className="w-full flex items-center gap-2 px-4 py-3 bg-gray-800/60 hover:bg-gray-800 text-sm text-left"
+        >
+          {detailsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <span className="font-medium flex-1">Stats, Approvals &amp; Consolidations</span>
+          <span className="text-xs text-gray-500">Click to expand</span>
+        </button>
+        {detailsOpen && (
+          <div className="p-4 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Counts by scope per agent */}
+              <section>
+                <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
+                  Counts by Agent
+                </h2>
+                <StatsPanel />
+              </section>
+
+              {/* Pending org approvals */}
+              <section>
+                <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
+                  Pending Org Approvals
+                </h2>
+                <PendingApprovals />
+              </section>
+            </div>
+
+            {/* Recent consolidations */}
+            <section>
+              <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
+                Recent Consolidations
+              </h2>
+              <RecentConsolidations />
+            </section>
+          </div>
+        )}
+      </div>
 
       {/* Memory browser */}
       <MemoryBrowser />
+
+      {/* Dream state per agent */}
+      <section className="mt-6 mb-6">
+        <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
+          Dreaming
+        </h2>
+        <DreamLogPanel />
+      </section>
     </div>
   );
 }

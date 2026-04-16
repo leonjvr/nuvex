@@ -9,11 +9,22 @@ Spec:
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import AsyncMock, patch
 
 from src.brain.arousal import get_model_tier_override
+from src.brain.routing.classifier import ClassificationResult
+
+
+def _make_classification(task_type: str) -> ClassificationResult:
+    """Return a minimal ClassificationResult for use in mocks."""
+    return ClassificationResult(
+        task_type=task_type,
+        complexity_score=0.2,
+        output_type="text",
+        tool_likelihood=0.0,
+        risk_class="low",
+        budget_pressure=0.0,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -67,15 +78,29 @@ class TestRouteModelNode:
         )
 
         with (
-            patch("src.brain.nodes.route_model.classify", return_value="code_generation"),
             patch(
-                "src.brain.nodes.route_model.resolve_model",
-                return_value=("default-model", "standard"),
+                "src.brain.nodes.route_model.classify_detailed",
+                return_value=_make_classification("code_generation"),
             ),
+            patch(
+                "src.brain.nodes.route_model.resolve_model_decision",
+                return_value={
+                    "model_name": "default-model",
+                    "tier": "standard",
+                    "provider": "openai",
+                    "fallback_used": False,
+                    "decision_reason": "routing_config",
+                    "task_type": "code_generation",
+                },
+            ),
+            patch("src.brain.nodes.route_model.publish", new_callable=AsyncMock) as mock_publish,
         ):
             result = await route_model(state)
 
         assert result["active_model"] == "anthropic/claude-3-haiku"
+        assert result["metadata"]["routing_decision"]["decision_reason"] == "model_hint"
+        mock_publish.assert_awaited_once()
+        assert mock_publish.await_args_list[0].args[0] == "model.routed"
 
     async def test_route_model_calls_arousal_when_no_hint(self):
         """Without a model_hint, route_model reads arousal and applies tier override."""
@@ -92,15 +117,29 @@ class TestRouteModelNode:
         )
 
         with (
-            patch("src.brain.nodes.route_model.classify", return_value="simple_reply"),
             patch(
-                "src.brain.nodes.route_model.resolve_model",
-                return_value=("default-model", "standard"),
+                "src.brain.nodes.route_model.classify_detailed",
+                return_value=_make_classification("simple_reply"),
+            ),
+            patch(
+                "src.brain.nodes.route_model.resolve_model_decision",
+                return_value={
+                    "model_name": "default-model",
+                    "tier": "standard",
+                    "provider": "openai",
+                    "fallback_used": False,
+                    "decision_reason": "routing_config",
+                    "task_type": "simple_reply",
+                },
             ),
             patch("src.brain.arousal.read_arousal", new_callable=AsyncMock, return_value=0.50),
+            patch("src.brain.nodes.route_model.publish", new_callable=AsyncMock) as mock_publish,
         ):
             result = await route_model(state)
 
         # Mid-range arousal → no override → tier = "standard"
         assert result["model_tier"] == "standard"
         assert result["active_model"] == "default-model"
+        assert result["metadata"]["routing_decision"]["decision_reason"] == "routing_config"
+        mock_publish.assert_awaited_once()
+        assert mock_publish.await_args_list[0].args[0] == "model.routed"

@@ -1,0 +1,61 @@
+    Updating crates.io index
+     Locking 7 packages to latest compatible versions
+      Adding libm v0.1.4
+      Adding native-windows-gui v1.0.13
+      Adding newline-converter v0.2.2
+      Adding plotters v0.3.7
+      Adding plotters-backend v0.3.7
+      Adding stretch v0.3.2
+      Adding winapi-build v0.1.1
+ Downloading crates ...
+  Downloaded futures-io v0.3.32
+  Downloaded plotters-backend v0.3.7
+  Downloaded winapi-build v0.1.1
+  Downloaded plotters v0.3.7
+  Downloaded libm v0.1.4
+  Downloaded native-windows-gui v1.0.13
+  Downloaded winapi v0.3.9
+  Downloaded stretch v0.3.2
+  Downloaded newline-converter v0.2.2
+   Compiling memchr v2.8.0
+   Compiling futures-io v0.3.32
+   Compiling futures-channel v0.3.32
+   Compiling libm v0.1.4
+   Compiling winapi v0.3.9
+   Compiling winapi-build v0.1.1
+   Compiling plotters-backend v0.3.7
+   Compiling newline-converter v0.2.2
+   Compiling native-windows-gui v1.0.13
+   Compiling plotters v0.3.7
+   Compiling hyper v1.9.0
+   Compiling futures-util v0.3.32
+   Compiling serde_json v1.0.149
+   Compiling stretch v0.3.2
+   Compiling hyper-util v0.1.20
+   Compiling tower v0.5.3
+   Compiling tokio-tungstenite v0.29.0
+   Compiling tower-http v0.6.8
+   Compiling hyper-tls v0.6.0
+   Compiling reqwest v0.12.28
+   Compiling nuvex-desktop v0.2.0 (C:\Users\leon\repos\nuvex\src\nuvex-desktop)
+warning: unused import: `anyhow::Result`
+ --> src\dispatcher.rs:2:5
+  |
+2 | use anyhow::Result;
+  |     ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `log_path` is never used
+  --> src\config.rs:43:12
+   |
+36 | impl Config {
+   | ----------- associated function in this implementation
+...
+43 |     pub fn log_path() -> Result<PathBuf> {
+   |            ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `nuvex-desktop` (bin "nuvex-desktop") generated 2 warnings (run `cargo fix --bin "nuvex-desktop" -p nuvex-desktop` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 2m 23s
