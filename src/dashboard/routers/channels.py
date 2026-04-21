@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api/channels", tags=["channels"])
 _NUVEX_CONFIG = Path(os.environ.get("NUVEX_CONFIG", "config/nuvex.yaml"))
 _QR_FILE = Path("/data/wa-qr.json")
 _WA_CREDS = Path("/data/wa-creds")
+_WA_QR_DIR = Path("/data/wa-qr")
 
 _AGENT_CHANNELS = ("telegram", "email", "slack", "discord")
 # Keys whose values are masked to "***" on GET and preserved on PUT when "***" is sent back
@@ -54,6 +55,37 @@ def _mask(d: dict) -> dict:
 
 def _unmask(updates: dict, existing: dict) -> dict:
     return {k: (existing.get(k, "") if v == "***" else v) for k, v in updates.items()}
+
+
+def _agent_exists(agent_id: str) -> bool:
+    raw = _read_yaml()
+    for a in raw.get("agents", []):
+        if a.get("name") == agent_id:
+            return True
+    return False
+
+
+def _qr_path_for_agent(agent_id: str) -> Path:
+    safe = "".join(c for c in agent_id if c.isalnum() or c in ("-", "_"))
+    if not safe:
+        safe = "agent"
+    return _WA_QR_DIR / f"{safe}.json"
+
+
+def _wa_creds_path_for_agent(agent_id: str) -> Path:
+    safe = "".join(c for c in agent_id if c.isalnum() or c in ("-", "_"))
+    if not safe:
+        safe = "agent"
+    return _WA_CREDS / safe
+
+
+def _read_qr_state(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"status": "offline", "qr": None, "ts": None}
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return {"status": "offline", "qr": None, "ts": None}
 
 
 # ── WhatsApp (org-level) ──────────────────────────────────────────────────────
@@ -87,12 +119,18 @@ async def save_whatsapp_config(payload: WhatsAppPayload) -> JSONResponse:
 
 @router.get("/whatsapp/qr")
 async def get_whatsapp_qr() -> JSONResponse:
-    if not _QR_FILE.exists():
-        return JSONResponse({"status": "offline", "qr": None, "ts": None})
-    try:
-        return JSONResponse(json.loads(_QR_FILE.read_text()))
-    except Exception:
-        return JSONResponse({"status": "offline", "qr": None, "ts": None})
+    return JSONResponse(_read_qr_state(_QR_FILE))
+
+
+@router.get("/whatsapp/agents/{agent_id}/qr")
+async def get_whatsapp_qr_for_agent(agent_id: str) -> JSONResponse:
+    if not _agent_exists(agent_id):
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")
+    # Prefer agent-scoped QR files; fall back to legacy single-file state.
+    path = _qr_path_for_agent(agent_id)
+    if path.exists():
+        return JSONResponse(_read_qr_state(path))
+    return JSONResponse(_read_qr_state(_QR_FILE))
 
 
 @router.post("/whatsapp/clear")
@@ -102,6 +140,28 @@ async def clear_whatsapp_session() -> JSONResponse:
     if _QR_FILE.exists():
         _QR_FILE.unlink()
     return JSONResponse({"cleared": True})
+
+
+@router.post("/whatsapp/agents/{agent_id}/clear")
+async def clear_whatsapp_session_for_agent(agent_id: str) -> JSONResponse:
+    if not _agent_exists(agent_id):
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")
+
+    agent_creds = _wa_creds_path_for_agent(agent_id)
+    if agent_creds.exists():
+        shutil.rmtree(agent_creds)
+    elif _WA_CREDS.exists() and (_WA_CREDS / "creds.json").exists():
+        # Migration fallback: clear legacy single-account creds layout.
+        shutil.rmtree(_WA_CREDS)
+
+    agent_qr = _qr_path_for_agent(agent_id)
+    if agent_qr.exists():
+        agent_qr.unlink()
+    elif _QR_FILE.exists():
+        # Migration fallback: clear legacy single QR state file.
+        _QR_FILE.unlink()
+
+    return JSONResponse({"cleared": True, "agent_id": agent_id})
 
 
 def _gateway_status() -> str:
@@ -196,6 +256,72 @@ _BRAIN_URL = os.environ.get("BRAIN_URL", "http://brain:8100")
 _GATEWAY_WA_URL = os.environ.get("GATEWAY_WA_URL", "http://gateway-wa:8101")
 _GATEWAY_TG_URL = os.environ.get("GATEWAY_TG_URL", "http://gateway-telegram:8102")
 _GATEWAY_MAIL_URL = os.environ.get("GATEWAY_MAIL_URL", "http://gateway-email:8103")
+_ORG_ID = os.environ.get("NUVEX_ORG_ID", "default")
+
+
+class WhatsAppBindingCreatePayload(BaseModel):
+    agent_id: str
+    channel_identity: str
+
+
+@router.get("/whatsapp/bindings")
+async def list_whatsapp_bindings() -> JSONResponse:
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(f"{_BRAIN_URL}/api/v1/orgs/{_ORG_ID}/channels")
+            if r.status_code != 200:
+                return JSONResponse([])
+            rows = r.json()
+            bindings = [
+                {
+                    "id": b.get("id"),
+                    "org_id": b.get("org_id"),
+                    "agent_id": b.get("agent_id"),
+                    "channel_type": b.get("channel_type"),
+                    "channel_identity": b.get("channel_identity"),
+                    "config": b.get("config") or {},
+                    "created_at": b.get("created_at"),
+                }
+                for b in rows
+                if isinstance(b, dict) and b.get("channel_type") == "whatsapp"
+            ]
+            return JSONResponse(bindings)
+    except Exception:
+        return JSONResponse([])
+
+
+@router.post("/whatsapp/bindings")
+async def create_whatsapp_binding(payload: WhatsAppBindingCreatePayload) -> JSONResponse:
+    body = {
+        "channel_type": "whatsapp",
+        "channel_identity": payload.channel_identity,
+        "agent_id": payload.agent_id,
+        "config": {},
+    }
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.post(f"{_BRAIN_URL}/api/v1/orgs/{_ORG_ID}/channels", json=body)
+            if r.status_code >= 400:
+                raise HTTPException(status_code=r.status_code, detail=r.text)
+            return JSONResponse(r.json())
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.delete("/whatsapp/bindings/{binding_id}")
+async def delete_whatsapp_binding(binding_id: int) -> JSONResponse:
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.delete(f"{_BRAIN_URL}/api/v1/orgs/{_ORG_ID}/channels/{binding_id}")
+            if r.status_code in (200, 204):
+                return JSONResponse({"deleted": True})
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/whatsapp/groups")

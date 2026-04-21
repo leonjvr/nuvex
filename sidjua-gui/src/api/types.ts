@@ -352,7 +352,52 @@ export interface TokenCreateResponse {
   rawToken: string;
   warning:  string;
 }
+// ---- Organisations --------------------------------------------------------
 
+export type OrgStatus = 'active' | 'suspended' | 'archived';
+
+export interface Organisation {
+  org_id:              string;
+  name:                string;
+  status:              OrgStatus;
+  config:              Record<string, unknown>;
+  policies:            Record<string, unknown>;
+  communication_links: Record<string, unknown>;
+  created_at:          string | null;
+  updated_at:          string | null;
+}
+
+export interface OrgAgent {
+  id:              string;
+  org_id:          string;
+  name:            string;
+  tier:            number;
+  division:        string;
+  lifecycle_state: string;
+}
+
+export interface ChannelBinding {
+  id:               number;
+  org_id:           string;
+  agent_id:         string | null;
+  channel_type:     string;
+  channel_identity: string;
+  config:           Record<string, unknown>;
+  created_at:       string;
+}
+
+export interface WorkPacket {
+  id:             string;
+  source_org_id:  string;
+  target_org_id:  string;
+  packet_type:    string;
+  status:         string;
+  mode:           string;
+  result:         Record<string, unknown> | null;
+  error:          string | null;
+  created_at:     string;
+  updated_at:     string;
+}
 // ---- API Error -------------------------------------------------------------
 
 export interface ApiErrorBody {

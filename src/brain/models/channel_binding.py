@@ -1,4 +1,4 @@
-"""SQLAlchemy model for channel_bindings — one channel identity per org."""
+"""SQLAlchemy model for channel_bindings with optional agent scoping."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -14,11 +14,15 @@ class ChannelBinding(Base):
     __tablename__ = "channel_bindings"
     __table_args__ = (
         UniqueConstraint("channel_type", "channel_identity", name="uq_channel_bindings_type_identity"),
+        UniqueConstraint("org_id", "agent_id", "channel_type", name="uq_channel_bindings_org_agent_channel"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     org_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("organisations.org_id"), nullable=False, index=True
+    )
+    agent_id: Mapped[str | None] = mapped_column(
+        String(100), ForeignKey("agents.id"), nullable=True, index=True
     )
     channel_type: Mapped[str] = mapped_column(String(50), nullable=False)
     channel_identity: Mapped[str] = mapped_column(String(200), nullable=False)

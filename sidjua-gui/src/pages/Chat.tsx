@@ -8,6 +8,7 @@ import { ArrowLeft, Play } from 'lucide-react';
 
 import { useAppConfig }  from '../lib/config';
 import { useApi }        from '../hooks/useApi';
+import { useOrg }         from '../lib/org-context';
 import { AgentIcon }     from '../components/shared/AgentIcon';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import type { StarterAgentsResponse, ProviderConfigResponse } from '../api/types';
@@ -557,6 +558,7 @@ export function Chat() {
   const navigate               = useNavigate();
   const { client, config }     = useAppConfig();
   const baseUrl                = config.serverUrl;
+  const { selectedOrg }        = useOrg();
 
   const agentsRes   = useApi<StarterAgentsResponse>((c) => c.listStarterAgents());
   const providerRes = useApi<ProviderConfigResponse>((c) => c.getProviderConfig());
@@ -569,6 +571,7 @@ export function Chat() {
   const abortRef                      = useRef<AbortController | null>(null);
 
   const agents = (agentsRes.data?.agents ?? [])
+    .filter((a) => !selectedOrg || !(a as StarterAgentShape & { org_id?: string }).org_id || (a as StarterAgentShape & { org_id?: string }).org_id === selectedOrg)
     .sort((a, b) => AGENT_ORDER.indexOf(a.id) - AGENT_ORDER.indexOf(b.id));
 
   const currentAgent = agents.find((a) => a.id === agentId);

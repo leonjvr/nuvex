@@ -78,6 +78,15 @@ export const API_PATHS = {
   // Apply configuration
   apply:                 ()             => `${API_PREFIX}/apply`,
 
+  // Organisations
+  orgs:              ()                         => `/api/v1/orgs`,
+  org:               (id: string)               => `/api/v1/orgs/${id}`,
+  orgAgents:         (orgId: string)            => `/api/v1/orgs/${orgId}/agents`,
+  orgChannels:       (orgId: string)            => `/api/v1/orgs/${orgId}/channels`,
+  orgChannel:        (orgId: string, id: number) => `/api/v1/orgs/${orgId}/channels/${id}`,
+  orgPackets:        (orgId: string)            => `/api/v1/orgs/${orgId}/packets`,
+  orgPacket:         (orgId: string, id: string) => `/api/v1/orgs/${orgId}/packets/${id}`,
+
   // Tokens (bootstrap → admin exchange)
   tokens:                ()             => `${API_PREFIX}/tokens`,
 } as const;

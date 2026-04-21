@@ -14,6 +14,7 @@ import {
   Settings,
   Cpu,
   Network,
+  Building2,
 } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
 
@@ -25,15 +26,16 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/',           labelKey: 'gui.nav.dashboard',  icon: <LayoutDashboard size={18} /> },
-  { to: '/chat',       labelKey: 'gui.nav.chat',        icon: <MessageSquare   size={18} /> },
-  { to: '/agents',     labelKey: 'gui.nav.agents',      icon: <Bot             size={18} />, badge: '6' },
-  { to: '/divisions',  labelKey: 'gui.nav.divisions',   icon: <Network         size={18} /> },
-  { to: '/governance', labelKey: 'gui.nav.governance',  icon: <ShieldCheck     size={18} /> },
-  { to: '/audit',      labelKey: 'gui.nav.audit',       icon: <ScrollText      size={18} /> },
-  { to: '/costs',      labelKey: 'gui.nav.costs',       icon: <DollarSign      size={18} /> },
-  { to: '/config',     labelKey: 'gui.nav.config',      icon: <Cpu             size={18} /> },
-  { to: '/settings',   labelKey: 'gui.nav.settings',    icon: <Settings        size={18} /> },
+  { to: '/',                labelKey: 'gui.nav.dashboard',      icon: <LayoutDashboard size={18} /> },
+  { to: '/chat',            labelKey: 'gui.nav.chat',            icon: <MessageSquare   size={18} /> },
+  { to: '/agents',          labelKey: 'gui.nav.agents',          icon: <Bot             size={18} />, badge: '6' },
+  { to: '/organisations',   labelKey: 'gui.nav.organisations',   icon: <Building2       size={18} /> },
+  { to: '/divisions',       labelKey: 'gui.nav.divisions',       icon: <Network         size={18} /> },
+  { to: '/governance',      labelKey: 'gui.nav.governance',      icon: <ShieldCheck     size={18} /> },
+  { to: '/audit',           labelKey: 'gui.nav.audit',           icon: <ScrollText      size={18} /> },
+  { to: '/costs',           labelKey: 'gui.nav.costs',           icon: <DollarSign      size={18} /> },
+  { to: '/config',          labelKey: 'gui.nav.config',          icon: <Cpu             size={18} /> },
+  { to: '/settings',        labelKey: 'gui.nav.settings',        icon: <Settings        size={18} /> },
 ];
 
 interface SidebarProps {

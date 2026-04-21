@@ -13,6 +13,7 @@ import { useDivisions } from '../hooks/useDivisions';
 import { useApi }       from '../hooks/useApi';
 import { useSse }       from '../hooks/useSse';
 import { useAppConfig } from '../lib/config';
+import { useOrg }       from '../lib/org-context';
 import { formatRelative, todayIso } from '../lib/format';
 import { ProgressBar }   from '../components/shared/ProgressBar';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
@@ -559,6 +560,7 @@ export function Agents() {
   const navigate             = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { client }           = useAppConfig();
+  const { selectedOrg }      = useOrg();
 
   const divisionParam = searchParams.get('division') ?? '';
   const statusParam   = searchParams.get('status')   ?? '';
@@ -631,6 +633,7 @@ export function Agents() {
   // Filtered + sorted agent list
   const agents = useMemo(() => {
     let list = [...agentMap.values()];
+    if (selectedOrg)    list = list.filter((a) => !(a as Agent & { org_id?: string }).org_id || (a as Agent & { org_id?: string }).org_id === selectedOrg);
     if (divisionFilter) list = list.filter((a) => a.division === divisionFilter);
     if (statusFilter)   list = list.filter((a) => a.status === statusFilter);
     if (search) {

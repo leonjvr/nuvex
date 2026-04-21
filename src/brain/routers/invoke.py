@@ -51,6 +51,58 @@ async def _build_messages(agent_id: str, user_message: str) -> list[AnyMessage]:
     return [HumanMessage(content=user_message)]
 
 
+async def _validate_channel_binding(req: InvokeRequest) -> None:
+    """Validate inbound channel identity against organisation and agent bindings when present."""
+    if not req.channel or req.org_id == "default":
+        return
+
+    try:
+        from ..models.channel_binding import ChannelBinding
+        from ..db import get_session as _cbs
+        from sqlalchemy import select as _sel
+
+        binding_identity = None
+        if req.metadata:
+            binding_identity = req.metadata.channel_identity or req.metadata.sender
+        if not binding_identity:
+            raise HTTPException(status_code=403, detail="Missing channel binding identity")
+
+        async with _cbs() as _cbsess:
+            _has_bindings = (
+                await _cbsess.execute(
+                    _sel(ChannelBinding.id).where(ChannelBinding.org_id == req.org_id).limit(1)
+                )
+            ).scalar_one_or_none()
+            if _has_bindings is None:
+                return
+
+            conditions = [
+                ChannelBinding.org_id == req.org_id,
+                ChannelBinding.channel_type == req.channel,
+                ChannelBinding.channel_identity == binding_identity,
+            ]
+            if req.channel == "whatsapp":
+                conditions.append(ChannelBinding.agent_id == req.agent_id)
+
+            _match = (
+                await _cbsess.execute(_sel(ChannelBinding.id).where(*conditions).limit(1))
+            ).scalar_one_or_none()
+            if _match is None:
+                if req.channel == "whatsapp":
+                    raise HTTPException(
+                        status_code=403,
+                        detail="WhatsApp identity is not bound to this agent in the organisation",
+                    )
+                raise HTTPException(
+                    status_code=403,
+                    detail="Channel identity not bound to this organisation",
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.debug("invoke: channel binding check failed (non-fatal): %s", exc)
+
+
 def _load_project_context(workspace_path: str, project_label: str) -> str | None:
     """Read projects.json and build a context block for the given project label."""
     import os
@@ -131,33 +183,7 @@ async def invoke(req: InvokeRequest) -> InvokeResponse:
                 )
 
     # §10.3 — Channel validation: if bindings exist for this org, enforce them
-    if req.channel and req.org_id != "default":
-        try:
-            from ..models.channel_binding import ChannelBinding
-            from ..db import get_session as _cbs
-            from sqlalchemy import select as _sel
-            async with _cbs() as _cbsess:
-                _has_bindings = (await _cbsess.execute(
-                    _sel(ChannelBinding.id).where(ChannelBinding.org_id == req.org_id).limit(1)
-                )).scalar_one_or_none()
-                if _has_bindings is not None:
-                    sender_id = req.metadata.sender if req.metadata else None
-                    _match = (await _cbsess.execute(
-                        _sel(ChannelBinding.id).where(
-                            ChannelBinding.org_id == req.org_id,
-                            ChannelBinding.channel_type == req.channel,
-                            ChannelBinding.channel_identity == sender_id,
-                        ).limit(1)
-                    )).scalar_one_or_none()
-                    if _match is None:
-                        raise HTTPException(
-                            status_code=403,
-                            detail="Channel identity not bound to this organisation",
-                        )
-        except HTTPException:
-            raise
-        except Exception as _cbe:
-            log.debug("invoke: channel binding check failed (non-fatal): %s", _cbe)
+    await _validate_channel_binding(req)
 
     # Hard cap check: reject before graph invocation when budget exceeded (§38.2)
     try:
@@ -349,6 +375,10 @@ async def invoke_stream(req: InvokeRequest) -> StreamingResponse:
     """SSE streaming endpoint — emits JSON events for each graph step, then persists."""
     graph = get_compiled_graph()
     invocation_id = str(uuid.uuid4())
+
+    # Keep stream endpoint validation consistent with /invoke.
+    await _validate_channel_binding(req)
+
     initial_state = await _build_initial_state(req, invocation_id)
 
     lg_config = {"configurable": {"thread_id": initial_state.thread_id}, "recursion_limit": 100}

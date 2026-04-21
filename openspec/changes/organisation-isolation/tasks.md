@@ -114,15 +114,15 @@
 
 ## 14. Dashboard — Organisation Support
 
-- [ ] 14.1 Create organisations list page — show all orgs with name, status badge, agent count, channel count, daily spend
-- [ ] 14.2 Add org selector to dashboard header — switch between orgs or select "All Organisations"
-- [ ] 14.3 Update agent list/detail pages to filter by selected org
-- [ ] 14.4 Update thread viewer to filter by selected org
-- [ ] 14.5 Update audit log viewer to filter by selected org; show cross-org work packets in both org views
-- [ ] 14.6 Update cost analytics to support org-level aggregation
-- [ ] 14.7 Build channel bindings management page per org
-- [ ] 14.8 Build work packets history page with filters for source/target org, status, type
-- [ ] 14.9 Build org create/edit/suspend forms
+- [x] 14.1 Create organisations list page — show all orgs with name, status badge, agent count, channel count, daily spend
+- [x] 14.2 Add org selector to dashboard header — switch between orgs or select "All Organisations"
+- [x] 14.3 Update agent list/detail pages to filter by selected org
+- [x] 14.4 Update thread viewer to filter by selected org
+- [x] 14.5 Update audit log viewer to filter by selected org; show cross-org work packets in both org views
+- [x] 14.6 Update cost analytics to support org-level aggregation
+- [x] 14.7 Build channel bindings management page per org
+- [x] 14.8 Build work packets history page with filters for source/target org, status, type
+- [x] 14.9 Build org create/edit/suspend forms
 
 ## 15. Cron & Event Bus Updates
 
@@ -153,13 +153,13 @@
 - [x] 18.5 Write unit test for config loader — YAML scan, DB sync, legacy fallback, divergence detection
 - [x] 18.6 Write unit test for communication links validation — allowed types, undeclared org, undeclared type
 - [x] 18.7 Write unit test for channel binding uniqueness — duplicate rejection, valid binding, auto-binding
-- [ ] 18.8 Write integration test for cross-org data isolation — org A cannot see org B's threads, messages, budgets
-- [ ] 18.9 Write integration test for inter-org sync work packet — create, dispatch, receive, return result
-- [ ] 18.10 Write integration test for inter-org async work packet — create, dispatch, poll, complete
-- [ ] 18.11 Write integration test for three-tier policy merge — global + org + agent, strictest wins
-- [ ] 18.12 Write integration test for org-level budget cap — org exceeds budget, agent still under agent limit
-- [ ] 18.13 Write integration test for channel ownership — binding enforced, duplicate rejected, cross-org rejected
-- [ ] 18.14 Write integration test for default org migration — existing data migrated, thread IDs prefixed, backward compat routes work
-- [ ] 18.15 Write integration test for org lifecycle — create, suspend (invokes blocked), archive (read-only)
-- [ ] 18.16 Write integration test for plugin org enablement — org whitelist blocks non-listed plugins
+- [x] 18.8 Write integration test for cross-org data isolation — org A cannot see org B's threads, messages, budgets
+- [x] 18.9 Write integration test for inter-org sync work packet — create, dispatch, receive, return result
+- [x] 18.10 Write integration test for inter-org async work packet — create, dispatch, poll, complete
+- [x] 18.11 Write integration test for three-tier policy merge — global + org + agent, strictest wins
+- [x] 18.12 Write integration test for org-level budget cap — org exceeds budget, agent still under agent limit
+- [x] 18.13 Write integration test for channel ownership — binding enforced, duplicate rejected, cross-org rejected
+- [x] 18.14 Write integration test for default org migration — existing data migrated, thread IDs prefixed, backward compat routes work
+- [x] 18.15 Write integration test for org lifecycle — create, suspend (invokes blocked), archive (read-only)
+- [x] 18.16 Write integration test for plugin org enablement — org whitelist blocks non-listed plugins
 

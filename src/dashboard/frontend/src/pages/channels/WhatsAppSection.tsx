@@ -3,17 +3,21 @@ import { useState, useEffect } from "react";
 import { CheckCircle2, Loader2, Play, Plus, RefreshCw, Save, Square, Trash2, Wifi, WifiOff } from "lucide-react";
 import {
   clearWASession,
+  createWhatsAppBinding,
+  deleteWhatsAppBinding,
   fetchAgentList,
   fetchGatewayStatus,
   fetchGroupBindings,
   fetchKnownGroups,
   fetchQRStatus,
+  fetchWhatsAppBindings,
   fetchWhatsAppConfig,
   saveGroupBindings,
   saveWhatsAppConfig,
   startGateway,
   stopGateway,
   type GroupBinding,
+  type WhatsAppBinding,
   type WhatsAppConfig,
 } from "./api";
 
@@ -22,16 +26,20 @@ const QR_POLL_MS = 4000;
 export default function WhatsAppSection() {
   const qc = useQueryClient();
   const [editCfg, setEditCfg] = useState<WhatsAppConfig | null>(null);
+  const [newBindingAgent, setNewBindingAgent] = useState<string>("maya");
+  const [newBindingIdentity, setNewBindingIdentity] = useState<string>("");
 
   const { data: agents = [] } = useQuery({ queryKey: ["channel-agents"], queryFn: fetchAgentList });
   const { data: waCfg } = useQuery({ queryKey: ["wa-config"], queryFn: fetchWhatsAppConfig });
+  const { data: waBindings = [] } = useQuery({ queryKey: ["wa-bindings"], queryFn: fetchWhatsAppBindings });
   const { data: knownGroups = [] } = useQuery({ queryKey: ["wa-groups"], queryFn: fetchKnownGroups });
   const { data: savedBindings = [] } = useQuery({ queryKey: ["wa-group-bindings"], queryFn: fetchGroupBindings });
   const [bindings, setBindings] = useState<GroupBinding[]>([]);
   useEffect(() => { if (savedBindings.length > 0 || bindings.length === 0) setBindings(savedBindings); }, [savedBindings]);
+  const selectedAgent = editCfg?.agent_id || waCfg?.agent_id || "maya";
   const { data: qrStatus, refetch: refetchQR } = useQuery({
-    queryKey: ["wa-qr"],
-    queryFn: fetchQRStatus,
+    queryKey: ["wa-qr", selectedAgent],
+    queryFn: () => fetchQRStatus(selectedAgent),
     refetchInterval: (q) => (q.state.data?.status === "pairing" ? QR_POLL_MS : false),
   });
   const { data: gw, refetch: refetchGW } = useQuery({
@@ -41,6 +49,9 @@ export default function WhatsAppSection() {
   });
 
   useEffect(() => { if (waCfg && !editCfg) setEditCfg(waCfg); }, [waCfg]);
+  useEffect(() => {
+    if (!newBindingAgent && agents.length > 0) setNewBindingAgent(agents[0]);
+  }, [agents, newBindingAgent]);
 
   const saveMut = useMutation({
     mutationFn: saveWhatsAppConfig,
@@ -53,8 +64,21 @@ export default function WhatsAppSection() {
   });
 
   const clearMut = useMutation({
-    mutationFn: clearWASession,
+    mutationFn: () => clearWASession(selectedAgent),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["wa-qr"] }); refetchQR(); },
+  });
+
+  const addBindingMut = useMutation({
+    mutationFn: () => createWhatsAppBinding(newBindingAgent, newBindingIdentity),
+    onSuccess: () => {
+      setNewBindingIdentity("");
+      qc.invalidateQueries({ queryKey: ["wa-bindings"] });
+    },
+  });
+
+  const deleteBindingMut = useMutation({
+    mutationFn: (bindingId: number) => deleteWhatsAppBinding(bindingId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["wa-bindings"] }),
   });
 
   const startMut = useMutation({
@@ -83,8 +107,65 @@ export default function WhatsAppSection() {
   return (
     <div className="space-y-5">
       <p className="text-sm text-gray-400">
-        One WhatsApp number per organisation. The selected agent handles all incoming messages.
+        WhatsApp pairing state is now tracked per selected agent during migration to per-agent numbers.
       </p>
+
+      <div className="border border-gray-800 rounded-md p-3 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-300">Agent Number Bindings</h3>
+          <p className="text-xs text-gray-500">Assign one WhatsApp identity (number JID) to each agent.</p>
+        </div>
+        <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Agent</label>
+            <select
+              value={newBindingAgent}
+              onChange={(e) => setNewBindingAgent(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 w-full focus:outline-none focus:border-indigo-500"
+            >
+              {agents.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">WhatsApp Identity</label>
+            <input
+              type="text"
+              placeholder="e.g. 639171234567@s.whatsapp.net"
+              value={newBindingIdentity}
+              onChange={(e) => setNewBindingIdentity(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 w-full focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+          <button
+            onClick={() => addBindingMut.mutate()}
+            disabled={addBindingMut.isPending || !newBindingAgent || !newBindingIdentity.trim()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded text-xs text-white transition-colors"
+          >
+            {addBindingMut.isPending ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {waBindings.length === 0 && <p className="text-xs text-gray-500">No WhatsApp bindings yet.</p>}
+          {waBindings.map((b: WhatsAppBinding) => (
+            <div key={b.id} className="flex items-center justify-between bg-gray-900/50 border border-gray-800 rounded px-2 py-1.5">
+              <div className="text-xs text-gray-300">
+                <span className="font-medium">{b.agent_id || "(none)"}</span>
+                <span className="text-gray-500"> - </span>
+                <span>{b.channel_identity}</span>
+              </div>
+              <button
+                onClick={() => deleteBindingMut.mutate(b.id)}
+                disabled={deleteBindingMut.isPending}
+                className="p-1 text-red-400 hover:text-red-300 disabled:opacity-50"
+                title="Remove binding"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Config form */}
       <div className="grid grid-cols-2 gap-4">

@@ -9,28 +9,111 @@ import qrcode from "qrcode-terminal";
 import QRCode from "qrcode";
 import pino from "pino";
 import fetch from "node-fetch";
-import { readFileSync, existsSync, writeFileSync } from "fs";
-import { join } from "path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
 const BRAIN_URL = process.env.BRAIN_URL || "http://brain:8100";
-const AGENT_ID = process.env.NUVEX_AGENT_ID || "maya";
 const ORG_ID = (() => {
   const id = process.env.NUVEX_ORG_ID || "";
-  if (!id) logger.warn("NUVEX_ORG_ID is not set — defaulting to 'default'. Set this env var to avoid this warning.");
+  if (!id) logger.warn("NUVEX_ORG_ID is not set - defaulting to 'default'. Set this env var to avoid this warning.");
   return id || "default";
 })();
-const CREDS_PATH = process.env.WA_CREDS_PATH || "/data/wa-creds";
+const DEFAULT_AGENT_ID = process.env.NUVEX_AGENT_ID || "maya";
+const CREDS_BASE = process.env.WA_CREDS_BASE || process.env.WA_CREDS_PATH || "/data/wa-creds";
+const QR_BASE = process.env.WA_QR_DIR || "/data/wa-qr";
 const GROUP_POLICY = (process.env.WA_GROUP_POLICY || "allowlist").toLowerCase();
-const DM_POLICY = (process.env.WA_DM_POLICY || "pairing").toLowerCase();
-const QR_FILE = process.env.WA_QR_FILE || "/data/wa-qr.json";
+const POLL_INTERVAL_MS = parseInt(process.env.WA_POLL_INTERVAL_MS || "5000", 10);
+const CHANNEL_TAG = "whatsapp";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const runtimeByAgent = new Map();
+const projectCacheByAgent = new Map();
+let primaryRuntimeAgent = DEFAULT_AGENT_ID;
+
+// Backwards compatibility for existing imports/tests that mutate exported sock.
+let sock = null;
+
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 function randomBetween(min, max) { return Math.floor(min + Math.random() * (max - min)); }
 
-// ── Humanise config (refreshed every 5 min) ───────────────────────────────────
+function sanitizeId(raw) {
+  const clean = String(raw || "").replace(/[^a-zA-Z0-9_-]/g, "");
+  return clean || "agent";
+}
+
+function normalizeWaIdentity(raw) {
+  if (!raw) return null;
+  const txt = String(raw).trim().toLowerCase();
+  const at = txt.indexOf("@");
+  if (at === -1) return txt;
+  const local = txt.slice(0, at).split(":")[0];
+  const domain = txt.slice(at + 1);
+  return `${local}@${domain}`;
+}
+
+function getRuntime(agentId = primaryRuntimeAgent) {
+  return runtimeByAgent.get(agentId) || null;
+}
+
+function listRuntimes() {
+  return Array.from(runtimeByAgent.values());
+}
+
+function defaultRuntimeIdentity() {
+  return process.env.WA_CHANNEL_IDENTITY ? normalizeWaIdentity(process.env.WA_CHANNEL_IDENTITY) : null;
+}
+
+function makeRuntime(binding) {
+  const agentId = binding?.agent_id || DEFAULT_AGENT_ID;
+  const safeAgent = sanitizeId(agentId);
+  const runtime = {
+    agentId,
+    identity: normalizeWaIdentity(binding?.channel_identity || defaultRuntimeIdentity()),
+    sock: null,
+    credsPath: join(CREDS_BASE, safeAgent),
+    qrFile: process.env.WA_QR_FILE || join(QR_BASE, `${safeAgent}.json`),
+    chatMapFile: join(CREDS_BASE, safeAgent, "chatmap.json"),
+    chatMap: new Map(),
+    contactSessions: {},
+    activeSession: {},
+  };
+  return runtime;
+}
+
+function writeQrState(runtime, state) {
+  try {
+    mkdirSync(dirname(runtime.qrFile), { recursive: true });
+    writeFileSync(runtime.qrFile, JSON.stringify({ ...state, ts: Date.now() }));
+  } catch {}
+}
+
+function saveChatMap(runtime) {
+  try {
+    mkdirSync(dirname(runtime.chatMapFile), { recursive: true });
+    const data = {};
+    for (const [jid, info] of runtime.chatMap) data[jid] = info;
+    writeFileSync(runtime.chatMapFile, JSON.stringify(data), "utf8");
+  } catch (err) {
+    logger.warn({ err, agent_id: runtime.agentId }, "Could not save chatmap (non-fatal)");
+  }
+}
+
+function loadChatMap(runtime) {
+  try {
+    if (!existsSync(runtime.chatMapFile)) return;
+    const data = JSON.parse(readFileSync(runtime.chatMapFile, "utf8"));
+    let count = 0;
+    for (const [jid, info] of Object.entries(data)) {
+      runtime.chatMap.set(jid, info);
+      count++;
+    }
+    logger.info({ count, agent_id: runtime.agentId }, "Restored chatmap from disk");
+  } catch (err) {
+    logger.warn({ err, agent_id: runtime.agentId }, "Could not load chatmap (non-fatal)");
+  }
+}
+
 let _humanise = null;
 async function getHumanise() {
   if (_humanise) return _humanise;
@@ -39,50 +122,51 @@ async function getHumanise() {
     if (res.ok) {
       const waCfg = await res.json();
       _humanise = {
-        enabled:                  waCfg.humanise_enabled                 ?? false,
-        read_receipt_delay_ms:    Number(waCfg.humanise_read_receipt_delay_ms ?? 1500),
-        thinking_delay_ms:        Number(waCfg.humanise_thinking_delay_ms     ?? 2500),
-        typing_speed_wpm:         Number(waCfg.humanise_typing_speed_wpm      ?? 45),
-        chunk_messages:           waCfg.humanise_chunk_messages          ?? true,
-        group_bindings:           Array.isArray(waCfg.group_bindings) ? waCfg.group_bindings : [],
+        enabled: waCfg.humanise_enabled ?? false,
+        read_receipt_delay_ms: Number(waCfg.humanise_read_receipt_delay_ms ?? 1500),
+        thinking_delay_ms: Number(waCfg.humanise_thinking_delay_ms ?? 2500),
+        typing_speed_wpm: Number(waCfg.humanise_typing_speed_wpm ?? 45),
+        chunk_messages: waCfg.humanise_chunk_messages ?? true,
+        group_bindings: Array.isArray(waCfg.group_bindings) ? waCfg.group_bindings : [],
       };
-      setTimeout(() => { _humanise = null; }, 5 * 60 * 1000); // refresh every 5 min
+      setTimeout(() => { _humanise = null; }, 5 * 60 * 1000);
     }
-  } catch { /* keep defaults */ }
-  if (!_humanise) _humanise = { enabled: false, read_receipt_delay_ms: 1500, thinking_delay_ms: 2500, typing_speed_wpm: 45, chunk_messages: true, group_bindings: [] };
+  } catch {}
+  if (!_humanise) {
+    _humanise = {
+      enabled: false,
+      read_receipt_delay_ms: 1500,
+      thinking_delay_ms: 2500,
+      typing_speed_wpm: 45,
+      chunk_messages: true,
+      group_bindings: [],
+    };
+  }
   return _humanise;
 }
 
-// ── Projects registry (refreshed every 10 min) ────────────────────────────────
-let _projects = null;
-let _projectsClearTimer = null;
-async function getProjects() {
-  if (_projects) return _projects;
+async function getProjects(agentId) {
+  const cached = projectCacheByAgent.get(agentId);
+  if (cached) return cached;
+  let projects = {};
   try {
-    const res = await fetch(`${BRAIN_URL}/agents/${AGENT_ID}/projects`, { signal: AbortSignal.timeout(5000) });
-    if (res.ok) {
-      _projects = await res.json();
-      if (_projectsClearTimer) clearTimeout(_projectsClearTimer);
-      _projectsClearTimer = setTimeout(() => { _projects = null; }, 10 * 60 * 1000);
-    }
+    const res = await fetch(`${BRAIN_URL}/agents/${agentId}/projects`, { signal: AbortSignal.timeout(5000) });
+    if (res.ok) projects = await res.json();
   } catch (err) {
-    logger.warn({ err }, "Could not fetch projects from brain (non-fatal)");
+    logger.warn({ err, agent_id: agentId }, "Could not fetch projects from brain (non-fatal)");
   }
-  if (!_projects) _projects = {};
-  return _projects;
+  projectCacheByAgent.set(agentId, projects || {});
+  setTimeout(() => projectCacheByAgent.delete(agentId), 10 * 60 * 1000);
+  return projects || {};
 }
 
-/** Resolve a group JID to a project label by matching contact_channel to the
- *  group's name in chatMap, or to the JID directly. Returns null if no match. */
-async function resolveProjectForGroup(jid) {
-  const projects = await getProjects();
-  const groupInfo = chatMap.get(jid);
-  const groupName = (groupInfo && groupInfo.name) ? groupInfo.name.toLowerCase() : null;
+async function resolveProjectForGroup(runtime, jid) {
+  const projects = await getProjects(runtime.agentId);
+  const groupInfo = runtime.chatMap.get(jid);
+  const groupName = (groupInfo && groupInfo.name) ? String(groupInfo.name).toLowerCase() : null;
   for (const [label, proj] of Object.entries(projects)) {
-    const cc = (proj.contact_channel || "").toLowerCase();
-    if (cc === jid || (groupName && cc === groupName)) {
-      return label;
-    }
+    const cc = String(proj.contact_channel || "").toLowerCase();
+    if (cc === jid || (groupName && cc === groupName)) return label;
   }
   return null;
 }
@@ -90,7 +174,6 @@ async function resolveProjectForGroup(jid) {
 function splitIntoChunks(text, maxLen = 500) {
   if (text.length <= maxLen) return [text];
   const chunks = [];
-  // split on double newline first, then sentence boundaries
   const paragraphs = text.split(/\n{2,}/);
   let current = "";
   for (const para of paragraphs) {
@@ -105,100 +188,73 @@ function splitIntoChunks(text, maxLen = 500) {
   return chunks;
 }
 
-function writeQrState(state) {
-  try { writeFileSync(QR_FILE, JSON.stringify({ ...state, ts: Date.now() })); } catch {}
+function defaultThread(runtime, jid) {
+  return `${ORG_ID}:${runtime.agentId}:whatsapp:${jid}`;
 }
 
-// ── Per-contact session tracking ─────────────────────────────────────────────
-// contactSessions[jid] = [ threadId1, threadId2, … ]
-// activeSession[jid] = threadId (currently active)
-const contactSessions = {};
-const activeSession = {};
-
-function defaultThread(jid) { return `${ORG_ID}:${AGENT_ID}:whatsapp:${jid}`; }
-
-function getActiveThread(jid) {
-  if (!activeSession[jid]) activeSession[jid] = defaultThread(jid);
-  if (!contactSessions[jid]) contactSessions[jid] = [activeSession[jid]];
-  return activeSession[jid];
+function getActiveThread(runtime, jid) {
+  if (!runtime.activeSession[jid]) runtime.activeSession[jid] = defaultThread(runtime, jid);
+  if (!runtime.contactSessions[jid]) runtime.contactSessions[jid] = [runtime.activeSession[jid]];
+  return runtime.activeSession[jid];
 }
 
-function newSession(jid, name) {
+function newSession(runtime, jid, name) {
   const slug = name ? name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30) : `s${Date.now()}`;
-  const threadId = `${ORG_ID}:${AGENT_ID}:whatsapp:${jid}:${slug}`;
-  if (!contactSessions[jid]) contactSessions[jid] = [defaultThread(jid)];
-  contactSessions[jid].push(threadId);
-  activeSession[jid] = threadId;
+  const threadId = `${ORG_ID}:${runtime.agentId}:whatsapp:${jid}:${slug}`;
+  if (!runtime.contactSessions[jid]) runtime.contactSessions[jid] = [defaultThread(runtime, jid)];
+  runtime.contactSessions[jid].push(threadId);
+  runtime.activeSession[jid] = threadId;
   return { threadId, slug };
 }
 
-// ── Slash command help text ───────────────────────────────────────────────────
 const HELP_TEXT = `*Available commands:*
 
-/new [name]   — Start a new focused session
-/sessions     — List your sessions
-/switch <n>   — Switch to session number N
-/clear        — Start fresh (same as /new)
-/status       — Show agent status
-/who          — Who is this agent
-/help         — Show this list
+/new [name]   - Start a new focused session
+/sessions     - List your sessions
+/switch <n>   - Switch to session number N
+/clear        - Start fresh (same as /new)
+/status       - Show agent status
+/who          - Who is this agent
+/help         - Show this list
 
 *Tips:*
-• Use sessions to separate topics (e.g. /new skill-building)
-• Messages in each session keep their own context`;
+* Use sessions to separate topics (e.g. /new skill-building)
+* Messages in each session keep their own context`;
 
-let sock = null;
-// Simple in-process chat list populated from messaging-history.set events
-const chatMap = new Map(); // jid → { id, name, subject, isGroup }
-const CHATMAP_FILE = join(CREDS_PATH, "chatmap.json");
-
-/** Persist chatMap to disk so group names survive container restarts. */
-function saveChatMap() {
+async function invokeAgent(
+  message,
+  threadId,
+  sender,
+  channel,
+  workspacePath,
+  projectLabel,
+  senderName,
+  options = {},
+) {
   try {
-    const data = {};
-    for (const [jid, info] of chatMap) data[jid] = info;
-    writeFileSync(CHATMAP_FILE, JSON.stringify(data), "utf8");
-  } catch (err) {
-    logger.warn({ err }, "Could not save chatmap (non-fatal)");
-  }
-}
-
-/** Load persisted chatMap from disk on startup. */
-function loadChatMap() {
-  try {
-    if (existsSync(CHATMAP_FILE)) {
-      const data = JSON.parse(readFileSync(CHATMAP_FILE, "utf8"));
-      let count = 0;
-      for (const [jid, info] of Object.entries(data)) {
-        chatMap.set(jid, info);
-        count++;
-      }
-      logger.info({ count }, "Restored chatmap from disk");
-    }
-  } catch (err) {
-    logger.warn({ err }, "Could not load chatmap (non-fatal)");
-  }
-}
-loadChatMap();
-
-// ── Brain invoke ──────────────────────────────────────────────────────────────
-async function invokeAgent(message, threadId, sender, channel, workspacePath, projectLabel, senderName) {
-  try {
+    const agentId = options.agentId || DEFAULT_AGENT_ID;
+    const channelIdentity = options.channelIdentity || null;
     const body = {
-      agent_id: AGENT_ID,
+      agent_id: agentId,
       org_id: ORG_ID,
       message,
       thread_id: threadId,
       channel,
       sender,
-      metadata: { channel, sender, ...(senderName ? { sender_name: senderName } : {}), ...(projectLabel ? { project_label: projectLabel } : {}) },
+      metadata: {
+        channel,
+        sender,
+        ...(channelIdentity ? { channel_identity: channelIdentity } : {}),
+        ...(senderName ? { sender_name: senderName } : {}),
+        ...(projectLabel ? { project_label: projectLabel } : {}),
+      },
     };
     if (workspacePath) body.workspace_path = workspacePath;
     const res = await fetch(`${BRAIN_URL}/invoke`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(1_200_000), // 20 min — dev-server tasks can take 15-20 min
+      signal: AbortSignal.timeout(1_200_000),
     });
     if (!res.ok) throw new Error(`Brain returned ${res.status}`);
     return await res.json();
@@ -208,28 +264,29 @@ async function invokeAgent(message, threadId, sender, channel, workspacePath, pr
   }
 }
 
-// ── Streaming invoke — sends each AI reply to WA as it arrives ───────────────
-// Used for project-scoped messages so Maya's "On it!" and final reply are
-// delivered immediately without waiting for the full LangGraph run to finish.
-// Humanise settings (thinking_delay, typing_speed, chunk_messages) are honoured
-// for each message chunk that arrives from the stream.
-async function invokeAgentStream(message, threadId, sender, channel, workspacePath, projectLabel, jid, humanise, senderName) {
+async function invokeAgentStream(runtime, message, threadId, sender, channel, workspacePath, projectLabel, jid, humanise, senderName) {
   try {
     const body = JSON.stringify({
-      agent_id: AGENT_ID,
+      agent_id: runtime.agentId,
       org_id: ORG_ID,
       message,
       thread_id: threadId,
       channel,
       sender,
-      metadata: { channel, sender, ...(senderName ? { sender_name: senderName } : {}), ...(projectLabel ? { project_label: projectLabel } : {}) },
+      metadata: {
+        channel,
+        sender,
+        ...(runtime.identity ? { channel_identity: runtime.identity } : {}),
+        ...(senderName ? { sender_name: senderName } : {}),
+        ...(projectLabel ? { project_label: projectLabel } : {}),
+      },
       ...(workspacePath ? { workspace_path: workspacePath } : {}),
     });
     const res = await fetch(`${BRAIN_URL}/invoke/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,
-      signal: AbortSignal.timeout(1_200_000), // 20 min — same as sync invoke
+      signal: AbortSignal.timeout(1_200_000),
     });
     if (!res.ok) throw new Error(`Brain stream returned ${res.status}`);
 
@@ -250,19 +307,13 @@ async function invokeAgentStream(message, threadId, sender, channel, workspacePa
         let event;
         try { event = JSON.parse(raw); } catch { continue; }
         if (event.done) return;
-        // Only forward real AI prose — skip tool_call announcements (they look like "I'll use X...")
+
         const content = event.content?.trim();
         if (!content || event.tool_calls || sentSet.has(content)) continue;
         sentSet.add(content);
 
-        // For the first chunk: honour thinking_delay but cap at 5 s so "On it!" still
-        // feels prompt. Subsequent chunks arrive much later (mid-task updates / final reply)
-        // so no extra delay is needed — brain already takes real time between them.
         if (isFirstChunk && h?.enabled) {
-          const target = Math.min(
-            randomBetween(h.thinking_delay_ms * 0.5, h.thinking_delay_ms * 1.5),
-            5000,
-          );
+          const target = Math.min(randomBetween(h.thinking_delay_ms * 0.5, h.thinking_delay_ms * 1.5), 5000);
           const elapsed = Date.now() - streamStart;
           const remainder = target - elapsed;
           if (remainder > 0) await sleep(remainder);
@@ -271,41 +322,39 @@ async function invokeAgentStream(message, threadId, sender, channel, workspacePa
           isFirstChunk = false;
         }
 
-        logger.info({ jid, node: event.node }, "Streaming partial reply to WA");
+        logger.info({ jid, agent_id: runtime.agentId, node: event.node }, "Streaming partial reply to WA");
         try {
           if (h?.enabled && h?.chunk_messages) {
-            // Apply typing indicator proportional to word count, same as sync path
             const words = content.split(/\s+/).length;
             const typingMs = Math.min(12000, Math.floor((words / (h.typing_speed_wpm || 60)) * 60000));
-            try { await sock.sendPresenceUpdate("composing", jid); } catch {}
+            try { await runtime.sock.sendPresenceUpdate("composing", jid); } catch {}
             await sleep(typingMs);
-            await sock.sendMessage(jid, { text: content.slice(0, 4096) });
-            try { await sock.sendPresenceUpdate("paused", jid); } catch {}
+            await runtime.sock.sendMessage(jid, { text: content.slice(0, 4096) });
+            try { await runtime.sock.sendPresenceUpdate("paused", jid); } catch {}
           } else {
-            await sock.sendMessage(jid, { text: content.slice(0, 4096) });
+            await runtime.sock.sendMessage(jid, { text: content.slice(0, 4096) });
           }
         } catch (e) {
-          logger.warn({ e }, "Stream: failed to send WA message");
+          logger.warn({ e, agent_id: runtime.agentId }, "Stream: failed to send WA message");
         }
       }
     }
   } catch (err) {
-    logger.error({ err }, "Brain stream invoke failed");
-    try { await sock.sendMessage(jid, { text: `[Error] Dev task failed: ${err.message}` }); } catch {}
+    logger.error({ err, agent_id: runtime.agentId }, "Brain stream invoke failed");
+    try { await runtime.sock.sendMessage(jid, { text: `[Error] Dev task failed: ${err.message}` }); } catch {}
   }
 }
 
-// ── Chat sync: push known chats to brain on connect ───────────────────────────
-async function syncChatsToBrain() {
+async function syncChatsToBrain(runtime) {
   try {
-    const chats = Array.from(chatMap.values());
+    const chats = Array.from(runtime.chatMap.values());
     if (chats.length === 0) return;
     const items = chats.slice(0, 500).map((c) => {
       const jid = c.id || "";
       const isGroup = jid.endsWith("@g.us");
       return {
-        thread_id: `${ORG_ID}:${AGENT_ID}:whatsapp:${jid}`,
-        agent_id: AGENT_ID,
+        thread_id: `${ORG_ID}:${runtime.agentId}:whatsapp:${jid}`,
+        agent_id: runtime.agentId,
         channel: isGroup ? "whatsapp-group" : "whatsapp",
         contact: jid,
         display_name: c.name || c.subject || null,
@@ -321,29 +370,30 @@ async function syncChatsToBrain() {
     });
     if (res.ok) {
       const d = await res.json();
-      logger.info({ inserted: d.inserted, total: d.total }, "WA chat sync complete");
+      logger.info({ inserted: d.inserted, total: d.total, agent_id: runtime.agentId }, "WA chat sync complete");
     }
   } catch (err) {
-    logger.warn({ err }, "WA chat sync failed (non-fatal)");
+    logger.warn({ err, agent_id: runtime.agentId }, "WA chat sync failed (non-fatal)");
   }
 }
 
-// ── Slash command handler ─────────────────────────────────────────────────────
-async function handleCommand(jid, cmd, args, sender) {
-  const reply = async (text) => { try { await sock.sendMessage(jid, { text }); } catch (e) { logger.warn({ e }, "reply failed"); } };
+async function handleCommand(runtime, jid, cmd, args, sender) {
+  const reply = async (text) => {
+    try { await runtime.sock.sendMessage(jid, { text }); } catch (e) { logger.warn({ e, agent_id: runtime.agentId }, "reply failed"); }
+  };
 
   switch (cmd) {
     case "/new":
     case "/clear": {
       const name = args.trim() || "";
-      const { slug } = newSession(jid, name || null);
+      const { slug } = newSession(runtime, jid, name || null);
       const label = name || `session-${Date.now()}`;
       reply(`New session started: *${label}*\nThread: ${slug}\nSend your first message to begin.`);
       break;
     }
     case "/sessions": {
-      const sessions = contactSessions[jid] || [defaultThread(jid)];
-      const current = getActiveThread(jid);
+      const sessions = runtime.contactSessions[jid] || [defaultThread(runtime, jid)];
+      const current = getActiveThread(runtime, jid);
       const lines = sessions.map((s, i) => {
         const label = s.split(":").slice(2).join(":") || s;
         return `${i + 1}. ${label}${s === current ? " ✅ (active)" : ""}`;
@@ -353,11 +403,11 @@ async function handleCommand(jid, cmd, args, sender) {
     }
     case "/switch": {
       const n = parseInt(args.trim(), 10);
-      const sessions = contactSessions[jid] || [defaultThread(jid)];
+      const sessions = runtime.contactSessions[jid] || [defaultThread(runtime, jid)];
       if (isNaN(n) || n < 1 || n > sessions.length) {
         reply(`Invalid session number. You have ${sessions.length} session(s). Use /sessions to list them.`);
       } else {
-        activeSession[jid] = sessions[n - 1];
+        runtime.activeSession[jid] = sessions[n - 1];
         const label = sessions[n - 1].split(":").slice(2).join(":") || sessions[n - 1];
         reply(`Switched to session ${n}: *${label}*`);
       }
@@ -368,11 +418,22 @@ async function handleCommand(jid, cmd, args, sender) {
         const r = await fetch(`${BRAIN_URL}/health`, { signal: AbortSignal.timeout(5_000) });
         const d = await r.json();
         reply(`*Agent status:* ${d.status}\n*DB:* ${d.db}\n*Version:* ${d.version}`);
-      } catch { reply("Could not reach brain. Check your connection."); }
+      } catch {
+        reply("Could not reach brain. Check your connection.");
+      }
       break;
     }
     case "/who": {
-      const result = await invokeAgent("Who are you? Briefly introduce yourself in one paragraph.", getActiveThread(jid), sender, "whatsapp");
+      const result = await invokeAgent(
+        "Who are you? Briefly introduce yourself in one paragraph.",
+        getActiveThread(runtime, jid),
+        sender,
+        "whatsapp",
+        null,
+        null,
+        null,
+        { agentId: runtime.agentId, channelIdentity: runtime.identity },
+      );
       reply(result.reply || "I'm your AI assistant.");
       break;
     }
@@ -382,8 +443,7 @@ async function handleCommand(jid, cmd, args, sender) {
   }
 }
 
-// ── Message handler ───────────────────────────────────────────────────────────
-async function handleMessage(msg) {
+async function handleMessageWithRuntime(runtime, msg) {
   const jid = msg.key.remoteJid || "";
   const isGroup = jid.endsWith("@g.us");
   const sender = isGroup ? msg.key.participant || jid : jid;
@@ -392,85 +452,72 @@ async function handleMessage(msg) {
 
   if (isGroup && GROUP_POLICY !== "allowlist") return;
 
-  // Ensure group name is in chatMap — fetch from WA if missing (needed for project resolution)
-  if (isGroup && (!chatMap.has(jid) || !chatMap.get(jid)?.name)) {
+  if (isGroup && (!runtime.chatMap.has(jid) || !runtime.chatMap.get(jid)?.name)) {
     try {
-      const meta = await sock.groupMetadata(jid);
+      const meta = await runtime.sock.groupMetadata(jid);
       if (meta?.subject) {
-        chatMap.set(jid, { id: jid, name: meta.subject });
-        saveChatMap();
-        logger.info({ jid, name: meta.subject }, "Fetched and cached group metadata");
+        runtime.chatMap.set(jid, { id: jid, name: meta.subject });
+        saveChatMap(runtime);
       }
     } catch (e) {
-      logger.warn({ e, jid }, "Could not fetch group metadata (non-fatal)");
+      logger.warn({ e, jid, agent_id: runtime.agentId }, "Could not fetch group metadata (non-fatal)");
     }
   }
 
-  const body =
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text ||
-    msg.message?.imageMessage?.caption ||
-    "";
-
+  const body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || "";
   let text = body;
-  if (msg.message?.audioMessage) {
-    text = `[Audio]\nTranscript: (audio not transcribed in gateway)`;
-  }
-
+  if (msg.message?.audioMessage) text = `[Audio]\nTranscript: (audio not transcribed in gateway)`;
   if (!text.trim()) return;
 
   const h = await getHumanise();
-
-  // 1. Delay before read receipt (feels like opening chat)
   if (h.enabled) {
     const d = randomBetween(h.read_receipt_delay_ms * 0.5, h.read_receipt_delay_ms * 1.5);
     await sleep(d);
   }
-  try { await sock.readMessages([msg.key]); } catch (e) { logger.warn({ e }, "readMessages failed"); }
+  try { await runtime.sock.readMessages([msg.key]); } catch {}
 
-  // Slash command routing (no further humanise needed for commands)
   if (text.startsWith("/")) {
     const [cmd, ...rest] = text.split(" ");
-    await handleCommand(jid, cmd.toLowerCase(), rest.join(" "), sender);
+    await handleCommand(runtime, jid, cmd.toLowerCase(), rest.join(" "), sender);
     return;
   }
 
-  const threadId = getActiveThread(jid);
+  const threadId = getActiveThread(runtime, jid);
 
-  // Look up group workspace binding and project context.
-  // Project bindings (from Dev Server skill's projects.json) take priority over
-  // manual nuvex.yaml group_bindings for project context injection.
   let workspacePath = null;
   let projectLabel = null;
   if (isGroup) {
-    projectLabel = await resolveProjectForGroup(jid);
+    projectLabel = await resolveProjectForGroup(runtime, jid);
     if (!projectLabel) {
-      // Fall back to manual nuvex.yaml group_bindings
       const h0 = await getHumanise();
       const binding = (h0.group_bindings || []).find((b) => b.jid === jid);
       if (binding) workspacePath = binding.workspace;
     }
   }
 
-  // 2. Invoke brain.
-  //    Project-scoped group messages use streaming so Maya's "On it!" ack arrives
-  //    in WA within seconds while the long dev-server task runs in the background.
-  //    Regular messages use the sync endpoint.
   if (projectLabel) {
-    await invokeAgentStream(text, threadId, sender, channel, workspacePath, projectLabel, jid, h, senderName);
-    return; // replies already sent inside invokeAgentStream
+    await invokeAgentStream(runtime, text, threadId, sender, channel, workspacePath, projectLabel, jid, h, senderName);
+    return;
   }
 
-  const _brainStart = Date.now();
-  const result = await invokeAgent(text, threadId, sender, channel, workspacePath, projectLabel, senderName);
+  const brainStart = Date.now();
+  const result = await invokeAgent(
+    text,
+    threadId,
+    sender,
+    channel,
+    workspacePath,
+    projectLabel,
+    senderName,
+    { agentId: runtime.agentId, channelIdentity: runtime.identity },
+  );
   const reply = result.reply || "";
   if (h.enabled) {
     const target = randomBetween(h.thinking_delay_ms * 0.5, h.thinking_delay_ms * 1.5);
-    const elapsed = Date.now() - _brainStart;
+    const elapsed = Date.now() - brainStart;
     const remainder = target - elapsed;
     if (remainder > 0) await sleep(remainder);
   }
-
   if (!reply) return;
 
   try {
@@ -479,30 +526,39 @@ async function handleMessage(msg) {
       for (let i = 0; i < chunks.length; i++) {
         const words = chunks[i].split(/\s+/).length;
         const typingMs = Math.min(12000, Math.floor((words / h.typing_speed_wpm) * 60000));
-        try { await sock.sendPresenceUpdate("composing", jid); } catch (e) {}
+        try { await runtime.sock.sendPresenceUpdate("composing", jid); } catch {}
         await sleep(typingMs);
-        await sock.sendMessage(jid, { text: chunks[i] });
+        await runtime.sock.sendMessage(jid, { text: chunks[i] });
         if (i < chunks.length - 1) {
-          try { await sock.sendPresenceUpdate("paused", jid); } catch (e) {}
+          try { await runtime.sock.sendPresenceUpdate("paused", jid); } catch {}
           await sleep(randomBetween(600, 1800));
         }
       }
-      try { await sock.sendPresenceUpdate("paused", jid); } catch (e) {}
+      try { await runtime.sock.sendPresenceUpdate("paused", jid); } catch {}
     } else {
-      await sock.sendMessage(jid, { text: reply.slice(0, 4096) });
+      await runtime.sock.sendMessage(jid, { text: reply.slice(0, 4096) });
     }
   } catch (err) {
-    logger.error({ err, jid }, "Failed to send reply");
+    logger.error({ err, jid, agent_id: runtime.agentId }, "Failed to send reply");
   }
 }
 
-// ── Connect ───────────────────────────────────────────────────────────────────
+async function handleMessage(msg) {
+  const runtime = getRuntime() || {
+    agentId: DEFAULT_AGENT_ID,
+    identity: defaultRuntimeIdentity(),
+    sock,
+    chatMap: new Map(),
+    contactSessions: {},
+    activeSession: {},
+  };
+  if (!runtime.sock) return;
+  await handleMessageWithRuntime(runtime, msg);
+}
 
-async function fetchAgentChannelConfig() {
+async function fetchAgentChannelConfig(agentId) {
   try {
-    const res = await fetch(`${BRAIN_URL}/agents/${AGENT_ID}`, {
-      signal: AbortSignal.timeout(5000),
-    });
+    const res = await fetch(`${BRAIN_URL}/agents/${agentId}`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return {};
     const cfg = await res.json();
     return cfg?.channels?.whatsapp ?? {};
@@ -511,16 +567,15 @@ async function fetchAgentChannelConfig() {
   }
 }
 
-async function connectToWhatsApp() {
-  const waCfg = await fetchAgentChannelConfig();
+async function connectRuntime(runtime) {
+  loadChatMap(runtime);
+  const waCfg = await fetchAgentChannelConfig(runtime.agentId);
   const envSyncOverride = process.env.WA_SYNC_FULL_HISTORY;
-  const syncFullHistory =
-    envSyncOverride != null
-      ? String(envSyncOverride).toLowerCase() === "true"
-      : waCfg.sync_full_history === true;
-  logger.info({ syncFullHistory }, "WA channel config loaded");
+  const syncFullHistory = envSyncOverride != null
+    ? String(envSyncOverride).toLowerCase() === "true"
+    : waCfg.sync_full_history === true;
 
-  const { state, saveCreds } = await useMultiFileAuthState(CREDS_PATH);
+  const { state, saveCreds } = await useMultiFileAuthState(runtime.credsPath);
   const { version } = await fetchLatestBaileysVersion();
 
   const socketOptions = {
@@ -538,96 +593,162 @@ async function connectToWhatsApp() {
     socketOptions.getMessage = async () => ({ conversation: "" });
   }
 
-  sock = makeWASocket(socketOptions);
+  const runtimeSock = makeWASocket(socketOptions);
+  runtime.sock = runtimeSock;
+  runtimeByAgent.set(runtime.agentId, runtime);
+  if (runtime.agentId === primaryRuntimeAgent || !sock) sock = runtimeSock;
 
-  sock.ev.on("creds.update", saveCreds);
+  runtimeSock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", async (update) => {
+  runtimeSock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
+
     if (qr) {
       qrcode.generate(qr, { small: true });
       try {
         const dataUrl = await QRCode.toDataURL(qr, { width: 280, margin: 2 });
-        writeQrState({ status: "pairing", qr: dataUrl });
-      } catch (e) { logger.warn({ err: e }, "QR gen failed"); }
-    }
-    if (connection === "close") {
-      const shouldReconnect = new Boom(lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-      logger.info({ code: lastDisconnect?.error?.output?.statusCode }, "WA disconnected");
-      if (shouldReconnect) {
-        setTimeout(connectToWhatsApp, 5000);
-      } else {
-        logger.error("WhatsApp logged out — remove credentials and restart");
-        writeQrState({ status: "logged_out", qr: null });
+        writeQrState(runtime, { status: "pairing", qr: dataUrl, agent_id: runtime.agentId });
+      } catch (e) {
+        logger.warn({ err: e, agent_id: runtime.agentId }, "QR generation failed");
       }
-    } else if (connection === "open") {
-      logger.info("WhatsApp connected");
-      writeQrState({ status: "connected", qr: null });
-      // Sync known chats to brain after history arrives (delay for history sync)
-      setTimeout(syncChatsToBrain, 8000);
+    }
+
+    if (connection === "close") {
+      const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
+      const shouldReconnect = code !== DisconnectReason.loggedOut;
+      logger.info({ code, agent_id: runtime.agentId }, "WA disconnected");
+      if (shouldReconnect) {
+        setTimeout(() => connectRuntime(runtime).catch((err) => logger.error({ err, agent_id: runtime.agentId }, "WA reconnect failed")), 5000);
+      } else {
+        writeQrState(runtime, { status: "logged_out", qr: null, agent_id: runtime.agentId });
+      }
+      return;
+    }
+
+    if (connection === "open") {
+      const rawIdentity = runtimeSock.user?.id || runtime.identity;
+      runtime.identity = normalizeWaIdentity(rawIdentity);
+      writeQrState(runtime, {
+        status: "connected",
+        qr: null,
+        agent_id: runtime.agentId,
+        channel_identity: runtime.identity,
+      });
+      logger.info({ agent_id: runtime.agentId, channel_identity: runtime.identity }, "WhatsApp connected");
+      setTimeout(() => syncChatsToBrain(runtime), 8000);
     }
   });
 
-  sock.ev.on("messages.upsert", async ({ messages, type }) => {
+  runtimeSock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
     for (const msg of messages) {
       if (!msg.message || msg.key.fromMe) continue;
-      await handleMessage(msg);
+      await handleMessageWithRuntime(runtime, msg);
     }
   });
 
-  // Populate chatMap from history sync event, then sync to brain
-  sock.ev.on("messaging-history.set", ({ chats, isLatest }) => {
+  runtimeSock.ev.on("messaging-history.set", ({ chats, isLatest }) => {
     if (chats && chats.length) {
       for (const c of chats) {
-        if (c.id) chatMap.set(c.id, { id: c.id, name: c.name || c.subject || null });
+        if (c.id) runtime.chatMap.set(c.id, { id: c.id, name: c.name || c.subject || null });
       }
     }
-    logger.info({ count: chatMap.size, isLatest }, "WA history sync received");
-    saveChatMap();
-    setTimeout(syncChatsToBrain, 1500);
+    logger.info({ count: runtime.chatMap.size, isLatest, agent_id: runtime.agentId }, "WA history sync received");
+    saveChatMap(runtime);
+    setTimeout(() => syncChatsToBrain(runtime), 1500);
   });
 
-  // Also capture chats seen in real-time messages
-  sock.ev.on("chats.upsert", (chats) => {
+  runtimeSock.ev.on("chats.upsert", (chats) => {
     for (const c of chats) {
-      if (c.id) chatMap.set(c.id, { id: c.id, name: c.name || c.subject || null });
+      if (c.id) runtime.chatMap.set(c.id, { id: c.id, name: c.name || c.subject || null });
     }
-    saveChatMap();
+    saveChatMap(runtime);
   });
 }
 
-// ---------------------------------------------------------------------------
-// Cross-channel action dispatch — supports extended action types
-// ---------------------------------------------------------------------------
+async function fetchWhatsAppBindings() {
+  try {
+    const res = await fetch(`${BRAIN_URL}/api/v1/orgs/${encodeURIComponent(ORG_ID)}/channels`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error(`bindings endpoint status ${res.status}`);
+    const rows = await res.json();
+    const waRows = Array.isArray(rows)
+      ? rows.filter((r) => r && r.channel_type === "whatsapp" && r.agent_id)
+      : [];
 
-const POLL_INTERVAL_MS = parseInt(process.env.WA_POLL_INTERVAL_MS || "5000", 10);
-const CHANNEL_TAG = "whatsapp";
+    if (waRows.length > 0) {
+      return waRows.map((r) => ({ agent_id: r.agent_id, channel_identity: normalizeWaIdentity(r.channel_identity) }));
+    }
+  } catch (err) {
+    logger.warn({ err }, "Could not fetch WhatsApp bindings from brain; using env fallback");
+  }
+
+  return [{ agent_id: DEFAULT_AGENT_ID, channel_identity: defaultRuntimeIdentity() }];
+}
+
+async function connectToWhatsApp() {
+  const bindings = await fetchWhatsAppBindings();
+  const uniqueByAgent = new Map();
+  for (const b of bindings) {
+    if (!uniqueByAgent.has(b.agent_id)) uniqueByAgent.set(b.agent_id, b);
+  }
+
+  const targets = Array.from(uniqueByAgent.values());
+  primaryRuntimeAgent = targets[0]?.agent_id || DEFAULT_AGENT_ID;
+
+  logger.info({ count: targets.length, org_id: ORG_ID }, "Starting WhatsApp runtimes for bindings");
+
+  for (const binding of targets) {
+    const runtime = makeRuntime(binding);
+    try {
+      await connectRuntime(runtime);
+    } catch (err) {
+      logger.error({ err, agent_id: runtime.agentId }, "Failed to start WA runtime for binding");
+    }
+  }
+}
+
+function chooseRuntimeForAction(payload) {
+  const preferredAgent = payload?.agent_id;
+  if (preferredAgent && runtimeByAgent.has(preferredAgent)) return runtimeByAgent.get(preferredAgent);
+  for (const rt of listRuntimes()) {
+    if (rt.sock) return rt;
+  }
+  return null;
+}
 
 async function pollAndDispatch() {
-  if (!sock) return;
+  if (listRuntimes().every((r) => !r.sock)) return;
   try {
     const url = `${BRAIN_URL}/actions/pending?channel=${CHANNEL_TAG}&limit=20`;
     const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return;
     const actions = await res.json();
     for (const action of actions) await dispatchAction(action);
-  } catch (err) { logger.debug({ err }, "action poll error"); }
+  } catch (err) {
+    logger.debug({ err }, "action poll error");
+  }
 }
 
 async function dispatchAction(action) {
   const { id, payload } = action;
   const type = payload?.action_type || "send_message";
+  const runtime = chooseRuntimeForAction(payload);
+  if (!runtime || !runtime.sock) {
+    await ackAction(id, "failed", "no connected whatsapp runtime");
+    return;
+  }
+
   try {
     switch (type) {
       case "send_message": {
         const jid = payload?.to || payload?.jid;
         const text = payload?.text || payload?.message || "";
         if (!jid || !text) { await ackAction(id, "failed", "missing jid or text"); return; }
-        await sock.sendMessage(jid, { text: String(text).slice(0, 4096) });
+        await runtime.sock.sendMessage(jid, { text: String(text).slice(0, 4096) });
         break;
       }
-
       case "send_image": {
         const jid = payload?.to || payload?.jid;
         const url = payload?.url;
@@ -636,10 +757,9 @@ async function dispatchAction(action) {
         const imgRes = await fetch(url, { signal: AbortSignal.timeout(30_000) });
         if (!imgRes.ok) { await ackAction(id, "failed", `image fetch failed: ${imgRes.status}`); return; }
         const buffer = Buffer.from(await imgRes.arrayBuffer());
-        await sock.sendMessage(jid, { image: buffer, caption });
+        await runtime.sock.sendMessage(jid, { image: buffer, caption });
         break;
       }
-
       case "send_document": {
         const jid = payload?.to || payload?.jid;
         const url = payload?.url;
@@ -649,77 +769,72 @@ async function dispatchAction(action) {
         if (!jid || !url) { await ackAction(id, "failed", "missing jid or url"); return; }
         const docRes = await fetch(url, { signal: AbortSignal.timeout(30_000) });
         const buffer = Buffer.from(await docRes.arrayBuffer());
-        await sock.sendMessage(jid, { document: buffer, mimetype, fileName: filename, caption });
+        await runtime.sock.sendMessage(jid, { document: buffer, mimetype, fileName: filename, caption });
         break;
       }
-
       case "send_location": {
         const jid = payload?.to || payload?.jid;
         const lat = parseFloat(payload?.lat || "0");
         const lon = parseFloat(payload?.lon || "0");
         const name = payload?.name || "";
         if (!jid) { await ackAction(id, "failed", "missing jid"); return; }
-        await sock.sendMessage(jid, { location: { degreesLatitude: lat, degreesLongitude: lon, name } });
+        await runtime.sock.sendMessage(jid, { location: { degreesLatitude: lat, degreesLongitude: lon, name } });
         break;
       }
-
       case "send_reaction": {
         const jid = payload?.to || payload?.jid;
-        const key = payload?.message_key; // { remoteJid, id, fromMe }
+        const key = payload?.message_key;
         const emoji = payload?.emoji || "👍";
         if (!jid || !key) { await ackAction(id, "failed", "missing jid or message_key"); return; }
-        await sock.sendMessage(jid, { react: { text: emoji, key } });
+        await runtime.sock.sendMessage(jid, { react: { text: emoji, key } });
         break;
       }
-
       case "create_group": {
         const name = payload?.name || "New Group";
         const participants = payload?.participants || [];
         if (participants.length === 0) { await ackAction(id, "failed", "no participants"); return; }
-        const result = await sock.groupCreate(name, participants);
+        const result = await runtime.sock.groupCreate(name, participants);
         await ackAction(id, "sent", null, { group_id: result.id });
         return;
       }
-
       case "add_to_group": {
         const groupJid = payload?.group_id;
         const participants = payload?.participants || [];
         if (!groupJid || participants.length === 0) { await ackAction(id, "failed", "missing group_id or participants"); return; }
-        await sock.groupParticipantsUpdate(groupJid, participants, "add");
+        await runtime.sock.groupParticipantsUpdate(groupJid, participants, "add");
         break;
       }
-
       case "get_chat_list": {
-        const chats = Array.from(chatMap.values()).slice(0, 200).map((c) => ({
-          jid: c.id, name: c.name || c.id, is_group: (c.id || "").endsWith("@g.us"),
+        const chats = Array.from(runtime.chatMap.values()).slice(0, 200).map((c) => ({
+          jid: c.id,
+          name: c.name || c.id,
+          is_group: (c.id || "").endsWith("@g.us"),
         }));
-        await ackAction(id, "sent", null, { chats });
+        await ackAction(id, "sent", null, { chats, agent_id: runtime.agentId });
         return;
       }
-
       case "get_contact_info": {
         const jid = payload?.jid;
         if (!jid) { await ackAction(id, "failed", "missing jid"); return; }
-        const contact = store.contacts?.[jid] || {};
-        await ackAction(id, "sent", null, { jid, name: contact.name || contact.notify || jid });
+        const info = runtime.chatMap.get(jid) || {};
+        await ackAction(id, "sent", null, { jid, name: info.name || jid, agent_id: runtime.agentId });
         return;
       }
-
       case "update_profile_name": {
         const name = payload?.name;
         if (!name) { await ackAction(id, "failed", "missing name"); return; }
-        await sock.updateProfileName(name);
+        await runtime.sock.updateProfileName(name);
         break;
       }
-
       default:
         await ackAction(id, "failed", `unknown action_type: ${type}`);
         return;
     }
-    await ackAction(id, "sent");
-    logger.info({ id, type }, "action dispatched");
+
+    await ackAction(id, "sent", null, { agent_id: runtime.agentId });
+    logger.info({ id, type, agent_id: runtime.agentId }, "action dispatched");
   } catch (err) {
-    logger.error({ err, id, type }, "action dispatch failed");
+    logger.error({ err, id, type, agent_id: runtime.agentId }, "action dispatch failed");
     await ackAction(id, "failed", String(err.message));
   }
 }
@@ -735,7 +850,9 @@ async function ackAction(id, status, error = null, result = null) {
       body,
       signal: AbortSignal.timeout(5_000),
     });
-  } catch (err) { logger.debug({ err, id }, "ack failed"); }
+  } catch (err) {
+    logger.debug({ err, id }, "ack failed");
+  }
 }
 
 function startActionPoller() {
@@ -743,20 +860,44 @@ function startActionPoller() {
   logger.info("WA action poller started (interval=%dms)", POLL_INTERVAL_MS);
 }
 
-/** Return all WhatsApp groups the connected account is a member of. */
 async function getGroups() {
-  if (!sock) return [];
-  try {
-    const participating = await sock.groupFetchAllParticipating();
-    return Object.entries(participating).map(([jid, meta]) => ({
-      jid,
-      name: meta.subject || null,
-      participants: meta.participants ? meta.participants.length : 0,
-    }));
-  } catch (err) {
-    logger.warn({ err }, "groupFetchAllParticipating failed");
-    return [];
+  const out = [];
+  for (const runtime of listRuntimes()) {
+    if (!runtime.sock) continue;
+    try {
+      const participating = await runtime.sock.groupFetchAllParticipating();
+      for (const [jid, meta] of Object.entries(participating)) {
+        out.push({
+          agent_id: runtime.agentId,
+          channel_identity: runtime.identity,
+          jid,
+          name: meta.subject || null,
+          participants: meta.participants ? meta.participants.length : 0,
+        });
+      }
+    } catch (err) {
+      logger.warn({ err, agent_id: runtime.agentId }, "groupFetchAllParticipating failed");
+    }
   }
+  return out;
 }
 
-export { connectToWhatsApp, sock, startActionPoller, invokeAgent, handleMessage, pollAndDispatch, dispatchAction, getGroups };
+function getConnectionSummary() {
+  return listRuntimes().map((runtime) => ({
+    agent_id: runtime.agentId,
+    connected: Boolean(runtime.sock),
+    channel_identity: runtime.identity,
+  }));
+}
+
+export {
+  connectToWhatsApp,
+  startActionPoller,
+  getGroups,
+  getConnectionSummary,
+  invokeAgent,
+  handleMessage,
+  pollAndDispatch,
+  dispatchAction,
+  sock,
+};

@@ -20,19 +20,24 @@ def _get_db_url() -> str:
     url = os.environ.get("DATABASE_URL", "")
     if not url:
         raise RuntimeError("DATABASE_URL not set")
-    # Convert postgresql:// to postgresql+psycopg:// for async driver
+    # Convert to async SQLAlchemy driver URL.
+    # On Windows/Python 3.14, psycopg async can fail with ProactorEventLoop;
+    # asyncpg is more robust in this environment.
+    driver = "postgresql+asyncpg://" if os.name == "nt" else "postgresql+psycopg://"
     if url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+        url = url.replace("postgresql://", driver, 1)
     elif url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql+psycopg://", 1)
+        url = url.replace("postgres://", driver, 1)
     return url
 
 
 def init_engine() -> None:
     global _engine, _session_factory
     url = _get_db_url()
+    connect_args = {"ssl": False} if url.startswith("postgresql+asyncpg://") else {}
     _engine = create_async_engine(
         url,
+        connect_args=connect_args,
         pool_size=10,
         max_overflow=5,
         pool_pre_ping=True,

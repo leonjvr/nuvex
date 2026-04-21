@@ -12,6 +12,7 @@ import type { ConnectionStatus } from '../../lib/config';
 import { SseStatusIndicator } from '../shared/SseStatusIndicator';
 import { useSse } from '../../hooks/useSse';
 import { useTranslation } from '../../hooks/useTranslation';
+import { useOrg } from '../../lib/org-context';
 
 
 interface Crumb { label: string; to: string; }
@@ -21,14 +22,15 @@ function getCrumbs(pathname: string, t: (key: string) => string): Crumb[] {
   if (segments.length === 0) return [{ label: t('gui.breadcrumb.dashboard'), to: '/' }];
 
   const LABELS: Record<string, string> = {
-    agents:     t('gui.breadcrumb.agents'),
-    divisions:  t('gui.breadcrumb.divisions'),
-    governance: t('gui.breadcrumb.governance'),
-    audit:      t('gui.breadcrumb.audit'),
-    costs:      t('gui.breadcrumb.costs'),
-    config:     t('gui.breadcrumb.config'),
-    settings:   t('gui.breadcrumb.settings'),
-    chat:       t('gui.breadcrumb.chat'),
+    agents:        t('gui.breadcrumb.agents'),
+    divisions:     t('gui.breadcrumb.divisions'),
+    governance:    t('gui.breadcrumb.governance'),
+    audit:         t('gui.breadcrumb.audit'),
+    costs:         t('gui.breadcrumb.costs'),
+    config:        t('gui.breadcrumb.config'),
+    settings:      t('gui.breadcrumb.settings'),
+    chat:          t('gui.breadcrumb.chat'),
+    organisations: 'Organisations',
   };
 
   const crumbs: Crumb[] = [{ label: t('gui.breadcrumb.dashboard'), to: '/' }];
@@ -86,6 +88,7 @@ export function Header({ showMenuButton = false, onMenuToggle }: HeaderProps) {
   const { status: sseStatus } = useSse();
   const { t }         = useTranslation();
   const crumbs        = getCrumbs(location.pathname, t);
+  const { orgs, selectedOrg, setSelectedOrg } = useOrg();
 
   return (
     <header
@@ -165,6 +168,30 @@ export function Header({ showMenuButton = false, onMenuToggle }: HeaderProps) {
           );
         })}
       </nav>
+
+      {/* Org selector (14.2) */}
+      {orgs.length > 1 && (
+        <select
+          value={selectedOrg ?? ''}
+          onChange={(e) => setSelectedOrg(e.target.value || null)}
+          aria-label="Select organisation"
+          style={{
+            padding:      '4px 8px',
+            fontSize:     '12px',
+            border:       '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-sm)',
+            background:   'var(--color-surface)',
+            color:        'var(--color-text)',
+            cursor:       'pointer',
+            flexShrink:   0,
+          }}
+        >
+          <option value="">All Organisations</option>
+          {orgs.map((o) => (
+            <option key={o.org_id} value={o.org_id}>{o.name}</option>
+          ))}
+        </select>
+      )}
 
       {/* Right side */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

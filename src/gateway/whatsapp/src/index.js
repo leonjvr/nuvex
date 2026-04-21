@@ -1,13 +1,17 @@
 import express from "express";
-import { connectToWhatsApp, startActionPoller, getGroups } from "./bot.js";
+import { connectToWhatsApp, startActionPoller, getConnectionSummary, getGroups } from "./bot.js";
 
 const app = express();
 const PORT = parseInt(process.env.GATEWAY_WA_PORT || "8101", 10);
 
-let connected = false;
-
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", whatsapp: connected ? "connected" : "connecting" });
+  const runtimes = getConnectionSummary();
+  const connected = runtimes.some((r) => r.connected);
+  res.json({
+    status: "ok",
+    whatsapp: connected ? "connected" : "connecting",
+    runtimes,
+  });
 });
 
 app.get("/groups", async (_req, res) => {
@@ -22,7 +26,6 @@ async function main() {
 
   try {
     await connectToWhatsApp();
-    connected = true;
     startActionPoller();
   } catch (err) {
     console.error("Fatal WA connection error:", err);

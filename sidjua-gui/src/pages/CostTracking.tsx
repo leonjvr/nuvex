@@ -7,6 +7,7 @@ import { DollarSign, Hash, TrendingUp } from 'lucide-react';
 
 import { useApi }       from '../hooks/useApi';
 import { useDivisions } from '../hooks/useDivisions';
+import { useOrg }        from '../lib/org-context';
 import { MetricCard }    from '../components/shared/MetricCard';
 import { ProgressBar }   from '../components/shared/ProgressBar';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
@@ -203,10 +204,11 @@ const cardTitleStyle: React.CSSProperties = {
 
 export function CostTracking() {
   const [period, setPeriod] = useState<Period>('7d');
+  const { selectedOrg } = useOrg();
 
   const costsRes = useApi<CostsResponse>(
-    (c) => c.listCosts({ period }),
-    [period],
+    (c) => c.listCosts(selectedOrg ? { period, org_id: selectedOrg } : { period }),
+    [period, selectedOrg],
   );
   const divRes   = useDivisions();
 

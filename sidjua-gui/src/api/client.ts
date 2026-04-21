@@ -28,6 +28,10 @@ import type {
   ChatHistoryResponse,
   WorkspaceConfigResponse,
   FirstRunCompleteResponse,
+  Organisation,
+  OrgAgent,
+  ChannelBinding,
+  WorkPacket,
 } from './types';
 
 
@@ -412,5 +416,47 @@ export class SidjuaApiClient {
 
   triggerApply(): Promise<{ success: boolean; steps: number; duration: number; summary: Array<{ step: string; success: boolean; summary: string }> }> {
     return this.post(API_PATHS.apply());
+  }
+
+  // ---- Organisations (§14) -------------------------------------------------
+
+  listOrgs(): Promise<Organisation[]> {
+    return this.get(API_PATHS.orgs());
+  }
+
+  getOrg(orgId: string): Promise<Organisation> {
+    return this.get(API_PATHS.org(validatePathParam(orgId, 'orgId')));
+  }
+
+  createOrg(body: { org_id: string; name: string; config?: Record<string, unknown>; policies?: Record<string, unknown> }): Promise<Organisation> {
+    return this.post(API_PATHS.orgs(), body, undefined, undefined);
+  }
+
+  updateOrg(orgId: string, body: { name?: string; status?: string; config?: Record<string, unknown>; policies?: Record<string, unknown> }): Promise<Organisation> {
+    return this.put(API_PATHS.org(validatePathParam(orgId, 'orgId')), body);
+  }
+
+  listOrgAgents(orgId: string): Promise<OrgAgent[]> {
+    return this.get(API_PATHS.orgAgents(validatePathParam(orgId, 'orgId')));
+  }
+
+  listOrgChannels(orgId: string): Promise<ChannelBinding[]> {
+    return this.get(API_PATHS.orgChannels(validatePathParam(orgId, 'orgId')));
+  }
+
+  createOrgChannel(orgId: string, body: { agent_id?: string; channel_type: string; channel_identity: string; config?: Record<string, unknown> }): Promise<ChannelBinding> {
+    return this.post(API_PATHS.orgChannels(validatePathParam(orgId, 'orgId')), body);
+  }
+
+  deleteOrgChannel(orgId: string, bindingId: number): Promise<void> {
+    return this.delete(API_PATHS.orgChannel(validatePathParam(orgId, 'orgId'), bindingId));
+  }
+
+  listOrgPackets(orgId: string, params?: { status?: string; limit?: number }): Promise<WorkPacket[]> {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set('status', params.status);
+    if (params?.limit)  qs.set('limit', String(params.limit));
+    const q = qs.toString();
+    return this.get(`${API_PATHS.orgPackets(validatePathParam(orgId, 'orgId'))}${q ? `?${q}` : ''}`);
   }
 }

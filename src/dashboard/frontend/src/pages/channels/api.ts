@@ -99,18 +99,34 @@ export async function saveWhatsAppConfig(cfg: WhatsAppConfig): Promise<void> {
   });
 }
 
-export async function fetchQRStatus(): Promise<QRStatus> {
-  const res = await fetch("/api/channels/whatsapp/qr");
+export async function fetchQRStatus(agentId?: string): Promise<QRStatus> {
+  const target = agentId
+    ? `/api/channels/whatsapp/agents/${encodeURIComponent(agentId)}/qr`
+    : "/api/channels/whatsapp/qr";
+  const res = await fetch(target);
   if (!res.ok) return { status: "offline", qr: null, ts: null };
   return res.json();
 }
 
-export async function clearWASession(): Promise<void> {
-  await fetch("/api/channels/whatsapp/clear", { method: "POST" });
+export async function clearWASession(agentId?: string): Promise<void> {
+  const target = agentId
+    ? `/api/channels/whatsapp/agents/${encodeURIComponent(agentId)}/clear`
+    : "/api/channels/whatsapp/clear";
+  await fetch(target, { method: "POST" });
 }
 
 export interface GatewayStatus {
   status: "running" | "stopped" | "unavailable";
+}
+
+export interface WhatsAppBinding {
+  id: number;
+  org_id: string;
+  agent_id: string | null;
+  channel_type: "whatsapp";
+  channel_identity: string;
+  config: Record<string, unknown>;
+  created_at: string;
 }
 
 export async function fetchGatewayStatus(): Promise<GatewayStatus> {
@@ -187,4 +203,25 @@ export async function saveGroupBindings(bindings: GroupBinding[]): Promise<void>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ bindings }),
   });
+}
+
+export async function fetchWhatsAppBindings(): Promise<WhatsAppBinding[]> {
+  const res = await fetch("/api/channels/whatsapp/bindings");
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function createWhatsAppBinding(agentId: string, channelIdentity: string): Promise<WhatsAppBinding> {
+  const res = await fetch("/api/channels/whatsapp/bindings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agent_id: agentId, channel_identity: channelIdentity }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteWhatsAppBinding(bindingId: number): Promise<void> {
+  const res = await fetch(`/api/channels/whatsapp/bindings/${bindingId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
 }

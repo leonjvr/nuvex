@@ -6,6 +6,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Download, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 import { useAppConfig }  from '../lib/config';
+import { useOrg }         from '../lib/org-context';
 import { useDivisions }  from '../hooks/useDivisions';
 import { useSse }        from '../hooks/useSse';
 import { formatTime, formatRelative, todayIso } from '../lib/format';
@@ -212,6 +213,7 @@ export function AuditLog() {
   const { client } = useAppConfig();
   const divRes     = useDivisions();
   const { lastEvent } = useSse();
+  const { selectedOrg } = useOrg();
 
   // Filter state
   const [fromDate,  setFromDate]  = useState(todayIso().slice(0, 10));
@@ -252,6 +254,7 @@ export function AuditLog() {
       if (division)  params.division = division;
       if (agentId)   params.agent    = agentId;
       if (eventType) params.event    = eventType;
+  if (selectedOrg) (params as Record<string, unknown>)['org_id'] = selectedOrg;
 
       const res: AuditResponse = await client.listAudit(params);
       setEntries(res.entries);
@@ -263,6 +266,8 @@ export function AuditLog() {
       setLoading(false);
     }
   }, [client, fromDate, toDate, division, agentId, eventType]);
+  // Refetch when org selection changes
+  useEffect(() => { void fetch(0); }, [selectedOrg, fetch]);
 
   // Initial load
   useEffect(() => { void fetch(0); }, [fetch]);

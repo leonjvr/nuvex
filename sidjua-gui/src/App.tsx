@@ -22,6 +22,8 @@ import { AuditLog }     from './pages/AuditLog';
 import { CostTracking } from './pages/CostTracking';
 import { Configuration } from './pages/Configuration';
 import { Settings }     from './pages/Settings';
+import { Organisations } from './pages/Organisations';
+import { OrgProvider }  from './lib/org-context';
 
 
 type FirstRunState = 'loading' | 'completed' | 'pending' | 'error';
@@ -103,16 +105,17 @@ function AppRoutes({ firstRunState, onDismiss, onRetry }: AppRoutesProps) {
       {/* Main app — always rendered but visually covered by overlay when shown */}
       <Routes>
         <Route element={<Shell />}>
-          <Route index              element={<Dashboard />}    />
+          <Route index              element={<Dashboard />}      />
           <Route path="chat"        element={<Navigate to="/chat/guide" replace />} />
-          <Route path="chat/:agentId" element={<Chat />}       />
-          <Route path="agents"      element={<Agents />}       />
-          <Route path="divisions"   element={<Divisions />}    />
-          <Route path="governance"  element={<Governance />}   />
-          <Route path="audit"       element={<AuditLog />}     />
-          <Route path="costs"       element={<CostTracking />} />
-          <Route path="config"      element={<Configuration />}/>
-          <Route path="settings"    element={<Settings />}     />
+          <Route path="chat/:agentId" element={<Chat />}         />
+          <Route path="agents"      element={<Agents />}         />
+          <Route path="organisations" element={<Organisations />} />
+          <Route path="divisions"   element={<Divisions />}      />
+          <Route path="governance"  element={<Governance />}     />
+          <Route path="audit"       element={<AuditLog />}       />
+          <Route path="costs"       element={<CostTracking />}   />
+          <Route path="config"      element={<Configuration />}  />
+          <Route path="settings"    element={<Settings />}       />
           {/* Catch-all → dashboard */}
           <Route path="*"           element={<Navigate to="/" replace />} />
         </Route>
@@ -126,11 +129,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AppConfigProvider>
-        <ToastProvider>
-        <ErrorBoundary>
-          <AppWithFirstRunGate />
-        </ErrorBoundary>
-        </ToastProvider>
+        <OrgProvider>
+          <ToastProvider>
+            <ErrorBoundary>
+              <AppWithFirstRunGate />
+            </ErrorBoundary>
+          </ToastProvider>
+        </OrgProvider>
       </AppConfigProvider>
     </ThemeProvider>
   );

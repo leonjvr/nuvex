@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class MessageMetadata(BaseModel):
     sender: str = ""
     sender_name: str = ""
+    channel_identity: str | None = None  # owning channel account identity (e.g. WA number JID)
     channel: str = "test"  # whatsapp | telegram | email | test
     group_jid: str | None = None
     is_audio: bool = False
